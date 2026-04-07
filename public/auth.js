@@ -171,12 +171,65 @@ document.getElementById('form-register').addEventListener('submit', async e => {
     const { token, user } = await authRequest('/api/auth/register', { name, email, password });
     localStorage.setItem('kula_token', token);
     localStorage.setItem('kula_user',  JSON.stringify(user));
-    window.location.href = '/';
+    // Show step 2 instead of redirecting immediately
+    document.querySelector('.auth-card').style.display = 'none';
+    document.querySelector('.auth-logo').style.display = 'none';
+    document.querySelector('.auth-footer').style.display = 'none';
+    document.getElementById('step2-card').style.display = 'block';
+    document.getElementById('initial-balance').focus();
   } catch (err) {
     if (err.status === 409) setFieldError('reg-email', 'err-reg-email', err.message);
     else setGlobalError('err-reg-global', err.message);
     setLoading('register', false);
   }
+});
+
+// ── Step 2: initial balance ───────────────────────────────────────────────────
+async function saveInitialBalance(amount) {
+  const token = localStorage.getItem('kula_token');
+  if (!token || amount <= 0) return;
+  const today = new Date().toISOString().slice(0, 10);
+  await fetch('/api/transactions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({
+      type: 'income',
+      amount,
+      category: 'Solde initial',
+      description: 'Solde de départ',
+      date: today
+    })
+  });
+}
+
+function setLoading2(loading) {
+  const btn     = document.getElementById('btn-save-balance');
+  const spinner = document.getElementById('spinner-balance');
+  const text    = btn?.querySelector('.btn-submit-text');
+  btn.disabled  = loading;
+  spinner?.classList.toggle('visible', loading);
+  if (text) text.style.opacity = loading ? '0.6' : '1';
+}
+
+document.getElementById('btn-save-balance').addEventListener('click', async () => {
+  const raw = document.getElementById('initial-balance').value.trim();
+  const amount = parseFloat(raw);
+  if (raw && (isNaN(amount) || amount < 0)) {
+    document.getElementById('err-balance').textContent = 'Montant invalide';
+    return;
+  }
+  setLoading2(true);
+  try {
+    await saveInitialBalance(amount || 0);
+    window.location.href = '/';
+  } catch {
+    setGlobalError('err-balance-global', 'Erreur réseau, continue quand même.');
+    setTimeout(() => { window.location.href = '/'; }, 1500);
+  }
+});
+
+document.getElementById('btn-skip-balance').addEventListener('click', () => {
+  window.location.href = '/';
 });
 
 // ── Input: clear error on type ────────────────────────────────────────────────

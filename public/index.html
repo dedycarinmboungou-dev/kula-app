@@ -130,32 +130,34 @@
       </div>
     </div>
 
-    <div class="mic-status" id="mic-status">
-      <div class="mic-dot"></div>
-      <span id="mic-status-text">Écoute en cours… parlez maintenant</span>
-    </div>
-    <div class="chat-input-area">
-      <button class="btn-mic" id="btn-mic" title="Dicter un message">
-        <svg id="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line stroke-linecap="round" x1="12" y1="19" x2="12" y2="23"/>
-          <line stroke-linecap="round" x1="8" y1="23" x2="16" y2="23"/>
-        </svg>
-      </button>
-      <div class="chat-input-wrap">
-        <textarea
-          id="chat-input"
-          placeholder="Décris ta transaction…"
-          rows="1"
-          maxlength="500"
-        ></textarea>
+    <div class="chat-bottom" id="chat-bottom">
+      <div class="mic-status" id="mic-status">
+        <div class="mic-dot"></div>
+        <span id="mic-status-text">Écoute en cours… parlez maintenant</span>
       </div>
-      <button class="btn-send" id="btn-send" title="Envoyer">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7"/>
-        </svg>
-      </button>
+      <div class="chat-input-area">
+        <button class="btn-mic" id="btn-mic" title="Dicter un message">
+          <svg id="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line stroke-linecap="round" x1="12" y1="19" x2="12" y2="23"/>
+            <line stroke-linecap="round" x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+        <div class="chat-input-wrap">
+          <textarea
+            id="chat-input"
+            placeholder="Décris ta transaction…"
+            rows="1"
+            maxlength="500"
+          ></textarea>
+        </div>
+        <button class="btn-send" id="btn-send" title="Envoyer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </section>
 
@@ -213,6 +215,39 @@
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
+
+<!-- Welcome popup -->
+<div class="welcome-overlay" id="welcome-overlay" style="display:none">
+  <div class="welcome-modal">
+    <div class="welcome-emoji">🌱</div>
+    <h2 class="welcome-title">Bienvenue sur Kula !</h2>
+    <p class="welcome-sub">Ton assistant budget qui grandit avec toi.</p>
+    <div class="welcome-steps">
+      <div class="welcome-step">
+        <div class="welcome-step-icon">💬</div>
+        <div class="welcome-step-text">
+          <strong>Parle naturellement</strong>
+          <span>«&nbsp;Acheté du pain 500 FCFA&nbsp;»</span>
+        </div>
+      </div>
+      <div class="welcome-step">
+        <div class="welcome-step-icon">🤖</div>
+        <div class="welcome-step-text">
+          <strong>L'IA classe automatiquement</strong>
+          <span>Catégorie, montant, date — tout est géré</span>
+        </div>
+      </div>
+      <div class="welcome-step">
+        <div class="welcome-step-icon">📊</div>
+        <div class="welcome-step-text">
+          <strong>Suis ton budget en temps réel</strong>
+          <span>Tableau de bord, tendances, catégories</span>
+        </div>
+      </div>
+    </div>
+    <button class="welcome-btn" id="btn-welcome-close">C'est parti ! 🚀</button>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="/app.js"></script>

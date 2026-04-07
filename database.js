@@ -72,7 +72,7 @@ db.exec('PRAGMA foreign_keys = ON');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const VALID_CATEGORIES = [
-  'Salaire', 'Business', 'Famille',
+  'Salaire', 'Business', 'Famille', 'Solde initial',
   'Alimentation', 'Transport', 'Loisirs',
   'Vêtements', 'Santé', 'Éducation',
   'Téléphone', 'Logement', 'Autre'

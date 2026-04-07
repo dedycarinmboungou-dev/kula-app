@@ -44,18 +44,19 @@ const state = {
 
 // ── Category metadata ─────────────────────────────────────────────────────────
 const CATEGORIES = {
-  Salaire:      { icon: '💼', color: '#10B981' },
-  Business:     { icon: '🏢', color: '#059669' },
-  Famille:      { icon: '👨‍👩‍👧', color: '#34D399' },
-  Alimentation: { icon: '🛒', color: '#EF4444' },
-  Transport:    { icon: '🚌', color: '#F97316' },
-  Loisirs:      { icon: '🎉', color: '#A855F7' },
-  Vêtements:    { icon: '👗', color: '#EC4899' },
-  Santé:        { icon: '🏥', color: '#14B8A6' },
-  Éducation:    { icon: '📚', color: '#3B82F6' },
-  Téléphone:    { icon: '📱', color: '#8B5CF6' },
-  Logement:     { icon: '🏠', color: '#F59E0B' },
-  Autre:        { icon: '📦', color: '#6B7280' }
+  Salaire:          { icon: '💼', color: '#10B981' },
+  Business:         { icon: '🏢', color: '#059669' },
+  Famille:          { icon: '👨‍👩‍👧', color: '#34D399' },
+  'Solde initial':  { icon: '🏦', color: '#0EA5E9' },
+  Alimentation:     { icon: '🛒', color: '#EF4444' },
+  Transport:        { icon: '🚌', color: '#F97316' },
+  Loisirs:          { icon: '🎉', color: '#A855F7' },
+  Vêtements:        { icon: '👗', color: '#EC4899' },
+  Santé:            { icon: '🏥', color: '#14B8A6' },
+  Éducation:        { icon: '📚', color: '#3B82F6' },
+  Téléphone:        { icon: '📱', color: '#8B5CF6' },
+  Logement:         { icon: '🏠', color: '#F59E0B' },
+  Autre:            { icon: '📦', color: '#6B7280' }
 };
 
 // ── Formatting ────────────────────────────────────────────────────────────────
@@ -626,6 +627,16 @@ function init() {
   document.getElementById('btn-logout').addEventListener('click', () => {
     if (confirm('Se déconnecter de Kula ?')) logout();
   });
+
+  // Welcome popup for new users
+  if (!localStorage.getItem('kula_welcomed')) {
+    const overlay = document.getElementById('welcome-overlay');
+    overlay.style.display = 'flex';
+    document.getElementById('btn-welcome-close').addEventListener('click', () => {
+      overlay.style.display = 'none';
+      localStorage.setItem('kula_welcomed', '1');
+    });
+  }
 
   // Load dashboard
   loadDashboard();

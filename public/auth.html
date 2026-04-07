@@ -132,6 +132,32 @@
 
     </div><!-- /auth-card -->
 
+    <!-- ── Step 2: Solde de départ ──────────────────────────────────────── -->
+    <div class="auth-card step2-card" id="step2-card" style="display:none">
+      <div class="step2-header">
+        <div class="step2-icon">💰</div>
+        <h2 class="step2-title">Quel est ton solde actuel ?</h2>
+        <p class="step2-sub">On enregistre ton argent disponible pour démarrer ton suivi.</p>
+      </div>
+      <div class="step2-body">
+        <div class="field-group">
+          <label class="field-label" for="initial-balance">Montant disponible (FCFA)</label>
+          <div class="field-wrap">
+            <span class="field-icon">🏦</span>
+            <input class="field-input" id="initial-balance" type="number"
+              placeholder="Ex : 50 000" min="0" step="1" inputmode="numeric">
+          </div>
+          <div class="field-error" id="err-balance"></div>
+        </div>
+        <div class="form-error" id="err-balance-global"></div>
+        <button class="btn-submit" id="btn-save-balance" type="button">
+          <span class="btn-submit-text">Commencer avec Kula 🌱</span>
+          <div class="btn-spinner" id="spinner-balance"></div>
+        </button>
+        <button class="btn-skip" id="btn-skip-balance" type="button">Je commence à zéro</button>
+      </div>
+    </div>
+
     <p class="auth-footer">🔒 Vos données sont privées et sécurisées</p>
 
   </div><!-- /auth-wrapper -->
