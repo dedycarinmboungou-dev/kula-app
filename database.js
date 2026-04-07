@@ -1,6 +1,20 @@
 const path = require('path');
+const fs   = require('fs');
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'kula.db');
+function resolveDbPath() {
+  const envPath = process.env.DB_PATH;
+  if (envPath) {
+    const dir = path.dirname(envPath);
+    if (!fs.existsSync(dir)) {
+      console.warn(`  DB_PATH dir "${dir}" does not exist, falling back to ./kula.db`);
+      return path.join(__dirname, 'kula.db');
+    }
+    return envPath;
+  }
+  return path.join(__dirname, 'kula.db');
+}
+
+const DB_PATH = resolveDbPath();
 
 // ── DB driver: better-sqlite3 (Railway/prod) ou node:sqlite (local fallback) ──
 let db;
