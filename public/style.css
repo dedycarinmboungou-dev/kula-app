@@ -599,6 +599,47 @@ html, body {
 .empty-text { font-size: 15px; font-weight: 600; margin-bottom: 6px; color: var(--dark2); }
 .empty-sub { font-size: 13px; }
 
+/* ─── Chat topbar ───────────────────────────────────────────────────────────── */
+.chat-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.btn-back {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--light-gray);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.btn-back:active { background: var(--border); }
+
+.btn-back svg {
+  width: 18px;
+  height: 18px;
+  color: var(--dark);
+}
+
+.chat-topbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--dark);
+}
+
 /* ─── Chat Tab ──────────────────────────────────────────────────────────────── */
 #tab-chat {
   display: none;
