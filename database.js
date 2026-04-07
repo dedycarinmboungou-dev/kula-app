@@ -1,13 +1,23 @@
-const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'kula.db');
-const db = new DatabaseSync(DB_PATH);
+
+// ── DB driver: better-sqlite3 (Railway/prod) ou node:sqlite (local fallback) ──
+let db;
+try {
+  const Database = require('better-sqlite3');
+  db = new Database(DB_PATH);
+  console.log('  SQLite driver : better-sqlite3');
+} catch {
+  const { DatabaseSync } = require('node:sqlite');
+  db = new DatabaseSync(DB_PATH);
+  console.log('  SQLite driver : node:sqlite (built-in)');
+}
 
 db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = OFF'); // OFF during migration
 
-// ── Users table (always safe to create) ──────────────────────────────────────
+// ── Users table ───────────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +47,7 @@ if (!cols.some(c => c.name === 'user_id')) {
   db.exec('ALTER TABLE transactions ADD COLUMN user_id INTEGER REFERENCES users(id)');
 }
 
-// Indexes (recreate after column migration)
+// Indexes (after migration)
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tx_user_date     ON transactions(user_id, date);
   CREATE INDEX IF NOT EXISTS idx_tx_user_type     ON transactions(user_id, type);
