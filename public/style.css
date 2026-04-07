@@ -613,13 +613,12 @@ html, body {
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  /* Extra bottom padding for the fixed chat-bottom bar */
+  /* Space for fixed chat-bottom (input ~56px + nav 68px + extra) */
   padding: 16px 16px calc(var(--nav-height) + 80px);
   display: flex;
   flex-direction: column;
   gap: 12px;
   scroll-behavior: smooth;
-  min-height: calc(100dvh - var(--header-height) - var(--nav-height) - 68px);
 }
 
 .chat-messages::-webkit-scrollbar { width: 4px; }
@@ -773,14 +772,14 @@ html, body {
 /* Fixed chat bottom bar */
 .chat-bottom {
   position: fixed;
-  bottom: var(--nav-height);
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  z-index: 150;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
   background: var(--white);
   border-top: 1px solid var(--border);
+  /* Push content above the nav bar */
+  padding-bottom: var(--nav-height);
 }
 
 /* Chat input */

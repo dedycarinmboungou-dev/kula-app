@@ -628,15 +628,17 @@ function init() {
     if (confirm('Se déconnecter de Kula ?')) logout();
   });
 
-  // Welcome popup for new users
-  if (!localStorage.getItem('kula_welcomed')) {
-    const overlay = document.getElementById('welcome-overlay');
+  // Welcome popup — show once per browser (key: kula_welcome_shown)
+  const overlay = document.getElementById('welcome-overlay');
+  if (!localStorage.getItem('kula_welcome_shown')) {
     overlay.style.display = 'flex';
-    document.getElementById('btn-welcome-close').addEventListener('click', () => {
-      overlay.style.display = 'none';
-      localStorage.setItem('kula_welcomed', '1');
-    });
+  } else {
+    overlay.style.display = 'none';
   }
+  document.getElementById('btn-welcome-close').addEventListener('click', () => {
+    overlay.style.display = 'none';
+    localStorage.setItem('kula_welcome_shown', '1');
+  });
 
   // Load dashboard
   loadDashboard();
