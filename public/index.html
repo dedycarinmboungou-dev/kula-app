@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#064E3B">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kula">
+  <meta name="description" content="Kula - Fais grandir ton argent">
+  <title>Kula 🌱</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Header ────────────────────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-icon">🌱</div>
+        <div class="logo-text">
+          <h1>Kula</h1>
+          <span>Fais grandir ton argent</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="user-badge" id="user-badge" title="Mon compte">
+          <span id="user-initial">K</span>
+        </div>
+        <button class="btn-logout" id="btn-logout" title="Déconnexion">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="header-bottom">
+      <div class="month-selector" id="month-selector-wrap">
+        📅&nbsp;
+        <select id="month-select" title="Choisir le mois"></select>
+      </div>
+      <div class="user-greeting" id="user-greeting"></div>
+    </div>
+  </header>
+
+  <!-- ── Tab: Dashboard ────────────────────────────────────────────────── -->
+  <section class="tab-panel active" id="tab-dashboard">
+
+    <!-- Balance card -->
+    <div class="balance-card">
+      <div class="balance-bg-circle"></div>
+      <div class="balance-bg-circle2"></div>
+      <div class="balance-label">Solde total</div>
+      <div class="balance-amount" id="total-balance">
+        <span class="loading-spinner"></span>
+      </div>
+      <div class="balance-sub" id="balance-sub">Chargement…</div>
+    </div>
+
+    <!-- Income / Expense cards -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon income">💰</div>
+        <div class="stat-label">Revenus du mois</div>
+        <div class="stat-amount income" id="monthly-income">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon expense">💸</div>
+        <div class="stat-label">Dépenses du mois</div>
+        <div class="stat-amount expense" id="monthly-expense">—</div>
+      </div>
+    </div>
+
+    <!-- Category breakdown -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Dépenses par catégorie</span>
+      </div>
+      <div id="category-chart-wrap">
+        <div class="chart-container">
+          <canvas id="category-chart"></canvas>
+        </div>
+        <div class="category-list" id="category-list"></div>
+      </div>
+    </div>
+
+    <!-- Monthly trend -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Tendance 6 mois</span>
+      </div>
+      <div class="trend-container">
+        <canvas id="trend-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Recent transactions -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Récentes</span>
+        <button class="see-all" onclick="switchTab('transactions')">Voir tout →</button>
+      </div>
+      <div class="tx-list" id="recent-tx-list">
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div class="empty-text">Chargement…</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── Tab: Chat ──────────────────────────────────────────────────────── -->
+  <section class="tab-panel" id="tab-chat">
+    <div class="chat-messages" id="chat-messages">
+      <!-- Welcome message -->
+      <div class="msg bot">
+        <div class="msg-avatar">K</div>
+        <div class="msg-bubble">
+          👋 Bonjour ! Je suis <strong>Kula</strong>, ton assistant budget.<br><br>
+          Décris simplement tes dépenses ou revenus, par exemple :<br>
+          <em>"Acheté manioc 2500 FCFA"</em><br>
+          <em>"Reçu salaire 250 000"</em><br>
+          <em>"Transport 1500 ce matin"</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="mic-status" id="mic-status">
+      <div class="mic-dot"></div>
+      <span id="mic-status-text">Écoute en cours… parlez maintenant</span>
+    </div>
+    <div class="chat-input-area">
+      <button class="btn-mic" id="btn-mic" title="Dicter un message">
+        <svg id="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line stroke-linecap="round" x1="12" y1="19" x2="12" y2="23"/>
+          <line stroke-linecap="round" x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <div class="chat-input-wrap">
+        <textarea
+          id="chat-input"
+          placeholder="Décris ta transaction…"
+          rows="1"
+          maxlength="500"
+        ></textarea>
+      </div>
+      <button class="btn-send" id="btn-send" title="Envoyer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7"/>
+        </svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ── Tab: Transactions ──────────────────────────────────────────────── -->
+  <section class="tab-panel" id="tab-transactions">
+
+    <div class="filter-tabs">
+      <button class="filter-tab active" data-filter="all">Tout</button>
+      <button class="filter-tab" data-filter="income">Revenus</button>
+      <button class="filter-tab" data-filter="expense">Dépenses</button>
+    </div>
+
+    <div class="month-filter-row">
+      <select id="tx-month-select" title="Filtrer par mois"></select>
+    </div>
+
+    <div class="tx-list" id="all-tx-list">
+      <div class="empty-state">
+        <div class="empty-icon">💫</div>
+        <div class="empty-text">Chargement…</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── Bottom Navigation ──────────────────────────────────────────────── -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-tab="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+      <span class="nav-label">Tableau</span>
+    </button>
+
+    <button class="nav-fab" data-tab="chat" id="nav-chat">
+      <div class="fab-circle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+      </div>
+    </button>
+
+    <button class="nav-item" data-tab="transactions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      <span class="nav-label">Historique</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

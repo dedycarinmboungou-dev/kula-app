@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#064E3B">
+  <title>Kula 🌱 — Connexion</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/auth.css">
+</head>
+<body>
+
+  <!-- Background decoration -->
+  <div class="bg-circle bg-circle-1"></div>
+  <div class="bg-circle bg-circle-2"></div>
+  <div class="bg-circle bg-circle-3"></div>
+
+  <div class="auth-wrapper">
+
+    <!-- Logo -->
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🌱</div>
+      <div>
+        <div class="auth-logo-name">Kula</div>
+        <div class="auth-logo-slogan">Fais grandir ton argent</div>
+      </div>
+    </div>
+
+    <!-- Card -->
+    <div class="auth-card">
+
+      <!-- Tabs -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Connexion</button>
+        <button class="auth-tab" data-tab="register">Inscription</button>
+        <div class="auth-tab-indicator" id="tab-indicator"></div>
+      </div>
+
+      <!-- ── Login Form ───────────────────────────────────────────────── -->
+      <form class="auth-form active" id="form-login" novalidate>
+
+        <div class="field-group">
+          <label class="field-label" for="login-email">Adresse email</label>
+          <div class="field-wrap">
+            <span class="field-icon">✉️</span>
+            <input class="field-input" id="login-email" type="email"
+              placeholder="votre@email.com" autocomplete="email" required>
+          </div>
+          <div class="field-error" id="err-login-email"></div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="login-password">Mot de passe</label>
+          <div class="field-wrap">
+            <span class="field-icon">🔒</span>
+            <input class="field-input" id="login-password" type="password"
+              placeholder="••••••••" autocomplete="current-password" required>
+            <button type="button" class="btn-eye" id="eye-login" tabindex="-1">👁️</button>
+          </div>
+          <div class="field-error" id="err-login-password"></div>
+        </div>
+
+        <div class="form-error" id="err-login-global"></div>
+
+        <button class="btn-submit" id="btn-login" type="submit">
+          <span class="btn-submit-text">Se connecter</span>
+          <div class="btn-spinner" id="spinner-login"></div>
+        </button>
+
+        <p class="form-switch">
+          Pas encore de compte ?
+          <a href="#" class="form-switch-link" data-switch="register">S'inscrire</a>
+        </p>
+      </form>
+
+      <!-- ── Register Form ────────────────────────────────────────────── -->
+      <form class="auth-form" id="form-register" novalidate>
+
+        <div class="field-group">
+          <label class="field-label" for="reg-name">Votre nom</label>
+          <div class="field-wrap">
+            <span class="field-icon">👤</span>
+            <input class="field-input" id="reg-name" type="text"
+              placeholder="Jean Mukeba" autocomplete="name" required>
+          </div>
+          <div class="field-error" id="err-reg-name"></div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="reg-email">Adresse email</label>
+          <div class="field-wrap">
+            <span class="field-icon">✉️</span>
+            <input class="field-input" id="reg-email" type="email"
+              placeholder="votre@email.com" autocomplete="email" required>
+          </div>
+          <div class="field-error" id="err-reg-email"></div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="reg-password">Mot de passe</label>
+          <div class="field-wrap">
+            <span class="field-icon">🔒</span>
+            <input class="field-input" id="reg-password" type="password"
+              placeholder="Min. 6 caractères" autocomplete="new-password" required>
+            <button type="button" class="btn-eye" id="eye-reg" tabindex="-1">👁️</button>
+          </div>
+          <div class="field-error" id="err-reg-password"></div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="reg-confirm">Confirmer le mot de passe</label>
+          <div class="field-wrap">
+            <span class="field-icon">🔒</span>
+            <input class="field-input" id="reg-confirm" type="password"
+              placeholder="••••••••" autocomplete="new-password" required>
+          </div>
+          <div class="field-error" id="err-reg-confirm"></div>
+        </div>
+
+        <div class="form-error" id="err-reg-global"></div>
+
+        <button class="btn-submit" id="btn-register" type="submit">
+          <span class="btn-submit-text">Créer mon compte</span>
+          <div class="btn-spinner" id="spinner-register"></div>
+        </button>
+
+        <p class="form-switch">
+          Déjà un compte ?
+          <a href="#" class="form-switch-link" data-switch="login">Se connecter</a>
+        </p>
+      </form>
+
+    </div><!-- /auth-card -->
+
+    <p class="auth-footer">🔒 Vos données sont privées et sécurisées</p>
+
+  </div><!-- /auth-wrapper -->
+
+  <script src="/auth.js"></script>
+</body>
+</html>

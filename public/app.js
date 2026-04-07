@@ -1,0 +1,677 @@
+/* ─── Kula — Frontend Application ─────────────────────────────────────────── */
+
+// ── Auth guard ────────────────────────────────────────────────────────────────
+(function () {
+  const token = localStorage.getItem('kula_token');
+  if (!token) { window.location.href = '/auth.html'; return; }
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem('kula_token');
+      localStorage.removeItem('kula_user');
+      window.location.href = '/auth.html';
+    }
+  } catch (_) {
+    localStorage.removeItem('kula_token');
+    window.location.href = '/auth.html';
+  }
+})();
+
+// ── Auth helpers ───────────────────────────────────────────────────────────────
+function getToken() { return localStorage.getItem('kula_token') || ''; }
+
+function getUser() {
+  try { return JSON.parse(localStorage.getItem('kula_user') || '{}'); }
+  catch { return {}; }
+}
+
+function logout() {
+  localStorage.removeItem('kula_token');
+  localStorage.removeItem('kula_user');
+  window.location.href = '/auth.html';
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const state = {
+  currentTab: 'dashboard',
+  currentMonth: new Date().toISOString().slice(0, 7),
+  txFilter: 'all',
+  txMonth: new Date().toISOString().slice(0, 7),
+  chatHistory: [],
+  pendingTransaction: null,
+  charts: { category: null, trend: null }
+};
+
+// ── Category metadata ─────────────────────────────────────────────────────────
+const CATEGORIES = {
+  Salaire:      { icon: '💼', color: '#10B981' },
+  Business:     { icon: '🏢', color: '#059669' },
+  Famille:      { icon: '👨‍👩‍👧', color: '#34D399' },
+  Alimentation: { icon: '🛒', color: '#EF4444' },
+  Transport:    { icon: '🚌', color: '#F97316' },
+  Loisirs:      { icon: '🎉', color: '#A855F7' },
+  Vêtements:    { icon: '👗', color: '#EC4899' },
+  Santé:        { icon: '🏥', color: '#14B8A6' },
+  Éducation:    { icon: '📚', color: '#3B82F6' },
+  Téléphone:    { icon: '📱', color: '#8B5CF6' },
+  Logement:     { icon: '🏠', color: '#F59E0B' },
+  Autre:        { icon: '📦', color: '#6B7280' }
+};
+
+// ── Formatting ────────────────────────────────────────────────────────────────
+function formatAmount(amount) {
+  if (typeof amount !== 'number') amount = parseFloat(amount) || 0;
+  return new Intl.NumberFormat('fr-FR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(Math.round(Math.abs(amount)));
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatMonthLabel(monthStr) {
+  const [y, m] = monthStr.split('-');
+  const d = new Date(parseInt(y), parseInt(m) - 1, 1);
+  return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+}
+
+// ── Month selector ────────────────────────────────────────────────────────────
+function initMonthSelectors() {
+  const now = new Date();
+  const months = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(d.toISOString().slice(0, 7));
+  }
+
+  [document.getElementById('month-select'), document.getElementById('tx-month-select')].forEach(sel => {
+    if (!sel) return;
+    sel.innerHTML = months.map(m =>
+      `<option value="${m}"${m === state.currentMonth ? ' selected' : ''}>${formatMonthLabel(m)}</option>`
+    ).join('');
+  });
+
+  document.getElementById('month-select').addEventListener('change', e => {
+    state.currentMonth = e.target.value;
+    document.getElementById('tx-month-select').value = e.target.value;
+    loadDashboard();
+  });
+
+  document.getElementById('tx-month-select').addEventListener('change', e => {
+    state.txMonth = e.target.value;
+    loadTransactions();
+  });
+}
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` };
+  const res = await fetch(path, { headers, ...opts });
+
+  if (res.status === 401) {
+    logout();
+    return;
+  }
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show${type ? ' ' + type : ''}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// ── Tab navigation ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  state.currentTab = tab;
+
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item, .nav-fab').forEach(b => b.classList.remove('active'));
+
+  const panel = document.getElementById(`tab-${tab}`);
+  if (panel) panel.classList.add('active');
+
+  const navBtn = document.querySelector(`[data-tab="${tab}"]`);
+  if (navBtn) navBtn.classList.add('active');
+
+  if (tab === 'dashboard') loadDashboard();
+  if (tab === 'transactions') loadTransactions();
+  if (tab === 'chat') {
+    setTimeout(() => {
+      const cm = document.getElementById('chat-messages');
+      cm.scrollTop = cm.scrollHeight;
+      document.getElementById('chat-input').focus();
+    }, 100);
+  }
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const data = await api(`/api/dashboard?month=${state.currentMonth}`);
+
+    // Balance
+    const balEl = document.getElementById('total-balance');
+    balEl.innerHTML = `<span class="balance-currency">FCFA</span> ${formatAmount(data.balance)}`;
+    balEl.className = `balance-amount${data.balance < 0 ? ' negative' : ''}`;
+    document.getElementById('balance-sub').textContent =
+      `Ce mois: ${data.monthlyBalance >= 0 ? '+' : ''}${formatAmount(data.monthlyBalance)} FCFA`;
+
+    // Monthly stats
+    document.getElementById('monthly-income').textContent = `${formatAmount(data.monthlyIncome)} FCFA`;
+    document.getElementById('monthly-expense').textContent = `${formatAmount(data.monthlyExpense)} FCFA`;
+
+    // Category breakdown
+    renderCategoryChart(data.categories, data.monthlyExpense);
+
+    // Trend chart
+    renderTrendChart(data.trend);
+
+    // Recent transactions
+    renderTransactionList('recent-tx-list', data.recentTransactions);
+  } catch (err) {
+    console.error('Dashboard error:', err.message, err);
+    const balEl = document.getElementById('total-balance');
+    if (balEl) balEl.textContent = 'Erreur';
+    showToast('Erreur dashboard: ' + (err.message || 'réseau ?'), 'error');
+  }
+}
+
+// ── Category chart ──────────────────────────────────────────────────────────────
+function renderCategoryChart(categories, totalExpense) {
+  const expenseCats = categories.filter(c => c.type === 'expense');
+  const listEl = document.getElementById('category-list');
+  const ctx = document.getElementById('category-chart');
+
+  if (!expenseCats.length) {
+    ctx.style.display = 'none';
+    listEl.innerHTML = '<div class="chart-empty">Aucune dépense ce mois</div>';
+    if (state.charts.category) { state.charts.category.destroy(); state.charts.category = null; }
+    return;
+  }
+
+  ctx.style.display = 'block';
+
+  const labels = expenseCats.map(c => c.category);
+  const values = expenseCats.map(c => c.total);
+  const colors = labels.map(l => CATEGORIES[l]?.color || '#6B7280');
+
+  if (state.charts.category) state.charts.category.destroy();
+  state.charts.category = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${formatAmount(ctx.raw)} FCFA (${Math.round(ctx.raw / totalExpense * 100)}%)`
+          }
+        }
+      }
+    }
+  });
+
+  // Category list
+  const maxTotal = Math.max(...values, 1);
+  listEl.innerHTML = expenseCats.slice(0, 6).map(c => {
+    const meta = CATEGORIES[c.category] || { icon: '📦', color: '#6B7280' };
+    const pct = Math.round(c.total / totalExpense * 100);
+    return `
+      <div class="category-item">
+        <div class="category-dot" style="background:${meta.color}"></div>
+        <div class="category-info">
+          <div class="category-name">${meta.icon} ${c.category}</div>
+          <div class="category-bar-wrap">
+            <div class="category-bar" style="width:${(c.total/maxTotal)*100}%;background:${meta.color}"></div>
+          </div>
+        </div>
+        <div class="category-amount">${formatAmount(c.total)}<br><small style="font-size:10px;color:#6B7280">${pct}%</small></div>
+      </div>`;
+  }).join('');
+}
+
+// ── Trend chart ─────────────────────────────────────────────────────────────────
+function renderTrendChart(trend) {
+  const ctx = document.getElementById('trend-chart');
+  if (!trend || !trend.length) return;
+
+  const labels = trend.map(t => {
+    const [y, m] = t.month.split('-');
+    return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString('fr-FR', { month: 'short' });
+  });
+
+  if (state.charts.trend) state.charts.trend.destroy();
+  state.charts.trend = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Revenus',
+          data: trend.map(t => t.income),
+          backgroundColor: 'rgba(16,185,129,0.7)',
+          borderRadius: 6
+        },
+        {
+          label: 'Dépenses',
+          data: trend.map(t => t.expense),
+          backgroundColor: 'rgba(239,68,68,0.7)',
+          borderRadius: 6
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { font: { size: 11 }, boxWidth: 12 }
+        },
+        tooltip: {
+          callbacks: { label: ctx => ` ${formatAmount(ctx.raw)} FCFA` }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          ticks: { callback: v => formatAmount(v) }
+        }
+      }
+    }
+  });
+}
+
+// ── Transaction list rendering ──────────────────────────────────────────────────
+function renderTransactionList(containerId, transactions) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  if (!transactions || !transactions.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">💫</div>
+        <div class="empty-text">Aucune transaction</div>
+        <div class="empty-sub">Utilisez le chat pour ajouter vos dépenses et revenus</div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = transactions.map(tx => {
+    const meta = CATEGORIES[tx.category] || { icon: '📦', color: '#6B7280' };
+    const sign = tx.type === 'income' ? '+' : '-';
+    return `
+      <div class="tx-item" data-id="${tx.id}">
+        <div class="tx-icon ${tx.type}">${meta.icon}</div>
+        <div class="tx-info">
+          <div class="tx-desc">${escapeHtml(tx.description)}</div>
+          <div class="tx-meta">
+            <span class="tx-category-badge">${tx.category}</span>
+            ${formatDate(tx.date)}
+          </div>
+        </div>
+        <div class="tx-amount ${tx.type}">${sign}${formatAmount(tx.amount)} FCFA</div>
+        <button class="tx-delete" onclick="deleteTransaction(${tx.id})" title="Supprimer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>`;
+  }).join('');
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Load transactions tab ───────────────────────────────────────────────────────
+async function loadTransactions() {
+  try {
+    const params = new URLSearchParams({ month: state.txMonth });
+    let txs = await api(`/api/transactions?${params}`);
+
+    if (state.txFilter !== 'all') {
+      txs = txs.filter(t => t.type === state.txFilter);
+    }
+
+    renderTransactionList('all-tx-list', txs);
+  } catch (err) {
+    console.error('Load transactions error:', err);
+    showToast('Erreur lors du chargement', 'error');
+  }
+}
+
+// ── Delete transaction ──────────────────────────────────────────────────────────
+async function deleteTransaction(id) {
+  if (!confirm('Supprimer cette transaction ?')) return;
+  try {
+    await api(`/api/transactions/${id}`, { method: 'DELETE' });
+    showToast('Transaction supprimée', 'success');
+    if (state.currentTab === 'transactions') loadTransactions();
+    else loadDashboard();
+  } catch (err) {
+    showToast('Erreur: ' + err.message, 'error');
+  }
+}
+
+// ── Save a transaction ──────────────────────────────────────────────────────────
+async function saveTransaction(tx) {
+  const saved = await api('/api/transactions', {
+    method: 'POST',
+    body: JSON.stringify(tx)
+  });
+  return saved;
+}
+
+// ── Chat ────────────────────────────────────────────────────────────────────────
+function addChatMessage(role, content) {
+  const messages = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role === 'user' ? 'user' : 'bot'}`;
+
+  const avatar = role === 'user' ? '👤' : 'K';
+  const avatarClass = role === 'user' ? 'msg-avatar' : 'msg-avatar';
+
+  div.innerHTML = `
+    <div class="${avatarClass}">${role === 'user' ? '👤' : 'K'}</div>
+    <div class="msg-bubble">${content}</div>
+  `;
+
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+function showTypingIndicator() {
+  const messages = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.id = 'typing-indicator';
+  div.innerHTML = `
+    <div class="msg-avatar">K</div>
+    <div class="msg-bubble">
+      <div class="typing">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+  `;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function removeTypingIndicator() {
+  const t = document.getElementById('typing-indicator');
+  if (t) t.remove();
+}
+
+function renderTransactionPreview(tx, parentDiv) {
+  const meta = CATEGORIES[tx.category] || { icon: '📦', color: '#6B7280' };
+  const sign = tx.type === 'income' ? '+' : '-';
+  const typeLabel = tx.type === 'income' ? 'Revenu' : 'Dépense';
+
+  const preview = document.createElement('div');
+  preview.className = 'tx-preview';
+  preview.innerHTML = `
+    <div class="tx-preview-header">
+      <span class="tx-preview-label">Transaction détectée</span>
+      <span class="tx-preview-type ${tx.type}">${typeLabel}</span>
+    </div>
+    <div class="tx-preview-amount ${tx.type}">${sign}${formatAmount(tx.amount)} <small>FCFA</small></div>
+    <div class="tx-preview-details">
+      ${meta.icon} ${tx.category} · ${escapeHtml(tx.description)}<br>
+      📅 ${formatDate(tx.date)}
+    </div>
+    <div class="tx-preview-actions">
+      <button class="btn-confirm" id="btn-confirm-tx">✅ Enregistrer</button>
+      <button class="btn-cancel" id="btn-cancel-tx">Annuler</button>
+    </div>
+  `;
+
+  parentDiv.querySelector('.msg-bubble').appendChild(preview);
+
+  preview.querySelector('#btn-confirm-tx').addEventListener('click', async () => {
+    preview.querySelector('.tx-preview-actions').innerHTML = '<div style="text-align:center;color:#6B7280;font-size:13px">Enregistrement…</div>';
+    try {
+      await saveTransaction(tx);
+      preview.querySelector('.tx-preview-actions').innerHTML =
+        '<div style="text-align:center;color:#10B981;font-weight:600;font-size:14px">✅ Enregistré !</div>';
+      showToast('Transaction enregistrée !', 'success');
+      state.pendingTransaction = null;
+    } catch (err) {
+      preview.querySelector('.tx-preview-actions').innerHTML =
+        `<div style="text-align:center;color:#EF4444;font-size:13px">❌ ${err.message}</div>`;
+    }
+  });
+
+  preview.querySelector('#btn-cancel-tx').addEventListener('click', () => {
+    preview.innerHTML = '<div style="text-align:center;color:#6B7280;font-size:13px">Transaction annulée</div>';
+    state.pendingTransaction = null;
+  });
+}
+
+async function sendChatMessage() {
+  // Stop mic if recording
+  if (voice && voice.isListening()) voice.toggle();
+
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('btn-send').disabled = true;
+
+  // Add user message
+  addChatMessage('user', escapeHtml(text));
+  state.chatHistory.push({ role: 'user', content: text });
+
+  // Show typing
+  showTypingIndicator();
+
+  try {
+    const response = await api('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: text, history: state.chatHistory.slice(-10) })
+    });
+
+    removeTypingIndicator();
+
+    if (response.type === 'transaction' && response.transaction) {
+      const tx = response.transaction;
+      const botMsg = addChatMessage('bot', escapeHtml(response.message || 'Transaction détectée !'));
+      renderTransactionPreview(tx, botMsg);
+      state.chatHistory.push({ role: 'assistant', content: response.message });
+    } else {
+      const msg = response.message || "Je n'ai pas compris. Pouvez-vous reformuler ?";
+      addChatMessage('bot', escapeHtml(msg));
+      state.chatHistory.push({ role: 'assistant', content: msg });
+    }
+  } catch (err) {
+    removeTypingIndicator();
+    addChatMessage('bot', `❌ Erreur: ${escapeHtml(err.message)}`);
+  } finally {
+    document.getElementById('btn-send').disabled = false;
+    input.focus();
+  }
+}
+
+// ── Voice recognition ──────────────────────────────────────────────────────────
+const voice = (() => {
+  try {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'fr-FR';
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  recognition.maxAlternatives = 1;
+
+  let isListening = false;
+  let interimText = '';
+  let baseText = '';   // text already in the field before recording started
+
+  function setUI(listening) {
+    const btn = document.getElementById('btn-mic');
+    const status = document.getElementById('mic-status');
+    const input = document.getElementById('chat-input');
+    isListening = listening;
+    btn.classList.toggle('recording', listening);
+    btn.title = listening ? 'Arrêter' : 'Dicter un message';
+    status.classList.toggle('visible', listening);
+    if (listening) {
+      baseText = input.value.trim();
+      input.placeholder = 'Parlez maintenant…';
+    } else {
+      input.placeholder = 'Décris ta transaction…';
+      autoResize(input);
+    }
+  }
+
+  recognition.onresult = (e) => {
+    const input = document.getElementById('chat-input');
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    interimText = interim;
+    const combined = [baseText, final || interim].filter(Boolean).join(' ');
+    input.value = combined;
+    if (final) baseText = combined;
+    autoResize(input);
+  };
+
+  recognition.onerror = (e) => {
+    const msgs = {
+      'not-allowed': 'Accès au micro refusé. Autorisez le microphone dans votre navigateur.',
+      'no-speech':   'Aucune parole détectée. Réessayez.',
+      'network':     'Erreur réseau. Vérifiez votre connexion.',
+    };
+    showToast(msgs[e.error] || `Erreur micro: ${e.error}`, 'error');
+    setUI(false);
+  };
+
+  recognition.onend = () => {
+    if (isListening) setUI(false);
+  };
+
+  function toggle() {
+    if (isListening) {
+      recognition.stop();
+      setUI(false);
+    } else {
+      recognition.start();
+      setUI(true);
+    }
+  }
+
+  return { toggle, isListening: () => isListening };
+  } catch (e) {
+    console.warn('Voice recognition init error:', e);
+    return null;
+  }
+})();
+
+// ── Auto-resize textarea ────────────────────────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────────
+function init() {
+  // Service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
+  // Month selectors
+  initMonthSelectors();
+
+  // Show user info in header
+  const user = getUser();
+  if (user.name) {
+    const initial = user.name.charAt(0).toUpperCase();
+    document.getElementById('user-initial').textContent = initial;
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+    document.getElementById('user-greeting').textContent = `${greeting}, ${user.name.split(' ')[0]} 👋`;
+  }
+
+  // Logout button
+  document.getElementById('btn-logout').addEventListener('click', () => {
+    if (confirm('Se déconnecter de Kula ?')) logout();
+  });
+
+  // Load dashboard
+  loadDashboard();
+
+  // Nav buttons
+  document.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // Filter tabs
+  document.querySelectorAll('.filter-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.txFilter = btn.dataset.filter;
+      loadTransactions();
+    });
+  });
+
+  // Mic button
+  const micBtn = document.getElementById('btn-mic');
+  if (voice) {
+    micBtn.addEventListener('click', () => voice.toggle());
+  } else {
+    micBtn.disabled = true;
+    micBtn.title = 'Reconnaissance vocale non supportée par ce navigateur';
+  }
+
+  // Chat send button
+  document.getElementById('btn-send').addEventListener('click', sendChatMessage);
+
+  // Chat input keyboard shortcuts
+  document.getElementById('chat-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
+
+  document.getElementById('chat-input').addEventListener('input', function () {
+    autoResize(this);
+  });
+}
+
+// Make deleteTransaction global for inline onclick
+window.deleteTransaction = deleteTransaction;
+window.switchTab = switchTab;
+
+document.addEventListener('DOMContentLoaded', init);
