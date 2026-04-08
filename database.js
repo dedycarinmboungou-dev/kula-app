@@ -17,12 +17,12 @@ function resolveDbPath() {
     console.log(`  DB path : ${envPath}`);
     return envPath;
   }
-  const fallback = path.join(__dirname, 'kula.db');
+  const fallback = '/data/kula.db';
   console.log(`  DB path : ${fallback} (no DB_PATH set)`);
   return fallback;
 }
 
-const DB_PATH =  getDbPathdb();
+const DB_PATH =  getDbPath();
 
 // ── DB driver: better-sqlite3 (Railway/prod) ou node:sqlite (local fallback) ──
 let db;
