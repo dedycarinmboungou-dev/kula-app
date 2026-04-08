@@ -11,7 +11,7 @@ function resolveDbPath() {
         console.log(`  DB dir "${dir}" created`);
       } catch (e) {
         console.warn(`  Cannot create DB dir "${dir}": ${e.message} — falling back to ./kula.db`);
-        return path.join(__dirname, 'kula.db');
+        return '/data/kula.db';
       }
     }
     console.log(`  DB path : ${envPath}`);
@@ -22,7 +22,7 @@ function resolveDbPath() {
   return fallback;
 }
 
-const DB_PATH =  getDbPath();
+const DB_PATH =  resolveDbPath();
 
 // ── DB driver: better-sqlite3 (Railway/prod) ou node:sqlite (local fallback) ──
 let db;
