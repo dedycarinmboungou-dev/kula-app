@@ -22,7 +22,7 @@ function resolveDbPath() {
   return fallback;
 }
 
-const DB_PATH = </data/kula.db>();
+const DB_PATH =  /data/kula.db();
 
 // ── DB driver: better-sqlite3 (Railway/prod) ou node:sqlite (local fallback) ──
 let db;
