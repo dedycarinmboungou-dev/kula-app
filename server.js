@@ -271,6 +271,52 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour.`;
       parsed = { type: 'message', message: raw };
     }
 
+    // Normalise single transaction → array
+    if (parsed.type === 'transaction' && parsed.transaction) {
+      parsed.type = 'transactions';
+      parsed.transactions = [parsed.transaction];
+    }
+
+    // Auto-insert all detected transactions into SQLite
+    if (parsed.type === 'transactions' && Array.isArray(parsed.transactions)) {
+      const saved = [];
+      const errors = [];
+
+      for (const tx of parsed.transactions) {
+        try {
+          if (!tx.type || !['income', 'expense'].includes(tx.type))
+            throw new Error(`type invalide: ${tx.type}`);
+          if (!tx.amount || isNaN(tx.amount) || parseFloat(tx.amount) <= 0)
+            throw new Error(`montant invalide: ${tx.amount}`);
+          if (!tx.category || !VALID_CATEGORIES.includes(tx.category))
+            throw new Error(`catégorie inconnue: "${tx.category}"`);
+          if (!tx.description?.trim())
+            throw new Error('description manquante');
+
+          const txDate = tx.date || today;
+          const result = stmts.insertTransaction.run({
+            userId:      req.userId,
+            type:        tx.type,
+            amount:      parseFloat(tx.amount),
+            category:    tx.category,
+            description: tx.description.trim(),
+            date:        txDate
+          });
+
+          saved.push({ id: result.lastInsertRowid, ...tx, amount: parseFloat(tx.amount), date: txDate });
+        } catch (e) {
+          console.error('Chat tx insert error:', e.message, tx);
+          errors.push({ tx, error: e.message });
+        }
+      }
+
+      parsed.transactions = saved;
+      if (errors.length) {
+        const errMsg = errors.map(e => `"${e.tx.description || '?'}" (${e.error})`).join(', ');
+        parsed.message = (parsed.message || '') + ` ⚠️ Non enregistré : ${errMsg}`;
+      }
+    }
+
     res.json(parsed);
   } catch (err) {
     console.error('Chat error:', err);

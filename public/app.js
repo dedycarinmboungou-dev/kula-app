@@ -471,6 +471,24 @@ function renderTransactionPreview(tx, parentDiv) {
   });
 }
 
+// Carte affichée après qu'une transaction a été sauvegardée par le backend
+function renderSavedTransaction(tx, parentDiv) {
+  const meta = CATEGORIES[tx.category] || { icon: '📦', color: '#6B7280' };
+  const sign = tx.type === 'income' ? '+' : '-';
+  const card = document.createElement('div');
+  card.className = 'tx-saved-card';
+  card.innerHTML = `
+    <div class="tx-saved-icon">${meta.icon}</div>
+    <div class="tx-saved-info">
+      <div class="tx-saved-desc">${escapeHtml(tx.description)}</div>
+      <div class="tx-saved-cat">${escapeHtml(tx.category)}</div>
+    </div>
+    <div class="tx-saved-amount ${tx.type}">${sign}${formatAmount(tx.amount)} FCFA</div>
+    <div class="tx-saved-check">✅</div>
+  `;
+  parentDiv.querySelector('.msg-bubble').appendChild(card);
+}
+
 async function sendChatMessage() {
   // Stop mic if recording
   if (voice && voice.isListening()) voice.toggle();
@@ -498,17 +516,14 @@ async function sendChatMessage() {
 
     removeTypingIndicator();
 
-    // Normalise : ancien format "transaction" (objet) → nouveau format "transactions" (tableau)
-    if (response.type === 'transaction' && response.transaction) {
-      response.type = 'transactions';
-      response.transactions = [response.transaction];
-    }
-
     if (response.type === 'transactions' && Array.isArray(response.transactions) && response.transactions.length) {
-      const confirmMsg = response.message || `${response.transactions.length} transaction(s) détectée(s)`;
+      // Transactions already saved by the backend — show saved cards
+      const confirmMsg = response.message || `${response.transactions.length} transaction(s) enregistrée(s) ✅`;
       const botMsg = addChatMessage('bot', escapeHtml(confirmMsg));
-      response.transactions.forEach(tx => renderTransactionPreview(tx, botMsg));
+      response.transactions.forEach(tx => renderSavedTransaction(tx, botMsg));
       state.chatHistory.push({ role: 'assistant', content: confirmMsg });
+      // Refresh dashboard silently
+      if (state.currentTab === 'dashboard') loadDashboard();
     } else {
       const msg = response.message || "Je n'ai pas compris. Pouvez-vous reformuler ?";
       addChatMessage('bot', escapeHtml(msg));

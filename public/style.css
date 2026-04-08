@@ -1109,6 +1109,51 @@ html, body {
   margin: 8px 0 4px;
 }
 
+/* ─── Saved transaction card (in chat) ─────────────────────────────────────── */
+.tx-saved-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--light-gray);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 8px;
+  border-left: 3px solid var(--primary);
+}
+
+.tx-saved-icon { font-size: 20px; flex-shrink: 0; }
+
+.tx-saved-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tx-saved-desc {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tx-saved-cat {
+  font-size: 11px;
+  color: var(--gray);
+  margin-top: 1px;
+}
+
+.tx-saved-amount {
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.tx-saved-amount.income  { color: var(--income-color); }
+.tx-saved-amount.expense { color: var(--expense-color); }
+
+.tx-saved-check { font-size: 16px; flex-shrink: 0; }
+
 /* ─── Reminder banner ───────────────────────────────────────────────────────── */
 .reminder-banner {
   position: fixed;
