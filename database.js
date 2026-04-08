@@ -6,12 +6,20 @@ function resolveDbPath() {
   if (envPath) {
     const dir = path.dirname(envPath);
     if (!fs.existsSync(dir)) {
-      console.warn(`  DB_PATH dir "${dir}" does not exist, falling back to ./kula.db`);
-      return path.join(__dirname, 'kula.db');
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`  DB dir "${dir}" created`);
+      } catch (e) {
+        console.warn(`  Cannot create DB dir "${dir}": ${e.message} — falling back to ./kula.db`);
+        return path.join(__dirname, 'kula.db');
+      }
     }
+    console.log(`  DB path : ${envPath}`);
     return envPath;
   }
-  return path.join(__dirname, 'kula.db');
+  const fallback = path.join(__dirname, 'kula.db');
+  console.log(`  DB path : ${fallback} (no DB_PATH set)`);
+  return fallback;
 }
 
 const DB_PATH = resolveDbPath();
