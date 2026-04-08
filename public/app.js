@@ -610,6 +610,100 @@ function autoResize(el) {
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────────
+// ── Notifications & reminders ──────────────────────────────────────────────────
+const REMINDER_MESSAGES = [
+  { days: 1,  icon: '👀', text: 'Tu n\'as rien enregistré aujourd\'hui. Une petite dépense oubliée ?' },
+  { days: 2,  icon: '📝', text: 'Ça fait 2 jours sans transaction. Ton budget attend une mise à jour !' },
+  { days: 3,  icon: '⏰', text: '3 jours sans mise à jour — prends 2 minutes pour noter tes dépenses.' },
+  { days: 7,  icon: '🌱', text: 'Une semaine sans suivi ! Pour bien grandir, Kula a besoin de tes transactions.' },
+  { days: 999, icon: '💪', text: 'Ça fait longtemps ! Reviens noter tes finances, tu es le patron de ton argent.' }
+];
+
+function getReminderMessage(daysSince) {
+  for (const r of REMINDER_MESSAGES) {
+    if (daysSince <= r.days) return r;
+  }
+  return REMINDER_MESSAGES[REMINDER_MESSAGES.length - 1];
+}
+
+function showReminderBanner(daysSince) {
+  const banner  = document.getElementById('reminder-banner');
+  const textEl  = document.getElementById('reminder-text');
+  const { icon, text } = getReminderMessage(daysSince);
+  textEl.textContent = text;
+  document.querySelector('.reminder-icon').textContent = icon;
+  banner.style.display = 'flex';
+  setTimeout(() => banner.classList.add('visible'), 50);
+
+  document.getElementById('reminder-action').onclick = () => {
+    banner.classList.remove('visible');
+    switchTab('chat');
+  };
+  document.getElementById('reminder-close').onclick = () => {
+    banner.classList.remove('visible');
+    localStorage.setItem('kula_reminder_dismissed', Date.now().toString());
+  };
+}
+
+function sendBrowserNotification(daysSince) {
+  if (Notification.permission !== 'granted') return;
+  const { text } = getReminderMessage(daysSince);
+  const notif = new Notification('Kula 🌱 — Rappel budget', {
+    body: text,
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: 'kula-reminder',
+    renotify: true
+  });
+  notif.onclick = () => { window.focus(); notif.close(); switchTab('chat'); };
+}
+
+async function initNotifications() {
+  // Request permission once (don't re-ask if denied)
+  if (Notification.permission === 'default') {
+    setTimeout(async () => {
+      await Notification.requestPermission();
+    }, 5000); // ask 5s after load, less intrusive
+  }
+
+  // Check last transaction date after dashboard loads
+  // We'll hook into loadDashboard's result via a small delay
+  setTimeout(async () => {
+    try {
+      const data = await api(`/api/dashboard?month=${state.currentMonth}`);
+      if (!data) return;
+
+      // Find the most recent transaction date
+      const recent = data.recentTransactions;
+      if (!recent || !recent.length) {
+        // No transactions at all — show gentle nudge after 1 day of account age
+        const user = getUser();
+        if (user && user.created_at) {
+          const created = new Date(user.created_at);
+          const daysSince = Math.floor((Date.now() - created) / 86400000);
+          if (daysSince >= 1) showReminderBanner(daysSince);
+        }
+        return;
+      }
+
+      const lastDate   = new Date(recent[0].date + 'T12:00:00');
+      const daysSince  = Math.floor((Date.now() - lastDate) / 86400000);
+
+      if (daysSince < 1) return; // active today — no reminder
+
+      // Don't show if user dismissed recently (same day)
+      const dismissed = localStorage.getItem('kula_reminder_dismissed');
+      if (dismissed) {
+        const dismissedToday = new Date(parseInt(dismissed)).toDateString() === new Date().toDateString();
+        if (dismissedToday) return;
+      }
+
+      showReminderBanner(daysSince);
+      sendBrowserNotification(daysSince);
+    } catch { /* silent */ }
+  }, 1500);
+}
+
 function init() {
   // Service worker
   if ('serviceWorker' in navigator) {
@@ -645,6 +739,9 @@ function init() {
     overlay.style.display = 'none';
     localStorage.setItem('kula_welcome_shown', '1');
   });
+
+  // Notifications & reminders
+  initNotifications();
 
   // Load dashboard
   loadDashboard();
