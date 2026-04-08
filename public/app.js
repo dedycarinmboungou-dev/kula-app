@@ -498,11 +498,17 @@ async function sendChatMessage() {
 
     removeTypingIndicator();
 
+    // Normalise : ancien format "transaction" (objet) → nouveau format "transactions" (tableau)
     if (response.type === 'transaction' && response.transaction) {
-      const tx = response.transaction;
-      const botMsg = addChatMessage('bot', escapeHtml(response.message || 'Transaction détectée !'));
-      renderTransactionPreview(tx, botMsg);
-      state.chatHistory.push({ role: 'assistant', content: response.message });
+      response.type = 'transactions';
+      response.transactions = [response.transaction];
+    }
+
+    if (response.type === 'transactions' && Array.isArray(response.transactions) && response.transactions.length) {
+      const confirmMsg = response.message || `${response.transactions.length} transaction(s) détectée(s)`;
+      const botMsg = addChatMessage('bot', escapeHtml(confirmMsg));
+      response.transactions.forEach(tx => renderTransactionPreview(tx, botMsg));
+      state.chatHistory.push({ role: 'assistant', content: confirmMsg });
     } else {
       const msg = response.message || "Je n'ai pas compris. Pouvez-vous reformuler ?";
       addChatMessage('bot', escapeHtml(msg));

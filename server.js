@@ -218,28 +218,36 @@ app.post('/api/chat', requireAuth, async (req, res) => {
 Aujourd'hui nous sommes le ${today}.
 
 CATÉGORIES DISPONIBLES:
-- Revenus (income): Salaire, Business, Famille
+- Revenus (income): Salaire, Business, Famille, Solde initial
 - Dépenses (expense): Alimentation, Transport, Loisirs, Vêtements, Santé, Éducation, Téléphone, Logement, Autre
 
 INSTRUCTIONS:
-Si le message décrit une transaction financière, extrais les informations et réponds en JSON.
-Si le montant manque, demande une clarification.
-Si c'est une question, réponds normalement.
+1. Analyse le message entier et détecte TOUTES les transactions mentionnées (il peut y en avoir plusieurs).
+2. Si une ou plusieurs transactions sont détectées, réponds avec le format TRANSACTIONS.
+3. Si le montant d'une transaction est manquant, demande une clarification avec le format MESSAGE.
+4. Si c'est une question ou une conversation (pas de transaction), réponds avec le format MESSAGE.
+5. Une transaction doit avoir un montant explicite pour être extraite.
 
-FORMAT TRANSACTION:
-{"type":"transaction","transaction":{"type":"expense"|"income","amount":<number>,"category":"<catégorie>","description":"<description courte>","date":"${today}"},"message":"<confirmation en français>"}
+FORMAT TRANSACTIONS (une ou plusieurs) :
+{"type":"transactions","transactions":[{"type":"expense"|"income","amount":<number>,"category":"<catégorie>","description":"<description courte>","date":"${today}"},...],"message":"<confirmation en français listant toutes les transactions>"}
 
-FORMAT MESSAGE:
+FORMAT MESSAGE (question / clarification) :
 {"type":"message","message":"<réponse en français>"}
 
-Réponds UNIQUEMENT avec du JSON valide, sans markdown.`;
+EXEMPLES:
+- "Acheté du pain 500 et payé transport 300" → 2 transactions expense
+- "Reçu salaire 200000 et remboursé ami 15000" → 1 income + 1 expense
+- "J'ai dépensé de l'argent aujourd'hui" → demande clarification (montant manquant)
+- "Quel est mon solde ?" → type message
+
+Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour.`;
 
     const messages = history.slice(-10)
       .filter(h => h.role && h.content)
       .concat([{ role: 'user', content: message }]);
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
+      model: 'claude-sonnet-4-5',
       max_tokens: 1024,
       system: systemPrompt,
       messages
