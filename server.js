@@ -15,10 +15,13 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ── Brevo — email de bienvenue ────────────────────────────────────────────────
 async function sendWelcomeEmail(toEmail, toName) {
-  if (!process.env.BREVO_API_KEY) {
-    console.warn('  BREVO_API_KEY non défini — email de bienvenue ignoré');
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) {
+    console.warn('  [Brevo] BREVO_API_KEY non défini — email ignoré');
     return;
   }
+  console.log(`  [Brevo] Envoi email bienvenue → ${toEmail} (clé: ${apiKey.slice(0,8)}…)`);
+
 
   const firstName = toName.split(' ')[0];
 
@@ -84,7 +87,7 @@ async function sendWelcomeEmail(toEmail, toName) {
                 <tr><td style="height:10px;"></td></tr>
                 <tr>
                   <td style="background:#f0fdf4;border-left:4px solid #059669;border-radius:0 8px 8px 0;padding:16px 18px;">
-                    <p style="margin:0 0 4px;color:#1a7a4a;font-weight:700;font-size:14px;">🌟 3. Écoute les conseils de Kola Coach</p>
+                    <p style="margin:0 0 4px;color:#1a7a4a;font-weight:700;font-size:14px;">🌟 3. Discute avec Kula Coach</p>
                     <p style="margin:0;color:#374151;font-size:13px;line-height:1.6;">
                       Ton coach personnel analyse tes habitudes et te donne des conseils
                       personnalisés matin, après-midi et soir. L'argent se gère mieux
@@ -124,10 +127,11 @@ async function sendWelcomeEmail(toEmail, toName) {
 </html>`;
 
   try {
-    const { TransactionalEmailsApi, SendSmtpEmail } = require('@getbrevo/brevo');
+    const brevo = require('@getbrevo/brevo');
+    const { TransactionalEmailsApi, SendSmtpEmail } = brevo;
 
     const apiInstance = new TransactionalEmailsApi();
-    apiInstance.authentications['apiKey'].apiKey = process.env.BREVO_API_KEY;
+    apiInstance.authentications['apiKey'].apiKey = apiKey;
 
     const email = new SendSmtpEmail();
     email.subject = 'Bienvenue sur Kula 🌱 — Fais grandir ton argent !';
@@ -135,11 +139,12 @@ async function sendWelcomeEmail(toEmail, toName) {
     email.sender = { name: 'Kula 🌱', email: 'mindup05@gmail.com' };
     email.to = [{ email: toEmail, name: toName }];
 
-    await apiInstance.sendTransacEmail(email);
-    console.log(`  Email de bienvenue envoyé à ${toEmail}`);
+    const result = await apiInstance.sendTransacEmail(email);
+    console.log(`  [Brevo] ✅ Email envoyé à ${toEmail} — messageId: ${result?.body?.messageId || '?'}`);
   } catch (err) {
-    // Email failure is non-blocking — account is already created
-    console.error('  Brevo sendWelcomeEmail error:', err.message || err);
+    // Email failure is non-blocking — account already created
+    const detail = err?.response?.body ? JSON.stringify(err.response.body) : (err.message || String(err));
+    console.error(`  [Brevo] ❌ Erreur envoi email: ${detail}`);
   }
 }
 
@@ -519,7 +524,7 @@ app.post('/api/chat', requireAuth, async (req, res) => {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    const systemPrompt = `Tu es Kula, un assistant financier bienveillant pour une application de gestion de budget personnel. Kula signifie "grandir" en kituba. Tu parles en français, avec un ton chaleureux et encourageant, adapté au contexte africain francophone.
+    const systemPrompt = `Tu es Kula, un coach financier personnel bienveillant. Kula signifie "grandir" en kituba. Tu es comme un grand frère africain — bienveillant, direct, motivant, avec de l'humour. Tu parles en français familier mais respectueux, tu utilises des emojis. Adapté au contexte africain francophone.
 
 Aujourd'hui nous sommes le ${today}.
 
@@ -529,31 +534,33 @@ CATÉGORIES DISPONIBLES:
 
 TES RÔLES:
 A) ENREGISTRER DES TRANSACTIONS — quand l'utilisateur décrit des dépenses ou revenus
-B) DONNER DES CONSEILS FINANCIERS — quand l'utilisateur pose une question sur son budget, ses dépenses, comment économiser, investir, gérer son argent, etc.
-C) MOTIVER ET ENCOURAGER — féliciter les bonnes habitudes, encourager à tenir le budget
+B) DONNER DES CONSEILS FINANCIERS — quand l'utilisateur pose une question sur son budget, ses habitudes, comment économiser, investir, gérer son argent
+C) COACHER ET MOTIVER — analyser les habitudes, féliciter les progrès, donner des objectifs concrets
 
 RÈGLES TRANSACTIONS:
 1. Détecte TOUTES les transactions dans le message (il peut y en avoir plusieurs).
 2. Chaque transaction doit avoir un montant explicite — sinon demande clarification.
 3. Adapte la catégorie au contexte africain (ex: "manioc/foufou" → Alimentation, "moto-taxi/wewa" → Transport).
 
-RÈGLES CONSEILS:
+RÈGLES CONSEILS ET COACHING:
 - Donne des conseils pratiques, adaptés à la réalité africaine francophone.
 - Utilise des exemples concrets en FCFA.
 - Encourage l'épargne, la règle 50/30/20, les tontines, les fonds d'urgence.
 - Sois positif même si la situation financière est difficile.
+- Pour les bilans et analyses, sois précis et personnalisé.
 
 FORMAT TRANSACTIONS (une ou plusieurs) :
 {"type":"transactions","transactions":[{"type":"expense"|"income","amount":<number>,"category":"<catégorie>","description":"<description courte>","date":"${today}"},...],"message":"<confirmation chaleureuse en français>"}
 
-FORMAT MESSAGE (conseil / question / clarification) :
-{"type":"message","message":"<réponse en français, max 3 paragraphes, bienveillante et pratique>"}
+FORMAT MESSAGE (conseil / coaching / clarification) :
+{"type":"message","message":"<réponse en français, max 3 paragraphes, bienveillante et concrète>"}
 
 EXEMPLES:
 - "Acheté du pain 500 et payé wewa 300" → 2 transactions expense
 - "Reçu salaire 200000 et remboursé ami 15000" → 1 income + 1 expense
 - "Comment économiser ?" → conseil sur l'épargne
-- "Est-ce que je dépense trop en transport ?" → conseil + encouragement
+- "Analyse mes dépenses" → coaching personnalisé
+- "Est-ce que je dépense trop ?" → conseil + encouragement
 - "J'ai dépensé de l'argent" → demande le montant
 
 Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour.`;

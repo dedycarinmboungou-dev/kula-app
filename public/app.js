@@ -38,9 +38,7 @@ const state = {
   txFilter: 'all',
   txMonth: new Date().toISOString().slice(0, 7),
   chatHistory: [],
-  coachHistory: JSON.parse(localStorage.getItem('kula_coach_history') || '[]'),
   pendingTransaction: null,
-  coachLoaded: false,
   charts: { category: null, trend: null }
 };
 
@@ -149,14 +147,6 @@ function switchTab(tab) {
 
   if (tab === 'dashboard') loadDashboard();
   if (tab === 'transactions') loadTransactions();
-  if (tab === 'coach') {
-    if (!state.coachLoaded) loadCoach();
-    setTimeout(() => {
-      const cm = document.getElementById('coach-messages');
-      if (cm) cm.scrollTop = cm.scrollHeight;
-      document.getElementById('coach-input')?.focus();
-    }, 100);
-  }
   if (tab === 'chat') {
     setTimeout(() => {
       const cm = document.getElementById('chat-messages');
@@ -547,162 +537,14 @@ async function sendChatMessage() {
   }
 }
 
-// ── Kola Coach ─────────────────────────────────────────────────────────────────
-function addCoachMessage(role, content) {
-  const messages = document.getElementById('coach-messages');
-  if (!messages) return null;
-  const div = document.createElement('div');
-  div.className = `coach-msg ${role === 'user' ? 'user' : 'kola'}`;
-  div.innerHTML = role === 'user'
-    ? `<div class="coach-bubble">${content}</div>`
-    : `<div class="coach-bubble">${content}</div>`;
-  messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight;
-  return div;
-}
-
-function showCoachTyping() {
-  const messages = document.getElementById('coach-messages');
-  if (!messages) return;
-  const div = document.createElement('div');
-  div.className = 'coach-msg kola';
-  div.id = 'coach-typing';
-  div.innerHTML = `<div class="coach-bubble"><div class="typing"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
-  messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight;
-}
-
-function removeCoachTyping() {
-  document.getElementById('coach-typing')?.remove();
-}
-
-function renderBilanBars(week) {
-  if (!week) return;
-
-  const totalIn  = week.income  || 0;
-  const totalOut = week.expense || 0;
-  const balance  = totalIn - totalOut;
-  const maxVal   = Math.max(totalIn, totalOut, 1);
-
-  const inFill  = document.getElementById('bilan-income-fill');
-  const outFill = document.getElementById('bilan-expense-fill');
-  const inVal   = document.getElementById('bilan-income-val');
-  const outVal  = document.getElementById('bilan-expense-val');
-  const balEl   = document.getElementById('bilan-balance');
-
-  if (inFill)  inFill.style.width  = `${(totalIn  / maxVal) * 100}%`;
-  if (outFill) outFill.style.width = `${(totalOut / maxVal) * 100}%`;
-  if (inVal)   inVal.textContent   = `${formatAmount(totalIn)} FCFA`;
-  if (outVal)  outVal.textContent  = `${formatAmount(totalOut)} FCFA`;
-  if (balEl) {
-    balEl.textContent = `${balance >= 0 ? '📈' : '📉'} Bilan : ${balance >= 0 ? '+' : ''}${formatAmount(balance)} FCFA cette semaine`;
-    balEl.className = `coach-bilan-balance ${balance >= 0 ? 'positive' : 'negative'}`;
-  }
-}
-
-async function loadCoach() {
-  const quoteText   = document.getElementById('coach-quote-text');
-  const quoteAuthor = document.getElementById('coach-quote-author');
-  const loading     = document.getElementById('coach-loading');
-  const cm          = document.getElementById('coach-messages');
-
-  // Restore previous conversation from localStorage
-  if (state.coachHistory.length > 0) {
-    if (cm) cm.innerHTML = '';
-    state.coachHistory.forEach(m => addCoachMessage(m.role, m.content));
-    loading?.remove();
-  }
-
-  try {
-    const data = await api('/api/coach/analysis');
-
-    // Quote
-    if (quoteText && data.quote) {
-      quoteText.textContent = typeof data.quote === 'string' ? data.quote : (data.quote.text || data.quote);
-      if (quoteAuthor && typeof data.quote === 'object' && data.quote.author) {
-        quoteAuthor.textContent = '— ' + data.quote.author;
-      }
-    }
-
-    // Bilan bars
-    renderBilanBars(data.week);
-
-    // Remove loading spinner
-    loading?.remove();
-
-    // Initial Kola message (only if no prior history)
-    if (state.coachHistory.length === 0 && data.message) {
-      addCoachMessage('kola', escapeHtml(data.message));
-      state.coachHistory.push({ role: 'kola', content: data.message });
-      saveCoachHistory();
-    }
-
-    state.coachLoaded = true;
-  } catch (err) {
-    console.error('Coach load error:', err);
-    loading?.remove();
-    if (state.coachHistory.length === 0) {
-      addCoachMessage('kola', 'Bonjour ! Je suis Kola, ton coach financier. Comment puis-je t\'aider aujourd\'hui ?');
-    }
-    state.coachLoaded = true;
-  }
-}
-
-function saveCoachHistory() {
-  // Keep last 30 messages to avoid localStorage overflow
-  if (state.coachHistory.length > 30) {
-    state.coachHistory = state.coachHistory.slice(-30);
-  }
-  localStorage.setItem('kula_coach_history', JSON.stringify(state.coachHistory));
-}
-
-async function sendCoachMessage() {
-  const input = document.getElementById('coach-input');
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
-
-  input.value = '';
-  input.style.height = 'auto';
-  document.getElementById('coach-send').disabled = true;
-
-  addCoachMessage('user', escapeHtml(text));
-  state.coachHistory.push({ role: 'user', content: text });
-  saveCoachHistory();
-
-  showCoachTyping();
-
-  try {
-    const response = await api('/api/coach/chat', {
-      method: 'POST',
-      body: JSON.stringify({
-        message: text,
-        history: state.coachHistory.slice(-12)
-      })
-    });
-
-    removeCoachTyping();
-    const msg = response.message || 'Je suis là pour t\'aider !';
-    addCoachMessage('kola', escapeHtml(msg));
-    state.coachHistory.push({ role: 'kola', content: msg });
-    saveCoachHistory();
-  } catch (err) {
-    removeCoachTyping();
-    addCoachMessage('kola', `❌ ${escapeHtml(err.message)}`);
-  } finally {
-    document.getElementById('coach-send').disabled = false;
-    input.focus();
-  }
-}
-
-// ── Scheduled coach notifications (8h, 13h, 20h) ──────────────────────────────
-function scheduleCoachNotifications() {
+// ── Scheduled notifications (8h, 13h, 20h) ────────────────────────────────────
+function scheduleNotifications() {
   if (Notification.permission !== 'granted') return;
 
   const SLOTS = [
-    { hour: 8,  key: 'morning',   msg: '🌅 Bonjour ! Comment s\'est passée ta matinée financièrement ? Note tes dépenses avec Kula.' },
-    { hour: 13, key: 'afternoon', msg: '☀️ Pause déjeuner ! N\'oublie pas de noter tes dépenses du matin dans Kula.' },
-    { hour: 20, key: 'evening',   msg: '🌙 Bonsoir ! Prends 2 minutes pour bilan ta journée avec Kola Coach.' }
+    { hour: 8,  key: 'morning',   msg: '🌅 Bonjour ! Note tes dépenses et revenus du matin dans Kula.' },
+    { hour: 13, key: 'afternoon', msg: '☀️ Pause déjeuner ! Quelques dépenses à enregistrer dans Kula ?' },
+    { hour: 20, key: 'evening',   msg: '🌙 Bonsoir ! Prends 2 minutes pour faire le bilan de ta journée.' }
   ];
 
   const today = new Date().toDateString();
@@ -710,34 +552,26 @@ function scheduleCoachNotifications() {
   SLOTS.forEach(slot => {
     const storageKey = `kula_notif_${slot.key}`;
     const lastSent = localStorage.getItem(storageKey);
-
-    // Already sent today
     if (lastSent && new Date(parseInt(lastSent)).toDateString() === today) return;
 
     const now = new Date();
     const target = new Date();
     target.setHours(slot.hour, 0, 0, 0);
-
-    // If time already passed today, skip to tomorrow
     if (target <= now) return;
 
-    const delay = target - now;
     setTimeout(() => {
       if (Notification.permission !== 'granted') return;
-      const notif = new Notification('Kula Coach 🌱', {
+      const notif = new Notification('Kula 🌱', {
         body: slot.msg,
         icon: '/icon-192.png',
         badge: '/icon-192.png',
-        tag: `kula-coach-${slot.key}`,
+        tag: `kula-notif-${slot.key}`,
+
         renotify: false
       });
-      notif.onclick = () => {
-        window.focus();
-        switchTab('coach');
-        notif.close();
-      };
+      notif.onclick = () => { window.focus(); switchTab('chat'); notif.close(); };
       localStorage.setItem(storageKey, Date.now().toString());
-    }, delay);
+    }, target - now);
   });
 }
 
@@ -879,7 +713,7 @@ async function initNotifications() {
   if (Notification.permission === 'default') {
     setTimeout(async () => {
       const permission = await Notification.requestPermission();
-      if (permission === 'granted') scheduleCoachNotifications();
+      if (permission === 'granted') scheduleNotifications();
     }, 5000); // ask 5s after load, less intrusive
   }
 
@@ -1002,23 +836,8 @@ function init() {
     autoResize(this);
   });
 
-  // Coach send button
-  document.getElementById('coach-send')?.addEventListener('click', sendCoachMessage);
-
-  // Coach input keyboard shortcuts
-  document.getElementById('coach-input')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendCoachMessage();
-    }
-  });
-
-  document.getElementById('coach-input')?.addEventListener('input', function () {
-    autoResize(this);
-  });
-
-  // Schedule coach notifications after permission is obtained
-  setTimeout(() => scheduleCoachNotifications(), 6000);
+  // Schedule notifications after permission is obtained
+  setTimeout(() => scheduleNotifications(), 6000);
 }
 
 // ── PWA Install ────────────────────────────────────────────────────────────────

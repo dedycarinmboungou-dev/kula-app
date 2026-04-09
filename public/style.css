@@ -25,6 +25,13 @@
   --header-height: 60px;
 }
 
+html {
+  /* Prevent iOS bounce on the root document */
+  overflow: hidden;
+  height: 100%;
+  touch-action: pan-y;
+}
+
 html, body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
@@ -35,10 +42,14 @@ html, body {
 
   /* ── App native feel ── */
   overscroll-behavior: none;           /* no bounce on Android */
+  overscroll-behavior-y: none;         /* belt + suspenders */
   -webkit-overflow-scrolling: touch;   /* smooth iOS scroll */
   touch-action: pan-y;                 /* allow vertical scroll, block zoom gestures */
   -webkit-text-size-adjust: 100%;      /* no auto font resize on rotation */
   -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  position: fixed;                     /* prevent iOS rubber-band on body */
+  width: 100%;
 }
 
 /* No text selection on UI elements */
@@ -64,10 +75,13 @@ button, a, img, .nav-item, .nav-fab,
 #app {
   max-width: 480px;
   margin: 0 auto;
-  min-height: 100dvh;
+  height: 100%;
   background: var(--light-gray);
   position: relative;
   overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
 }
 
 /* ─── Header ───────────────────────────────────────────────────────────────── */
