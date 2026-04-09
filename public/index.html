@@ -182,6 +182,64 @@
     </div>
   </section>
 
+  <!-- ── Tab: Coach ───────────────────────────────────────────────────────── -->
+  <section class="tab-panel" id="tab-coach">
+
+    <!-- Kola header -->
+    <div class="coach-header">
+      <div class="coach-avatar">K</div>
+      <div class="coach-info">
+        <div class="coach-name">Kola</div>
+        <div class="coach-status" id="coach-status">Ton coach financier 🌱</div>
+      </div>
+      <div class="coach-badge" id="coach-moment-badge">—</div>
+    </div>
+
+    <!-- Quote of the day -->
+    <div class="coach-quote-card" id="coach-quote-card">
+      <div class="coach-quote-label">✨ Citation du jour</div>
+      <div class="coach-quote-text" id="coach-quote-text">Chargement…</div>
+      <div class="coach-quote-author" id="coach-quote-author"></div>
+    </div>
+
+    <!-- Weekly bilan -->
+    <div class="coach-bilan">
+      <div class="coach-bilan-title">📊 Bilan de la semaine</div>
+      <div class="coach-bilan-row">
+        <span class="bilan-lbl">💰 Revenus</span>
+        <div class="bilan-track"><div class="bilan-fill income" id="bilan-income-fill"></div></div>
+        <span class="bilan-val income" id="bilan-income-val">—</span>
+      </div>
+      <div class="coach-bilan-row">
+        <span class="bilan-lbl">💸 Dépenses</span>
+        <div class="bilan-track"><div class="bilan-fill expense" id="bilan-expense-fill"></div></div>
+        <span class="bilan-val expense" id="bilan-expense-val">—</span>
+      </div>
+      <div class="coach-bilan-balance" id="bilan-balance">Solde semaine : —</div>
+    </div>
+
+    <!-- Kola conversation -->
+    <div class="coach-messages" id="coach-messages">
+      <div class="coach-loading" id="coach-loading">
+        <div class="loading-spinner" style="border-color:rgba(16,185,129,0.2);border-top-color:#10B981"></div>
+        <span>Kola analyse tes finances…</span>
+      </div>
+    </div>
+
+    <!-- Input fixed at bottom -->
+    <div class="coach-bottom" id="coach-bottom">
+      <div class="chat-input-wrap">
+        <textarea id="coach-input" placeholder="Pose une question à Kola…" rows="1" maxlength="500"></textarea>
+      </div>
+      <button class="btn-send" id="coach-send" title="Envoyer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7"/>
+        </svg>
+      </button>
+    </div>
+
+  </section>
+
   <!-- ── Tab: Transactions ──────────────────────────────────────────────── -->
   <section class="tab-panel" id="tab-transactions">
 
@@ -214,6 +272,13 @@
         <rect x="14" y="14" width="7" height="7" rx="1"/>
       </svg>
       <span class="nav-label">Tableau</span>
+    </button>
+
+    <button class="nav-item" data-tab="coach">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+      </svg>
+      <span class="nav-label">Coach</span>
     </button>
 
     <button class="nav-fab" data-tab="chat" id="nav-chat">

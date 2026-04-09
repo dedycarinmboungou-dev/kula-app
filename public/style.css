@@ -1004,6 +1004,263 @@ button, a, img, .nav-item, .nav-fab,
   30% { transform: translateY(-6px); }
 }
 
+/* ─── Coach Tab ─────────────────────────────────────────────────────────────── */
+#tab-coach {
+  padding-bottom: calc(var(--nav-height) + 80px);
+}
+
+.coach-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px 16px;
+  background: linear-gradient(135deg, #064E3B, #065F46);
+  color: white;
+}
+
+.coach-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 900;
+  color: #064E3B;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(245,158,11,0.4);
+}
+
+.coach-info { flex: 1; }
+
+.coach-name {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.coach-status {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+.coach-badge {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Quote card */
+.coach-quote-card {
+  margin: 16px 16px 0;
+  background: linear-gradient(135deg, #047857, #065F46);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.coach-quote-card::before {
+  content: '❝';
+  position: absolute;
+  top: -8px;
+  right: 16px;
+  font-size: 64px;
+  opacity: 0.12;
+  line-height: 1;
+}
+
+.coach-quote-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  opacity: 0.75;
+  margin-bottom: 8px;
+}
+
+.coach-quote-text {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+  font-style: italic;
+}
+
+.coach-quote-author {
+  font-size: 12px;
+  opacity: 0.65;
+  margin-top: 8px;
+  text-align: right;
+  font-weight: 600;
+}
+
+/* Weekly bilan */
+.coach-bilan {
+  margin: 14px 16px 0;
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+}
+
+.coach-bilan-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 14px;
+}
+
+.coach-bilan-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.bilan-lbl {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray);
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.bilan-track {
+  flex: 1;
+  height: 8px;
+  background: var(--light-gray);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bilan-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(.34,1.56,.64,1);
+  width: 0%;
+}
+
+.bilan-fill.income  { background: linear-gradient(90deg, #10B981, #059669); }
+.bilan-fill.expense { background: linear-gradient(90deg, #EF4444, #DC2626); }
+
+.bilan-val {
+  font-size: 12px;
+  font-weight: 700;
+  width: 90px;
+  text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.bilan-val.income  { color: var(--income-color); }
+.bilan-val.expense { color: var(--expense-color); }
+
+.coach-bilan-balance {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dark);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* Coach messages */
+.coach-messages {
+  padding: 16px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.coach-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--gray);
+  font-size: 13px;
+  padding: 20px 0;
+  justify-content: center;
+}
+
+.coach-msg {
+  display: flex;
+  gap: 10px;
+  animation: msgIn 0.25s ease;
+}
+
+.coach-msg.user {
+  flex-direction: row-reverse;
+}
+
+.coach-msg-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  align-self: flex-end;
+}
+
+.coach-msg.kola .coach-msg-avatar {
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  color: #064E3B;
+}
+
+.coach-msg.user .coach-msg-avatar {
+  background: var(--dark2);
+  color: white;
+}
+
+.coach-msg-bubble {
+  max-width: 82%;
+  padding: 11px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.coach-msg.kola .coach-msg-bubble {
+  background: var(--white);
+  color: var(--dark);
+  border-bottom-left-radius: 4px;
+  box-shadow: var(--shadow);
+}
+
+.coach-msg.user .coach-msg-bubble {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+/* Coach fixed bottom input */
+.coach-bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  background: var(--white);
+  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+  padding-bottom: calc(var(--nav-height) + 10px);
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
 /* ─── Transactions Tab ──────────────────────────────────────────────────────── */
 #tab-transactions {
   padding: 16px 16px calc(var(--nav-height) + 16px);

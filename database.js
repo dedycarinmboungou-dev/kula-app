@@ -134,6 +134,11 @@ const stmts = {
     SELECT * FROM transactions WHERE user_id = $userId
     ORDER BY date DESC, created_at DESC LIMIT $limit
   `),
+  getTxSince: db.prepare(`
+    SELECT * FROM transactions
+    WHERE user_id = $userId AND date >= $since
+    ORDER BY date DESC
+  `),
   getMonthlyTrend: db.prepare(`
     SELECT
       strftime('%Y-%m', date) AS month,
