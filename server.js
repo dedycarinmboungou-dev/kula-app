@@ -298,13 +298,18 @@ app.put('/api/profile/name', requireAuth, (req, res) => {
 });
 
 app.put('/api/profile/photo', requireAuth, (req, res) => {
-  const { photo } = req.body;
-  if (!photo || !photo.startsWith('data:image/'))
-    return res.status(400).json({ error: 'Format photo invalide' });
-  if (photo.length > 3_800_000)
-    return res.status(400).json({ error: 'Photo trop grande (max 2 Mo)' });
-  stmts.updateUserPhoto.run({ photo, id: req.userId });
-  res.json({ ok: true }); // don't echo the base64 back
+  try {
+    const { photo } = req.body;
+    if (!photo || !photo.startsWith('data:image/'))
+      return res.status(400).json({ error: 'Format photo invalide' });
+    if (photo.length > 3_800_000)
+      return res.status(400).json({ error: 'Photo trop grande (max 2 Mo)' });
+    stmts.updateUserPhoto.run({ photo, id: req.userId });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[photo upload]', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
