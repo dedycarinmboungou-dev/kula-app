@@ -455,17 +455,63 @@ async function saveTransaction(tx) {
 }
 
 // ── Chat ────────────────────────────────────────────────────────────────────────
+
+// Convert plain bot text to light HTML: **bold**, bullet lists, line breaks
+function formatBotContent(text) {
+  // Escape raw HTML first (safety), then apply formatting
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Split into lines to handle bullet detection
+  const lines = escaped.split('\n');
+  const out = [];
+  let inList = false;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    const isBullet = /^[•\-\*]\s+/.test(line);
+
+    if (isBullet) {
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push(`<li>${applyInline(line.replace(/^[•\-\*]\s+/, ''))}</li>`);
+    } else {
+      if (inList) { out.push('</ul>'); inList = false; }
+      if (line === '') {
+        out.push('<br>');
+      } else {
+        out.push(applyInline(line) + '<br>');
+      }
+    }
+  }
+  if (inList) out.push('</ul>');
+
+  // Remove trailing <br> sequences
+  return out.join('').replace(/(<br>)+$/, '');
+}
+
+function applyInline(text) {
+  // **bold**
+  return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
 function addChatMessage(role, content) {
   const messages = document.getElementById('chat-messages');
   const div = document.createElement('div');
   div.className = `msg ${role === 'user' ? 'user' : 'bot'}`;
 
-  const avatarClass = 'msg-avatar';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
 
-  div.innerHTML = `
-    <div class="${avatarClass}">${role === 'user' ? '👤' : 'K'}</div>
-    <div class="msg-bubble">${content}</div>
-  `;
+  if (role === 'user') {
+    bubble.textContent = content; // user text is already escaped upstream
+  } else {
+    bubble.innerHTML = formatBotContent(content);
+  }
+
+  div.innerHTML = `<div class="msg-avatar">${role === 'user' ? '👤' : 'K'}</div>`;
+  div.appendChild(bubble);
 
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
@@ -589,19 +635,19 @@ async function sendChatMessage() {
     if (response.type === 'transactions' && Array.isArray(response.transactions) && response.transactions.length) {
       // Transactions already saved by the backend — show saved cards
       const confirmMsg = response.message || `${response.transactions.length} transaction(s) enregistrée(s) ✅`;
-      const botMsg = addChatMessage('bot', escapeHtml(confirmMsg));
+      const botMsg = addChatMessage('bot', confirmMsg);
       response.transactions.forEach(tx => renderSavedTransaction(tx, botMsg));
       state.chatHistory.push({ role: 'assistant', content: confirmMsg });
       // Refresh dashboard silently
       if (state.currentTab === 'dashboard') loadDashboard();
     } else {
       const msg = response.message || "Je n'ai pas compris. Pouvez-vous reformuler ?";
-      addChatMessage('bot', escapeHtml(msg));
+      addChatMessage('bot', msg);
       state.chatHistory.push({ role: 'assistant', content: msg });
     }
   } catch (err) {
     removeTypingIndicator();
-    addChatMessage('bot', `❌ Erreur: ${escapeHtml(err.message)}`);
+    addChatMessage('bot', `❌ ${escapeHtml(err.message)}`);
   } finally {
     document.getElementById('btn-send').disabled = false;
     input.focus();
@@ -659,13 +705,30 @@ const voice = (() => {
   recognition.maxAlternatives = 1;
 
   let isListening = false;
-  let baseText = '';   // text already in the field before recording started
+  let baseText    = '';
+  let silenceTimer = null;
+  const SILENCE_MS = 2500; // auto-send after 2.5s of silence
+
+  function clearSilenceTimer() {
+    if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
+  }
+
+  function startSilenceTimer() {
+    clearSilenceTimer();
+    silenceTimer = setTimeout(() => {
+      if (isListening) {
+        recognition.stop();           // triggers onend → setUI(false)
+        const input = document.getElementById('chat-input');
+        if (input.value.trim()) sendChatMessage();
+      }
+    }, SILENCE_MS);
+  }
 
   function setUI(listening) {
-    const btn = document.getElementById('btn-mic');
+    const btn    = document.getElementById('btn-mic');
     const status = document.getElementById('mic-status');
-    const input = document.getElementById('chat-input');
-    isListening = listening;
+    const input  = document.getElementById('chat-input');
+    isListening  = listening;
     btn.classList.toggle('recording', listening);
     btn.title = listening ? 'Arrêter' : 'Dicter un message';
     status.classList.toggle('visible', listening);
@@ -673,6 +736,7 @@ const voice = (() => {
       baseText = input.value.trim();
       input.placeholder = 'Parlez maintenant…';
     } else {
+      clearSilenceTimer();
       input.placeholder = 'Décris ta transaction…';
       autoResize(input);
     }
@@ -681,7 +745,7 @@ const voice = (() => {
   recognition.onresult = (e) => {
     const input = document.getElementById('chat-input');
     let interim = '';
-    let final = '';
+    let final   = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
       if (e.results[i].isFinal) final += t;
@@ -691,9 +755,22 @@ const voice = (() => {
     input.value = combined;
     if (final) baseText = combined;
     autoResize(input);
+    // Reset silence timer on every speech result
+    startSilenceTimer();
+  };
+
+  // onspeechend fires when the user stops speaking (before onend)
+  recognition.onspeechend = () => {
+    startSilenceTimer();
+  };
+
+  // onaudioend as backup (fires even with no speech event)
+  recognition.onaudioend = () => {
+    startSilenceTimer();
   };
 
   recognition.onerror = (e) => {
+    clearSilenceTimer();
     const msgs = {
       'not-allowed': 'Accès au micro refusé. Autorisez le microphone dans votre navigateur.',
       'no-speech':   'Aucune parole détectée. Réessayez.',
@@ -704,16 +781,20 @@ const voice = (() => {
   };
 
   recognition.onend = () => {
+    clearSilenceTimer();
     if (isListening) setUI(false);
   };
 
   function toggle() {
     if (isListening) {
+      clearSilenceTimer();
       recognition.stop();
       setUI(false);
     } else {
       recognition.start();
       setUI(true);
+      // Start silence timer immediately — if no speech at all, auto-cancel
+      startSilenceTimer();
     }
   }
 
