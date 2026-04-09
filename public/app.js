@@ -689,13 +689,28 @@ function scheduleNotifications() {
   });
 }
 
-// ── Voice recognition ──────────────────────────────────────────────────────────
+// ── Voice recognition + waveform visualiser ───────────────────────────────────
 const voice = (() => {
   try {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return null;
 
-    let isListening = false;
+    let isListening   = false;
+    let audioCtx      = null;
+    let analyser      = null;
+    let mediaStream   = null;
+    let animFrame     = null;
+
+    // ── UI helpers ────────────────────────────────────────────────────────
+    function showWave() {
+      document.getElementById('chat-input').style.display  = 'none';
+      document.getElementById('voice-wave').classList.add('active');
+    }
+
+    function hideWave() {
+      document.getElementById('voice-wave').classList.remove('active');
+      document.getElementById('chat-input').style.display  = '';
+    }
 
     function setBtn(active) {
       const btn = document.getElementById('btn-mic');
@@ -704,36 +719,130 @@ const voice = (() => {
       btn.title = active ? 'Arrêter' : 'Dicter un message';
     }
 
-    function toggle() {
-      if (isListening) return; // ignore double-tap — onend will reset
+    // ── Waveform drawing loop ─────────────────────────────────────────────
+    function drawWave() {
+      const canvas = document.getElementById('voice-wave');
+      if (!canvas || !analyser) return;
+
+      // Match canvas resolution to its CSS size
+      const dpr = window.devicePixelRatio || 1;
+      const W   = canvas.offsetWidth;
+      const H   = canvas.offsetHeight;
+      if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+        canvas.width  = W * dpr;
+        canvas.height = H * dpr;
+      }
+
+      const ctx    = canvas.getContext('2d');
+      const bufLen = analyser.frequencyBinCount;
+      const data   = new Uint8Array(bufLen);
+
+      function loop() {
+        animFrame = requestAnimationFrame(loop);
+        analyser.getByteTimeDomainData(data);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Gradient stroke
+        const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        grad.addColorStop(0,   '#10B981');
+        grad.addColorStop(0.5, '#1a7a4a');
+        grad.addColorStop(1,   '#10B981');
+
+        ctx.lineWidth   = 2.5 * dpr;
+        ctx.strokeStyle = grad;
+        ctx.lineCap     = 'round';
+        ctx.lineJoin    = 'round';
+        ctx.beginPath();
+
+        const sliceW = canvas.width / bufLen;
+        let   x      = 0;
+
+        for (let i = 0; i < bufLen; i++) {
+          const v = data[i] / 128.0;
+          const y = (v * canvas.height) / 2;
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+          x += sliceW;
+        }
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.stroke();
+      }
+      loop();
+    }
+
+    function stopWave() {
+      if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      if (audioCtx) {
+        audioCtx.close().catch(() => {});
+        audioCtx  = null;
+        analyser  = null;
+      }
+    }
+
+    // ── Main toggle ───────────────────────────────────────────────────────
+    async function toggle() {
+      if (isListening) return; // one session at a time
 
       const recognition = new SpeechRecognition();
-      recognition.lang = 'fr-FR';
-      recognition.interimResults = false;
-      recognition.continuous = false;
+      recognition.lang            = 'fr-FR';
+      recognition.interimResults  = false;
+      recognition.continuous      = false;
       recognition.maxAlternatives = 1;
+
+      // Start audio visualiser
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx    = new (window.AudioContext || window.webkitAudioContext)();
+        analyser    = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        audioCtx.createMediaStreamSource(mediaStream).connect(analyser);
+        showWave();
+        drawWave();
+      } catch {
+        // getUserMedia failed (denied or unavailable) — still run speech without wave
+        showWave();
+      }
 
       isListening = true;
       setBtn(true);
+      recognition.start();
 
+      // ── Result: fill textarea, stop visualiser, DON'T auto-send ─────────
       recognition.onresult = (e) => {
         const transcript = e.results[0]?.[0]?.transcript?.trim();
-        if (!transcript) return;
-        const input = document.getElementById('chat-input');
-        input.value = input.value.trim()
-          ? input.value.trim() + ' ' + transcript
-          : transcript;
-        autoResize(input);
-      };
-
-      recognition.onend = () => {
+        stopWave();
+        hideWave();
         isListening = false;
         setBtn(false);
+
         const input = document.getElementById('chat-input');
-        if (input.value.trim()) sendChatMessage();
+        if (transcript) {
+          input.value = input.value.trim()
+            ? input.value.trim() + ' ' + transcript
+            : transcript;
+          autoResize(input);
+        }
+        input.focus();
+        recognition.stop();
       };
 
+      // ── End (no result / aborted) ─────────────────────────────────────
+      recognition.onend = () => {
+        if (!isListening) return; // already handled by onresult
+        stopWave();
+        hideWave();
+        isListening = false;
+        setBtn(false);
+      };
+
+      // ── Errors ────────────────────────────────────────────────────────
       recognition.onerror = (e) => {
+        stopWave();
+        hideWave();
         isListening = false;
         setBtn(false);
         if (e.error === 'aborted' || e.error === 'no-speech') return;
@@ -743,8 +852,6 @@ const voice = (() => {
           showToast(`Erreur micro : ${e.error}`, 'error');
         }
       };
-
-      recognition.start();
     }
 
     return { toggle, isListening: () => isListening };

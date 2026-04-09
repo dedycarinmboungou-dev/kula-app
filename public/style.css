@@ -948,6 +948,16 @@ button, a, img, .nav-item, .nav-fab,
 
 .btn-mic:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* Voice waveform canvas */
+#voice-wave {
+  display: none;
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
+}
+#voice-wave.active { display: block; }
+
 /* Mic status banner */
 .mic-status {
   display: none;
