@@ -79,6 +79,77 @@ function formatMonthLabel(monthStr) {
   return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 }
 
+// ── PDF Export ────────────────────────────────────────────────────────────────
+function openExportModal() {
+  const modal = document.getElementById('pdf-modal');
+  const sel   = document.getElementById('pdf-month-select');
+  const prev  = document.getElementById('pdf-preview-title');
+
+  // Populate months
+  const now = new Date();
+  sel.innerHTML = '';
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const val = d.toISOString().slice(0, 7);
+    const lbl = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
+    if (i === 0) opt.selected = true;
+    sel.appendChild(opt);
+  }
+
+  // Update preview title on change
+  function updatePreview() {
+    const lbl = sel.options[sel.selectedIndex]?.text || '';
+    prev.textContent = `Rapport Kula — ${lbl}`;
+  }
+  sel.onchange = updatePreview;
+  updatePreview();
+
+  modal.style.display = 'flex';
+}
+
+async function downloadPDF() {
+  const sel   = document.getElementById('pdf-month-select');
+  const month = sel.value;
+  const btn   = document.getElementById('btn-pdf-download');
+  const label = document.getElementById('pdf-btn-label');
+
+  btn.disabled = true;
+  label.textContent = 'Génération en cours…';
+
+  try {
+    const res = await fetch(`/api/report/pdf?month=${month}`, {
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Erreur inconnue' }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const lbl  = sel.options[sel.selectedIndex]?.text || month;
+    a.href     = url;
+    a.download = `kula-rapport-${month}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    document.getElementById('pdf-modal').style.display = 'none';
+    showToast(`Rapport ${lbl} téléchargé ✅`, 'success');
+  } catch (err) {
+    showToast(`Erreur : ${err.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    label.textContent = 'Télécharger le PDF';
+  }
+}
+
 // ── Month selector ────────────────────────────────────────────────────────────
 function initMonthSelectors() {
   const now = new Date();
@@ -838,6 +909,16 @@ function init() {
 
   // Schedule notifications after permission is obtained
   setTimeout(() => scheduleNotifications(), 6000);
+
+  // PDF export modal
+  document.getElementById('pdf-modal-close')?.addEventListener('click', () => {
+    document.getElementById('pdf-modal').style.display = 'none';
+  });
+  document.getElementById('pdf-modal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('pdf-modal'))
+      document.getElementById('pdf-modal').style.display = 'none';
+  });
+  document.getElementById('btn-pdf-download')?.addEventListener('click', downloadPDF);
 }
 
 // ── PWA Install ────────────────────────────────────────────────────────────────
@@ -938,6 +1019,7 @@ function init() {
 
 // Make deleteTransaction global for inline onclick
 window.deleteTransaction = deleteTransaction;
+window.openExportModal  = openExportModal;
 window.switchTab = switchTab;
 
 document.addEventListener('DOMContentLoaded', init);
