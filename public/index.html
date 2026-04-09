@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#064E3B">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -47,6 +47,19 @@
     </div>
   </header>
 
+  <!-- PWA Install prompt — in page flow, below header -->
+  <div class="install-prompt" id="install-prompt" style="display:none">
+    <div class="install-prompt-left">
+      <div class="install-prompt-icon">📲</div>
+      <div class="install-prompt-text">
+        <strong>Installer Kula sur mon téléphone</strong>
+        <span>Accès rapide, fonctionne hors ligne</span>
+      </div>
+    </div>
+    <button class="install-prompt-btn" id="btn-install">Installer</button>
+    <button class="install-prompt-close" id="btn-install-close" aria-label="Fermer">✕</button>
+  </div>
+
   <!-- ── Tab: Dashboard ────────────────────────────────────────────────── -->
   <section class="tab-panel active" id="tab-dashboard">
 
@@ -59,19 +72,6 @@
         <span class="loading-spinner"></span>
       </div>
       <div class="balance-sub" id="balance-sub">Chargement…</div>
-    </div>
-
-    <!-- PWA Install prompt -->
-    <div class="install-prompt" id="install-prompt" style="display:none">
-      <div class="install-prompt-left">
-        <div class="install-prompt-icon">📲</div>
-        <div class="install-prompt-text">
-          <strong>Installer Kula sur mon téléphone</strong>
-          <span>Accès rapide, fonctionne hors ligne</span>
-        </div>
-      </div>
-      <button class="install-prompt-btn" id="btn-install">Installer</button>
-      <button class="install-prompt-close" id="btn-install-close" aria-label="Fermer">✕</button>
     </div>
 
     <!-- Income / Expense cards -->

@@ -32,8 +32,33 @@ html, body {
   color: var(--dark);
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior: none;
+
+  /* ── App native feel ── */
+  overscroll-behavior: none;           /* no bounce on Android */
+  -webkit-overflow-scrolling: touch;   /* smooth iOS scroll */
+  touch-action: pan-y;                 /* allow vertical scroll, block zoom gestures */
+  -webkit-text-size-adjust: 100%;      /* no auto font resize on rotation */
+  -ms-text-size-adjust: 100%;
 }
+
+/* No text selection on UI elements */
+button, a, nav, .nav-item, .nav-fab, .filter-tab,
+.auth-tab, .balance-card, .stat-card, .section-header,
+.chat-topbar, .install-prompt, .welcome-modal,
+.pwa-modal-header, .pwa-os-tabs {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* No long-press context menu on interactive elements */
+button, a, img, .nav-item, .nav-fab,
+.install-prompt-btn, .install-prompt-close,
+.btn-back, .btn-logout, .user-badge {
+  -webkit-touch-callout: none;
+}
+
+/* Tap highlight removal (Android) */
+* { -webkit-tap-highlight-color: transparent; }
 
 /* ─── App Layout ───────────────────────────────────────────────────────────── */
 #app {
@@ -1109,22 +1134,20 @@ html, body {
   margin: 8px 0 4px;
 }
 
-/* ─── PWA Install prompt (dashboard banner) ────────────────────────────────── */
+/* ─── PWA Install prompt (below header, in page flow) ──────────────────────── */
 .install-prompt {
-  margin: 0 16px 16px;
-  background: linear-gradient(135deg, #064E3B, #065F46);
-  border-radius: var(--radius);
-  padding: 14px 16px;
+  background: linear-gradient(135deg, #047857, #065F46);
+  padding: 12px 20px;
   display: flex;
   align-items: center;
   gap: 12px;
   color: white;
-  box-shadow: 0 4px 20px rgba(6,78,59,0.3);
-  animation: slideInDown 0.4s cubic-bezier(.34,1.56,.64,1);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  animation: slideInDown 0.35s ease;
 }
 
 @keyframes slideInDown {
-  from { opacity: 0; transform: translateY(-12px); }
+  from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
