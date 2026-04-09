@@ -300,14 +300,20 @@ app.put('/api/profile/name', requireAuth, (req, res) => {
 app.put('/api/profile/photo', requireAuth, (req, res) => {
   try {
     const { photo } = req.body;
+    console.log('[photo upload] userId=%s bodyKeys=%s photoLen=%s',
+      req.userId,
+      req.body ? Object.keys(req.body).join(',') : 'null',
+      photo ? photo.length : 'missing'
+    );
     if (!photo || !photo.startsWith('data:image/'))
       return res.status(400).json({ error: 'Format photo invalide' });
     if (photo.length > 3_800_000)
       return res.status(400).json({ error: 'Photo trop grande (max 2 Mo)' });
-    stmts.updateUserPhoto.run({ photo, id: req.userId });
+    const result = stmts.updateUserPhoto.run({ photo, id: req.userId });
+    console.log('[photo upload] done changes=%s', result?.changes ?? '?');
     res.json({ ok: true });
   } catch (e) {
-    console.error('[photo upload]', e);
+    console.error('[photo upload] ERROR', e.message, e.stack);
     res.status(500).json({ error: e.message });
   }
 });
@@ -942,6 +948,15 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour.`;
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ── Global error handler (must be last) ───────────────────────────────────────
+// Catches errors from middleware (express.json parse errors, etc.) and returns JSON
+app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
+  console.error('[Express error]', err.status, err.message, err.type || '');
+  const status  = err.status || err.statusCode || 500;
+  const message = err.message || 'Erreur serveur';
+  if (!res.headersSent) res.status(status).json({ error: message });
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
