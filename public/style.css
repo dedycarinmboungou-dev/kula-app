@@ -309,8 +309,8 @@ button, a, img, .nav-item, .nav-fab,
 .balance-card {
   background: linear-gradient(135deg, #064E3B 0%, #065F46 60%, #047857 100%);
   color: white;
-  padding: 24px 20px 32px;
-  margin-bottom: -16px;
+  padding: 28px 20px 64px;
+  margin-bottom: -32px;
   position: relative;
   overflow: hidden;
 }
@@ -318,12 +318,12 @@ button, a, img, .nav-item, .nav-fab,
 .balance-card::after {
   content: '';
   position: absolute;
-  bottom: -40px;
+  bottom: -32px;
   left: 0;
   right: 0;
-  height: 80px;
+  height: 64px;
   background: var(--light-gray);
-  border-radius: 50% 50% 0 0 / 40px 40px 0 0;
+  border-radius: 50% 50% 0 0 / 32px 32px 0 0;
 }
 
 .balance-label {
