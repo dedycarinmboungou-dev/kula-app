@@ -970,8 +970,12 @@ function init() {
 
     navigator.serviceWorker.addEventListener('message', (e) => {
       if (e.data?.type === 'UPDATE_AVAILABLE') {
+        // Red dot on profile badge
         const dot = document.getElementById('update-dot');
         if (dot) dot.style.display = 'block';
+        // Banner inside profile panel
+        const bar = document.getElementById('profile-update-bar');
+        if (bar) bar.style.display = 'flex';
       }
     });
   }
@@ -1263,34 +1267,49 @@ function initProfileHandlers() {
     document.getElementById('profile-photo-input').click();
   });
 
-  // File input → read → upload
-  document.getElementById('profile-photo-input')?.addEventListener('change', async e => {
+  // File input → resize → show immediately → upload
+  document.getElementById('profile-photo-input')?.addEventListener('change', e => {
     const file = e.target.files[0];
+    e.target.value = '';
     if (!file) return;
 
-    // Max ~2MB check (base64 will be ~4/3 larger)
-    if (file.size > 2 * 1024 * 1024) {
-      showToast('Image trop grande (max 2 Mo)', 'error');
-      e.target.value = '';
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image trop grande (max 5 Mo)', 'error');
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = async ev => {
-      const base64 = ev.target.result; // data:image/...;base64,...
-      try {
-        const res = await api('/api/profile/photo', {
-          method: 'PUT',
-          body: JSON.stringify({ photo: base64 })
-        });
-        setProfilePhoto(res.photo);
-        showToast('Photo mise à jour', 'success');
-      } catch (err) {
-        showToast('Erreur upload photo : ' + err.message, 'error');
-      }
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = async () => {
+        // Resize to max 400×400 via canvas to keep base64 small
+        const MAX = 400;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width  * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const base64 = canvas.toDataURL('image/jpeg', 0.82);
+
+        // ── Show immediately, don't wait for server ──
+        setProfilePhoto(base64);
+
+        // ── Upload in background ──
+        try {
+          await api('/api/profile/photo', {
+            method: 'PUT',
+            body: JSON.stringify({ photo: base64 })
+          });
+          showToast('Photo mise à jour ✓', 'success');
+        } catch (err) {
+          showToast('Erreur sauvegarde photo : ' + err.message, 'error');
+        }
+      };
+      img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
-    e.target.value = '';
   });
 
   // Edit name button

@@ -282,6 +282,12 @@
 <!-- Profile panel — fixed, slides up from bottom -->
 <div class="profile-panel" id="profile-panel">
 
+  <!-- Update banner inside panel (hidden until SW signals) -->
+  <div class="profile-update-bar" id="profile-update-bar" style="display:none">
+    <span>🔄 Nouvelle version disponible</span>
+    <button onclick="window.location.reload()">Mettre à jour</button>
+  </div>
+
   <!-- Top bar -->
   <div class="profile-topbar">
     <button class="profile-back" id="profile-back" aria-label="Fermer">

@@ -2252,6 +2252,31 @@ button, a, img, .nav-item, .nav-fab,
   font-weight: 700;
 }
 
+/* ─── Update bar inside profile panel ───────────────────────────────────────── */
+.profile-update-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid #a7f3d0;
+}
+.profile-update-bar button {
+  flex-shrink: 0;
+  padding: 5px 14px;
+  background: #1a7a4a;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* ─── Update dot (on profile badge) ─────────────────────────────────────────── */
 .update-dot {
   position: absolute;
