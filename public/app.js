@@ -606,9 +606,6 @@ function renderSavedTransaction(tx, parentDiv) {
 }
 
 async function sendChatMessage() {
-  // Stop mic if recording
-  if (voice && voice.isListening()) voice.toggle();
-
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
   if (!text) return;
@@ -695,110 +692,62 @@ function scheduleNotifications() {
 // ── Voice recognition ──────────────────────────────────────────────────────────
 const voice = (() => {
   try {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) return null;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
 
-  const recognition = new SpeechRecognition();
-  recognition.lang = 'fr-FR';
-  recognition.interimResults = true;
-  recognition.continuous = false;
-  recognition.maxAlternatives = 1;
+    let isListening = false;
 
-  let isListening = false;
-  let baseText    = '';
-  let silenceTimer = null;
-  const SILENCE_MS = 2500; // auto-send after 2.5s of silence
+    function setBtn(active) {
+      const btn = document.getElementById('btn-mic');
+      if (!btn) return;
+      btn.classList.toggle('recording', active);
+      btn.title = active ? 'Arrêter' : 'Dicter un message';
+    }
 
-  function clearSilenceTimer() {
-    if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
-  }
+    function toggle() {
+      if (isListening) return; // ignore double-tap — onend will reset
 
-  function startSilenceTimer() {
-    clearSilenceTimer();
-    silenceTimer = setTimeout(() => {
-      if (isListening) {
-        recognition.stop();           // triggers onend → setUI(false)
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'fr-FR';
+      recognition.interimResults = false;
+      recognition.continuous = false;
+      recognition.maxAlternatives = 1;
+
+      isListening = true;
+      setBtn(true);
+
+      recognition.onresult = (e) => {
+        const transcript = e.results[0]?.[0]?.transcript?.trim();
+        if (!transcript) return;
+        const input = document.getElementById('chat-input');
+        input.value = input.value.trim()
+          ? input.value.trim() + ' ' + transcript
+          : transcript;
+        autoResize(input);
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        setBtn(false);
         const input = document.getElementById('chat-input');
         if (input.value.trim()) sendChatMessage();
-      }
-    }, SILENCE_MS);
-  }
+      };
 
-  function setUI(listening) {
-    const btn    = document.getElementById('btn-mic');
-    const status = document.getElementById('mic-status');
-    const input  = document.getElementById('chat-input');
-    isListening  = listening;
-    btn.classList.toggle('recording', listening);
-    btn.title = listening ? 'Arrêter' : 'Dicter un message';
-    status.classList.toggle('visible', listening);
-    if (listening) {
-      baseText = input.value.trim();
-      input.placeholder = 'Parlez maintenant…';
-    } else {
-      clearSilenceTimer();
-      input.placeholder = 'Décris ta transaction…';
-      autoResize(input);
-    }
-  }
+      recognition.onerror = (e) => {
+        isListening = false;
+        setBtn(false);
+        if (e.error === 'aborted' || e.error === 'no-speech') return;
+        if (e.error === 'not-allowed') {
+          showToast('Accès au micro refusé. Autorisez-le dans votre navigateur.', 'error');
+        } else {
+          showToast(`Erreur micro : ${e.error}`, 'error');
+        }
+      };
 
-  recognition.onresult = (e) => {
-    const input = document.getElementById('chat-input');
-    let interim = '';
-    let final   = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) final += t;
-      else interim += t;
-    }
-    const combined = [baseText, final || interim].filter(Boolean).join(' ');
-    input.value = combined;
-    if (final) baseText = combined;
-    autoResize(input);
-    // Reset silence timer on every speech result
-    startSilenceTimer();
-  };
-
-  // onspeechend fires when the user stops speaking (before onend)
-  recognition.onspeechend = () => {
-    startSilenceTimer();
-  };
-
-  // onaudioend as backup (fires even with no speech event)
-  recognition.onaudioend = () => {
-    startSilenceTimer();
-  };
-
-  recognition.onerror = (e) => {
-    clearSilenceTimer();
-    const msgs = {
-      'not-allowed': 'Accès au micro refusé. Autorisez le microphone dans votre navigateur.',
-      'no-speech':   'Aucune parole détectée. Réessayez.',
-      'network':     'Erreur réseau. Vérifiez votre connexion.',
-    };
-    showToast(msgs[e.error] || `Erreur micro: ${e.error}`, 'error');
-    setUI(false);
-  };
-
-  recognition.onend = () => {
-    clearSilenceTimer();
-    if (isListening) setUI(false);
-  };
-
-  function toggle() {
-    if (isListening) {
-      clearSilenceTimer();
-      recognition.stop();
-      setUI(false);
-    } else {
       recognition.start();
-      setUI(true);
-      // Start silence timer immediately — if no speech at all, auto-cancel
-      startSilenceTimer();
     }
-  }
 
-  return { toggle, isListening: () => isListening };
+    return { toggle, isListening: () => isListening };
   } catch (e) {
     console.warn('Voice recognition init error:', e);
     return null;
