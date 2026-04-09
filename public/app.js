@@ -63,6 +63,10 @@ const CATEGORIES = {
   Autre:            { icon: '📦', color: '#6B7280' }
 };
 
+// ── Notification safety helper (iOS Safari has no Notification API) ───────────
+const notifGranted = () =>
+  typeof Notification !== 'undefined' && Notification.permission === 'granted';
+
 // ── Formatting ────────────────────────────────────────────────────────────────
 function formatAmount(amount) {
   if (typeof amount !== 'number') amount = parseFloat(amount) || 0;
@@ -260,8 +264,8 @@ async function loadDashboard() {
     // Recent transactions
     renderTransactionList('recent-tx-list', data.recentTransactions || []);
 
-    // Budget notifications (check after data loaded)
-    checkBudgetNotifications(data.categories || [], state.budgets);
+    // Budget notifications — wrapped so any error never blocks the dashboard
+    try { checkBudgetNotifications(data.categories || [], state.budgets); } catch { /* silent */ }
   } catch (err) {
     console.error('Dashboard error:', err.message, err);
     const balEl = document.getElementById('total-balance');
@@ -719,7 +723,7 @@ function getDailyQuote() {
 }
 
 function scheduleNotifications() {
-  if (Notification.permission !== 'granted') return;
+  if (!notifGranted()) return;
 
   const SLOTS = [
     { hour: 8,  key: 'morning',   msg: '🌅 Bonjour ! Note tes dépenses et revenus du matin dans Kula.' },
@@ -740,7 +744,7 @@ function scheduleNotifications() {
     if (target <= now) return;
 
     setTimeout(() => {
-      if (Notification.permission !== 'granted') return;
+      if (!notifGranted()) return;
       const body = slot.key === 'morning'
         ? `💡 Citation du jour : ${getDailyQuote()}`
         : slot.msg;
@@ -972,7 +976,7 @@ function showReminderBanner(daysSince) {
 }
 
 function sendBrowserNotification(daysSince) {
-  if (Notification.permission !== 'granted') return;
+  if (!notifGranted()) return;
   const { text } = getReminderMessage(daysSince);
   const notif = new Notification('Kula 🌱 — Rappel budget', {
     body: text,
@@ -985,6 +989,7 @@ function sendBrowserNotification(daysSince) {
 }
 
 async function initNotifications() {
+  if (typeof Notification === 'undefined') return; // iOS Safari — no API
   // Request permission once (don't re-ask if denied)
   if (Notification.permission === 'default') {
     setTimeout(async () => {
@@ -1262,7 +1267,7 @@ const EXPENSE_CATEGORIES = [
 const budgetAlertsSent = {};
 
 function checkBudgetNotifications(categories, budgets) {
-  if (Notification.permission !== 'granted') return;
+  if (!notifGranted()) return;
   (categories || []).filter(c => c.type === 'expense').forEach(c => {
     const limite = budgets[c.category];
     if (!limite || limite <= 0) return;
