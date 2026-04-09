@@ -2468,3 +2468,144 @@ button, a, img, .nav-item, .nav-fab,
 
 .welcome-btn:hover  { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16,185,129,0.5); }
 .welcome-btn:active { transform: translateY(0); }
+
+/* ─── Budget panel & button ──────────────────────────────────────────────────── */
+.btn-budgets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 20px;
+  background: #fff;
+  border: 1.5px solid #10B981;
+  border-radius: var(--radius);
+  color: #10B981;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  justify-content: center;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-budgets:active { background: #f0fdf4; }
+
+.budget-month-label {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--gray);
+  font-weight: 500;
+}
+
+.budget-panel-body {
+  padding: 16px 20px 40px;
+}
+
+.budget-panel-hint {
+  font-size: 12px;
+  color: var(--gray);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.budget-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.budget-row:last-child { border-bottom: none; }
+
+.budget-row-icon {
+  font-size: 20px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.budget-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.budget-row-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.budget-progress-wrap {
+  height: 4px;
+  background: var(--light-gray);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.budget-progress-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.budget-progress-label {
+  font-size: 10px;
+  color: var(--gray);
+  margin-top: 2px;
+}
+
+.budget-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.budget-input {
+  width: 90px;
+  padding: 6px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--dark);
+  background: var(--light-gray);
+  -moz-appearance: textfield;
+}
+.budget-input:focus {
+  outline: none;
+  border-color: #10B981;
+  background: #fff;
+}
+.budget-input::placeholder { color: #aaa; font-weight: 400; }
+
+.budget-input-unit {
+  font-size: 10px;
+  color: var(--gray);
+  white-space: nowrap;
+}
+
+/* Category list — budget progress bar (2nd bar under existing) */
+.category-budget-wrap {
+  height: 4px;
+  background: var(--light-gray);
+  border-radius: 2px;
+  margin-top: 2px;
+  overflow: hidden;
+}
+.category-budget-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+.category-budget-label {
+  font-size: 10px;
+  color: var(--gray);
+}

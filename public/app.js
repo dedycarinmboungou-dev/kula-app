@@ -42,7 +42,8 @@ const state = {
   txMonth: new Date().toISOString().slice(0, 7),
   chatHistory: [],
   pendingTransaction: null,
-  charts: { category: null, trend: null }
+  charts: { category: null, trend: null },
+  budgets: {}  // {category: limite} for current month
 };
 
 // ── Category metadata ─────────────────────────────────────────────────────────
@@ -246,14 +247,21 @@ async function loadDashboard() {
     document.getElementById('monthly-income').textContent = `${formatAmount(data.monthlyIncome)} FCFA`;
     document.getElementById('monthly-expense').textContent = `${formatAmount(data.monthlyExpense)} FCFA`;
 
-    // Category breakdown
-    renderCategoryChart(data.categories, data.monthlyExpense);
+    // Budget state for this month (passed to renderCategoryChart)
+    state.budgets = {};
+    if (data.budgets) data.budgets.forEach(b => { state.budgets[b.category] = b.limite; });
+
+    // Category breakdown (with budgets)
+    renderCategoryChart(data.categories, data.monthlyExpense, state.budgets);
 
     // Trend chart
     renderTrendChart(data.trend);
 
     // Recent transactions
     renderTransactionList('recent-tx-list', data.recentTransactions);
+
+    // Budget notifications (check after data loaded)
+    checkBudgetNotifications(data.categories, state.budgets);
   } catch (err) {
     console.error('Dashboard error:', err.message, err);
     const balEl = document.getElementById('total-balance');
@@ -263,7 +271,7 @@ async function loadDashboard() {
 }
 
 // ── Category chart ──────────────────────────────────────────────────────────────
-function renderCategoryChart(categories, totalExpense) {
+function renderCategoryChart(categories, totalExpense, budgets = {}) {
   const expenseCats = categories.filter(c => c.type === 'expense');
   const listEl = document.getElementById('category-list');
   const ctx = document.getElementById('category-chart');
@@ -300,11 +308,22 @@ function renderCategoryChart(categories, totalExpense) {
     }
   });
 
-  // Category list
+  // Category list with optional budget progress
   const maxTotal = Math.max(...values, 1);
   listEl.innerHTML = expenseCats.slice(0, 6).map(c => {
-    const meta = CATEGORIES[c.category] || { icon: '📦', color: '#6B7280' };
-    const pct = Math.round(c.total / totalExpense * 100);
+    const meta   = CATEGORIES[c.category] || { icon: '📦', color: '#6B7280' };
+    const pct    = Math.round(c.total / totalExpense * 100);
+    const limite = budgets[c.category];
+    let budgetHtml = '';
+    if (limite > 0) {
+      const bPct     = Math.min(100, Math.round(c.total / limite * 100));
+      const barColor = bPct >= 100 ? '#EF4444' : bPct >= 80 ? '#F59E0B' : '#10B981';
+      budgetHtml = `
+        <div class="category-budget-wrap">
+          <div class="category-budget-bar" style="width:${bPct}%;background:${barColor}"></div>
+        </div>
+        <div class="category-budget-label">${bPct}% du budget (${formatAmount(limite)} FCFA)</div>`;
+    }
     return `
       <div class="category-item">
         <div class="category-dot" style="background:${meta.color}"></div>
@@ -313,6 +332,7 @@ function renderCategoryChart(categories, totalExpense) {
           <div class="category-bar-wrap">
             <div class="category-bar" style="width:${(c.total/maxTotal)*100}%;background:${meta.color}"></div>
           </div>
+          ${budgetHtml}
         </div>
         <div class="category-amount">${formatAmount(c.total)}<br><small style="font-size:10px;color:#6B7280">${pct}%</small></div>
       </div>`;
@@ -660,6 +680,44 @@ async function sendChatMessage() {
 }
 
 // ── Scheduled notifications (8h, 13h, 20h) ────────────────────────────────────
+const DAILY_QUOTES = [
+  'L\'argent est un bon serviteur mais un mauvais maître. — Francis Bacon',
+  'Ne remets pas à demain l\'épargne que tu peux faire aujourd\'hui.',
+  'Petit à petit, l\'oiseau fait son nid. Petit à petit, l\'épargne grandit.',
+  'Celui qui ne sait pas gérer peu ne saura pas gérer beaucoup.',
+  'La richesse n\'est pas dans ce qu\'on gagne, mais dans ce qu\'on garde.',
+  'Un budget n\'est pas une prison — c\'est une carte vers la liberté.',
+  'L\'eau qui coule doucement creuse la roche. L\'épargne régulière bâtit la fortune.',
+  'Dépenser sans compter, c\'est marcher sans regarder où l\'on va.',
+  'La fourmi travaille en été pour ne pas avoir faim en hiver.',
+  'Connais tes dépenses avant de connaître tes manques.',
+  'Chaque franc économisé est un franc gagné deux fois.',
+  'Le meilleur investissement que tu puisses faire, c\'est en toi-même.',
+  'Une dépense imprévue ne ruine que celui qui n\'a rien prévu.',
+  'L\'indépendance financière commence par une seule décision : épargner.',
+  'Qui contrôle son argent contrôle son destin.',
+  'Mieux vaut un revenu modeste bien géré qu\'une fortune mal maîtrisée.',
+  'La discipline financière d\'aujourd\'hui est la liberté de demain.',
+  'Ne confonds pas le prix et la valeur — ce n\'est pas la même chose.',
+  'Ton futur se construit avec les habitudes d\'aujourd\'hui.',
+  'Semer l\'épargne, c\'est récolter la sécurité.',
+  'L\'argent est un outil — apprends à t\'en servir avant qu\'il ne te dirige.',
+  'Compte ce que tu as avant de compter ce que tu veux.',
+  'Une bonne gestion du budget, c\'est le respect de soi-même.',
+  'Ce n\'est pas le revenu qui enrichit, c\'est la sagesse dans les dépenses.',
+  'Le bonheur ne s\'achète pas, mais la tranquillité financière s\'épargne.',
+  'Regarde où va ton argent — il te dira où va ta vie.',
+  'Commence petit, reste constant : l\'épargne est une habitude, pas un montant.',
+  'Celui qui plan son argent ne sera jamais pris au dépourvu.',
+  'La générosité commence par avoir — et avoir commence par gérer.',
+  'Chaque sou compte quand on sait pourquoi on l\'économise.'
+];
+
+function getDailyQuote() {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+  return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
+}
+
 function scheduleNotifications() {
   if (Notification.permission !== 'granted') return;
 
@@ -683,12 +741,14 @@ function scheduleNotifications() {
 
     setTimeout(() => {
       if (Notification.permission !== 'granted') return;
+      const body = slot.key === 'morning'
+        ? `💡 Citation du jour : ${getDailyQuote()}`
+        : slot.msg;
       const notif = new Notification('Kula 🌱', {
-        body: slot.msg,
+        body,
         icon: '/icon-192.png',
         badge: '/icon-192.png',
         tag: `kula-notif-${slot.key}`,
-
         renotify: false
       });
       notif.onclick = () => { window.focus(); switchTab('chat'); notif.close(); };
@@ -1021,8 +1081,10 @@ function init() {
   // Notifications & reminders
   initNotifications();
 
-  // Load dashboard
-  loadDashboard();
+  // Handle manifest shortcut ?tab=chat
+  const urlTab = new URLSearchParams(window.location.search).get('tab');
+  if (urlTab) switchTab(urlTab);
+  else loadDashboard();
 
   // Nav buttons
   document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -1065,6 +1127,9 @@ function init() {
 
   // Schedule notifications after permission is obtained
   setTimeout(() => scheduleNotifications(), 6000);
+
+  // Budget panel
+  initBudgetHandlers();
 
   // Profile panel
   initProfileHandlers();
@@ -1186,6 +1251,133 @@ function init() {
     modal.style.display = 'flex';
   }
 })();
+
+// ── Budget panel ──────────────────────────────────────────────────────────────
+const EXPENSE_CATEGORIES = [
+  'Alimentation','Transport','Loisirs','Vêtements','Santé',
+  'Éducation','Téléphone','Logement','Autre'
+];
+
+// Track which alerts have already fired this session {category: pct_notified}
+const budgetAlertsSent = {};
+
+function checkBudgetNotifications(categories, budgets) {
+  if (Notification.permission !== 'granted') return;
+  categories.filter(c => c.type === 'expense').forEach(c => {
+    const limite = budgets[c.category];
+    if (!limite || limite <= 0) return;
+    const pct = c.total / limite * 100;
+    const key = c.category;
+
+    if (pct >= 100 && budgetAlertsSent[key] !== 100) {
+      budgetAlertsSent[key] = 100;
+      new Notification(`🚨 Budget ${c.category} dépassé !`, {
+        body: `Tu as dépensé ${formatAmount(c.total)} FCFA sur ${formatAmount(limite)} FCFA prévu.`,
+        icon: '/icon-192.png', tag: `budget-over-${key}`, renotify: true
+      });
+    } else if (pct >= 80 && pct < 100 && !budgetAlertsSent[key]) {
+      budgetAlertsSent[key] = 80;
+      new Notification(`⚠️ Budget ${c.category} à ${Math.round(pct)}%`, {
+        body: `Tu as dépensé ${formatAmount(c.total)} FCFA sur ${formatAmount(limite)} FCFA prévu.`,
+        icon: '/icon-192.png', tag: `budget-warn-${key}`, renotify: true
+      });
+    }
+  });
+}
+
+function openBudgets() {
+  const overlay = document.getElementById('budget-overlay');
+  const panel   = document.getElementById('budget-panel');
+  if (!overlay || !panel) return;
+
+  const month = state.currentMonth;
+  document.getElementById('budget-month-label').textContent =
+    new Date(month + '-01').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+  overlay.style.display = 'block';
+  setTimeout(() => { panel.style.transform = 'translateY(0)'; }, 0);
+
+  // Render rows immediately with cached budgets, then refresh
+  renderBudgetList(state.budgets, {});
+  api(`/api/budgets?month=${month}`).then(rows => {
+    const map = {};
+    rows.forEach(r => { map[r.category] = r.limite; });
+    // Also get current spending for progress
+    api(`/api/dashboard?month=${month}`).then(data => {
+      const spending = {};
+      data.categories.filter(c => c.type === 'expense').forEach(c => { spending[c.category] = c.total; });
+      renderBudgetList(map, spending);
+    }).catch(() => renderBudgetList(map, {}));
+  }).catch(() => {});
+}
+
+function renderBudgetList(budgetMap, spending) {
+  const list = document.getElementById('budget-list');
+  if (!list) return;
+  const month = state.currentMonth;
+
+  list.innerHTML = EXPENSE_CATEGORIES.map(cat => {
+    const meta    = CATEGORIES[cat] || { icon: '📦', color: '#6B7280' };
+    const limite  = budgetMap[cat] || 0;
+    const spent   = spending[cat] || 0;
+    const bPct    = limite > 0 ? Math.min(100, Math.round(spent / limite * 100)) : 0;
+    const barColor= bPct >= 100 ? '#EF4444' : bPct >= 80 ? '#F59E0B' : meta.color;
+    const progressHtml = limite > 0
+      ? `<div class="budget-progress-wrap">
+           <div class="budget-progress-bar" style="width:${bPct}%;background:${barColor}"></div>
+         </div>
+         <div class="budget-progress-label">${formatAmount(spent)} / ${formatAmount(limite)} FCFA (${bPct}%)</div>`
+      : '';
+    return `
+      <div class="budget-row">
+        <div class="budget-row-icon">${meta.icon}</div>
+        <div class="budget-row-info">
+          <div class="budget-row-name">${cat}</div>
+          ${progressHtml}
+        </div>
+        <div class="budget-input-wrap">
+          <input class="budget-input" type="number" inputmode="numeric" min="0" step="500"
+            placeholder="—" value="${limite > 0 ? limite : ''}"
+            data-cat="${cat}" data-month="${month}"
+            onchange="saveBudget(this)">
+          <span class="budget-input-unit">FCFA</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function saveBudget(input) {
+  const category = input.dataset.cat;
+  const month    = input.dataset.month;
+  const limite   = parseFloat(input.value) || 0;
+  try {
+    await api('/api/budgets', {
+      method: 'PUT',
+      body: JSON.stringify({ category, limite, month })
+    });
+    // Update local state and re-render dashboard category list
+    if (limite > 0) {
+      state.budgets[category] = limite;
+    } else {
+      delete state.budgets[category];
+    }
+    // Refresh dashboard category list with new budgets
+    loadDashboard();
+    showToast(`Budget ${category} ${limite > 0 ? 'enregistré' : 'supprimé'}`, 'success');
+  } catch (err) {
+    showToast('Erreur : ' + err.message, 'error');
+  }
+}
+
+function closeBudgets() {
+  document.getElementById('budget-panel').style.transform = 'translateY(100%)';
+  setTimeout(() => { document.getElementById('budget-overlay').style.display = 'none'; }, 300);
+}
+
+function initBudgetHandlers() {
+  document.getElementById('budget-back')?.addEventListener('click', closeBudgets);
+  document.getElementById('budget-overlay')?.addEventListener('click', closeBudgets);
+}
 
 // ── Profile panel ──────────────────────────────────────────────────────────────
 function openProfile() {
@@ -1395,6 +1587,8 @@ function initProfileHandlers() {
 window.deleteTransaction = deleteTransaction;
 window.openExportModal  = openExportModal;
 window.openProfile      = openProfile;
-window.switchTab = switchTab;
+window.openBudgets      = openBudgets;
+window.saveBudget       = saveBudget;
+window.switchTab        = switchTab;
 
 document.addEventListener('DOMContentLoaded', init);

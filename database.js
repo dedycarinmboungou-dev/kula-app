@@ -63,6 +63,24 @@ db.exec(`
   );
 `);
 
+// ── Budgets table ─────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS budgets (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    category   TEXT    NOT NULL,
+    limite     REAL    NOT NULL DEFAULT 0,
+    mois       TEXT    NOT NULL,
+    UNIQUE(user_id, category, mois)
+  );
+`);
+
+// Migration: add photo column to users if missing
+const userCols = db.prepare('PRAGMA table_info(users)').all();
+if (!userCols.some(c => c.name === 'photo')) {
+  db.exec('ALTER TABLE users ADD COLUMN photo TEXT');
+}
+
 // Migration: add user_id column if missing
 const cols = db.prepare('PRAGMA table_info(transactions)').all();
 if (!cols.some(c => c.name === 'user_id')) {
@@ -91,7 +109,17 @@ const stmts = {
   // Users
   insertUser:     db.prepare(`INSERT INTO users (name, email, password_hash) VALUES ($name, $email, $hash)`),
   getUserByEmail: db.prepare(`SELECT * FROM users WHERE email = $email`),
-  getUserById:    db.prepare(`SELECT id, name, email, created_at FROM users WHERE id = $id`),
+  getUserById:    db.prepare(`SELECT id, name, email, photo, created_at FROM users WHERE id = $id`),
+  updateUserName: db.prepare(`UPDATE users SET name = $name WHERE id = $id`),
+  updateUserPhoto: db.prepare(`UPDATE users SET photo = $photo WHERE id = $id`),
+
+  // Budgets
+  getBudgets: db.prepare(`SELECT category, limite FROM budgets WHERE user_id = $userId AND mois = $mois`),
+  upsertBudget: db.prepare(`
+    INSERT INTO budgets (user_id, category, limite, mois) VALUES ($userId, $category, $limite, $mois)
+    ON CONFLICT(user_id, category, mois) DO UPDATE SET limite = excluded.limite
+  `),
+  deleteBudget: db.prepare(`DELETE FROM budgets WHERE user_id = $userId AND category = $category AND mois = $mois`),
 
   // Transactions (scoped to user_id)
   insertTransaction: db.prepare(`

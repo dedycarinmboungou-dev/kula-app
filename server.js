@@ -319,6 +319,39 @@ app.put('/api/profile/photo', requireAuth, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// BUDGETS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/budgets?month=YYYY-MM  → [{category, limite}]
+app.get('/api/budgets', requireAuth, (req, res) => {
+  const mois = req.query.month || new Date().toISOString().slice(0, 7);
+  const rows = stmts.getBudgets.all({ userId: req.userId, mois });
+  res.json(rows);
+});
+
+// PUT /api/budgets  body: {category, limite, month}
+// limite=0 → delete
+app.put('/api/budgets', requireAuth, (req, res) => {
+  try {
+    const { category, limite, month } = req.body;
+    const mois = month || new Date().toISOString().slice(0, 7);
+    if (!category || !VALID_CATEGORIES.includes(category))
+      return res.status(400).json({ error: 'Catégorie invalide' });
+    const lim = parseFloat(limite);
+    if (isNaN(lim) || lim < 0)
+      return res.status(400).json({ error: 'Limite invalide' });
+    if (lim === 0) {
+      stmts.deleteBudget.run({ userId: req.userId, category, mois });
+    } else {
+      stmts.upsertBudget.run({ userId: req.userId, category, limite: lim, mois });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
 app.get('/api/dashboard', requireAuth, (req, res) => {
@@ -331,6 +364,7 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
     const categories = stmts.getCategoryStats.all({ userId, month });
     const recent     = stmts.getRecentTransactions.all({ userId, limit: 5 });
     const trend      = stmts.getMonthlyTrend.all({ userId });
+    const budgets    = stmts.getBudgets.all({ userId, mois: month });
 
     res.json({
       month,
@@ -339,6 +373,7 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
       monthlyExpense: stats.total_expense,
       monthlyBalance: stats.balance,
       categories,
+      budgets,
       recentTransactions: recent,
       trend
     });
@@ -942,6 +977,60 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour.`;
     console.error('Chat error:', err);
     const msg = err.status === 401 ? 'Clé API invalide.' : "Erreur, réessayez.";
     res.status(500).json({ type: 'message', message: msg });
+  }
+});
+
+// ── Widget page (lightweight, for PWA shortcut / home screen pin) ────────────
+app.get('/widget', requireAuth, (req, res) => {
+  try {
+    const month   = new Date().toISOString().slice(0, 7);
+    const userId  = req.userId;
+    const stats   = stmts.getDashboard.get({ userId, month });
+    const allTime = stmts.getAllTimeDashboard.get({ userId });
+    const budgets = stmts.getBudgets.all({ userId, mois: month });
+
+    const totalBudget  = budgets.reduce((s, b) => s + b.limite, 0);
+    const expense      = stats.total_expense || 0;
+    const pct          = totalBudget > 0 ? Math.min(100, Math.round(expense / totalBudget * 100)) : null;
+    const barColor     = pct === null ? '#10B981' : pct >= 100 ? '#EF4444' : pct >= 80 ? '#F59E0B' : '#10B981';
+
+    const fmt = n => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+
+    res.send(`<!DOCTYPE html><html lang="fr"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kula Widget</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#064E3B;color:#fff;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:rgba(255,255,255,.08);border-radius:20px;padding:24px 28px;width:100%;max-width:340px}
+  .logo{font-size:13px;opacity:.6;margin-bottom:16px;letter-spacing:.05em}
+  .label{font-size:11px;opacity:.55;margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em}
+  .amount{font-size:32px;font-weight:700;letter-spacing:-.5px;margin-bottom:18px}
+  .amount.expense{color:#FCA5A5}
+  .amount.balance{color:#6EE7B7}
+  .budget-row{margin-top:4px}
+  .budget-bar-bg{height:8px;background:rgba(255,255,255,.15);border-radius:99px;overflow:hidden;margin-top:6px}
+  .budget-bar-fill{height:100%;border-radius:99px;transition:width .4s}
+  .budget-pct{font-size:12px;opacity:.7;margin-top:5px}
+</style>
+</head><body>
+<div class="card">
+  <div class="logo">🌱 Kula</div>
+  <div class="label">Solde total</div>
+  <div class="amount balance">${fmt(allTime.balance)} <small style="font-size:14px">FCFA</small></div>
+  <div class="label">Dépenses ce mois</div>
+  <div class="amount expense">${fmt(expense)} <small style="font-size:14px">FCFA</small></div>
+  ${pct !== null ? `
+  <div class="budget-row">
+    <div class="label">Budget global utilisé</div>
+    <div class="budget-bar-bg"><div class="budget-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+    <div class="budget-pct">${pct}% de ${fmt(totalBudget)} FCFA</div>
+  </div>` : ''}
+</div>
+</body></html>`);
+  } catch (e) {
+    res.status(500).send('Erreur');
   }
 });
 

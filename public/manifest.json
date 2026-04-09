@@ -22,5 +22,21 @@
     }
   ],
   "categories": ["finance", "productivity"],
-  "lang": "fr"
+  "lang": "fr",
+  "shortcuts": [
+    {
+      "name": "Mon solde",
+      "short_name": "Solde",
+      "description": "Voir mon solde et dépenses du mois",
+      "url": "/widget",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ajouter une transaction",
+      "short_name": "Ajouter",
+      "description": "Ouvrir le chat pour enregistrer une dépense ou un revenu",
+      "url": "/?tab=chat",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }
