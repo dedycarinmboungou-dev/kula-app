@@ -31,6 +31,9 @@ function logout() {
   window.location.href = '/auth.html';
 }
 
+// ── Profile cache (loaded once at startup, used everywhere) ───────────────────
+const profile = { photo: null, initial: 'K', name: '' };
+
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
   currentTab: 'dashboard',
@@ -510,7 +513,12 @@ function addChatMessage(role, content) {
     bubble.innerHTML = formatBotContent(content);
   }
 
-  div.innerHTML = `<div class="msg-avatar">${role === 'user' ? '👤' : 'K'}</div>`;
+  const avatarHTML = role === 'user'
+    ? (profile.photo
+        ? `<div class="msg-avatar"><img src="${profile.photo}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block"></div>`
+        : `<div class="msg-avatar msg-avatar-initial">${profile.initial}</div>`)
+    : `<div class="msg-avatar">🌱</div>`;
+  div.innerHTML = avatarHTML;
   div.appendChild(bubble);
 
   messages.appendChild(div);
@@ -1061,12 +1069,15 @@ function init() {
   // Profile panel
   initProfileHandlers();
 
-  // Load saved photo into user-badge if present
+  // Load profile at startup — syncs photo to header badge, chat avatars, and profile cache
   (async () => {
     try {
       const data = await api('/api/profile');
-      if (data?.photo) setProfilePhoto(data.photo);
-    } catch { /* silent */ }
+      if (!data) return;
+      profile.name    = data.name  || '';
+      profile.initial = (data.name || 'K').charAt(0).toUpperCase();
+      setProfilePhoto(data.photo || null);
+    } catch { /* silent — user still works without photo */ }
   })();
 
   // PDF export modal
@@ -1231,25 +1242,41 @@ function closeProfile() {
 }
 
 function setProfilePhoto(src) {
+  // Keep module cache in sync
+  profile.photo = src || null;
+
+  // Profile panel avatar
   const img     = document.getElementById('profile-avatar-img');
   const initial = document.getElementById('profile-avatar-initial');
-  img.src             = src;
-  img.style.display   = 'block';
-  initial.style.display = 'none';
+  if (img && initial) {
+    if (src) {
+      img.src = src; img.style.display = 'block';
+      initial.style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      initial.style.display = '';
+    }
+  }
 
-  // Also update the user-badge in header
+  // Header badge
   const badge = document.querySelector('.user-badge');
   if (badge) {
     let badgeImg = badge.querySelector('img');
-    if (!badgeImg) {
-      badgeImg = document.createElement('img');
-      badgeImg.alt = '';
-      badge.appendChild(badgeImg);
+    if (src) {
+      if (!badgeImg) {
+        badgeImg = document.createElement('img');
+        badgeImg.alt = '';
+        badge.appendChild(badgeImg);
+      }
+      badgeImg.src = src;
+      badgeImg.style.display = 'block';
+      const initialEl = badge.querySelector('#user-initial');
+      if (initialEl) initialEl.style.display = 'none';
+    } else if (badgeImg) {
+      badgeImg.style.display = 'none';
+      const initialEl = badge.querySelector('#user-initial');
+      if (initialEl) initialEl.style.display = '';
     }
-    badgeImg.src = src;
-    badgeImg.style.display = 'block';
-    const initialEl = badge.querySelector('#user-initial');
-    if (initialEl) initialEl.style.display = 'none';
   }
 }
 
