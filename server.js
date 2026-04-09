@@ -396,7 +396,8 @@ app.get('/api/report/pdf', requireAuth, async (req, res) => {
     const txs     = stmts.getTransactionsByMonth.all({ userId, month }) || [];
     console.log(`[PDF] Data: income=${stats.total_income} expense=${stats.total_expense} cats=${cats.length} txs=${txs.length}`);
 
-    const fmt = n => Math.round(n || 0).toLocaleString('fr-FR');
+    // toLocaleString('fr-FR') uses non-breaking space (\u00A0) which pdfkit renders as "/"
+    const fmt = n => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     const [year, mon] = month.split('-');
     const monthLabel = new Date(parseInt(year), parseInt(mon) - 1, 1)
       .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
