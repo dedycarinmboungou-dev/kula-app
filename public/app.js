@@ -964,10 +964,21 @@ async function initNotifications() {
 }
 
 function init() {
-  // Service worker
+  // Service worker + update banner
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data?.type === 'UPDATE_AVAILABLE') {
+        const banner = document.getElementById('update-banner');
+        if (banner) banner.style.display = 'flex';
+      }
+    });
   }
+
+  document.getElementById('btn-update')?.addEventListener('click', () => {
+    window.location.reload();
+  });
 
   // Month selectors
   initMonthSelectors();

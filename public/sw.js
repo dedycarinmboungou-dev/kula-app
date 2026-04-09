@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kula-v1';
+const CACHE_NAME = 'kula-cache-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -11,19 +11,24 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch(() => {
-        // Ignore cache errors for external resources
-      });
+      return cache.addAll(STATIC_ASSETS).catch(() => {});
     })
   );
-  self.skipWaiting();
+  // Don't skipWaiting here — we wait for the page to confirm before activating,
+  // so the UPDATE_AVAILABLE message is shown first.
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    ).then(() => {
+      // Notify all open pages that a new version is now active
+      return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+        .then((clients) => {
+          clients.forEach(client => client.postMessage({ type: 'UPDATE_AVAILABLE' }));
+        });
+    })
   );
   self.clients.claim();
 });
@@ -48,9 +53,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(request).then((cached) =>
       cached || fetch(request).then((response) => {
-        if (response.ok && !url.pathname.startsWith('/api/')) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        if (response.ok) {
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
         }
         return response;
       })
