@@ -61,6 +61,19 @@
       <div class="balance-sub" id="balance-sub">Chargement…</div>
     </div>
 
+    <!-- PWA Install prompt -->
+    <div class="install-prompt" id="install-prompt" style="display:none">
+      <div class="install-prompt-left">
+        <div class="install-prompt-icon">📲</div>
+        <div class="install-prompt-text">
+          <strong>Installer Kula sur mon téléphone</strong>
+          <span>Accès rapide, fonctionne hors ligne</span>
+        </div>
+      </div>
+      <button class="install-prompt-btn" id="btn-install">Installer</button>
+      <button class="install-prompt-close" id="btn-install-close" aria-label="Fermer">✕</button>
+    </div>
+
     <!-- Income / Expense cards -->
     <div class="stats-row">
       <div class="stat-card">
@@ -230,6 +243,124 @@
   <span class="reminder-text" id="reminder-text"></span>
   <button class="reminder-action" id="reminder-action">Ajouter</button>
   <button class="reminder-close" id="reminder-close" aria-label="Fermer">✕</button>
+</div>
+
+<!-- PWA Install guide modal -->
+<div class="pwa-modal-overlay" id="pwa-modal" style="display:none">
+  <div class="pwa-modal">
+    <div class="pwa-modal-header">
+      <div class="pwa-modal-title">📲 Installer Kula</div>
+      <button class="pwa-modal-close" id="pwa-modal-close">✕</button>
+    </div>
+
+    <!-- OS tabs -->
+    <div class="pwa-os-tabs">
+      <button class="pwa-os-tab active" data-os="android">🤖 Android</button>
+      <button class="pwa-os-tab" data-os="ios">🍎 iPhone</button>
+    </div>
+
+    <!-- Android guide -->
+    <div class="pwa-guide active" id="guide-android">
+      <div class="pwa-step">
+        <div class="pwa-step-num">1</div>
+        <div class="pwa-step-content">
+          <div class="pwa-step-title">Appuie sur le bouton "Installer"</div>
+          <div class="pwa-mockup">
+            <div class="mockup-bar">
+              <span class="mockup-url">kula-app.onrender.com</span>
+              <span class="mockup-menu">⋮</span>
+            </div>
+            <div class="mockup-highlight">
+              <div class="mockup-btn-green">📲 Installer Kula sur mon téléphone</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pwa-step">
+        <div class="pwa-step-num">2</div>
+        <div class="pwa-step-content">
+          <div class="pwa-step-title">Une fenêtre s'ouvre — appuie sur <strong>Installer</strong></div>
+          <div class="pwa-mockup">
+            <div class="mockup-dialog">
+              <div class="mockup-dialog-icon">🌱</div>
+              <div class="mockup-dialog-name">Kula</div>
+              <div class="mockup-dialog-sub">kula-app.onrender.com</div>
+              <div class="mockup-dialog-actions">
+                <span class="mockup-link">Annuler</span>
+                <span class="mockup-btn-primary">Installer</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pwa-step">
+        <div class="pwa-step-num">3</div>
+        <div class="pwa-step-content">
+          <div class="pwa-step-title">C'est fait ! L'icône Kula apparaît sur ton écran 🎉</div>
+          <div class="pwa-mockup pwa-mockup-home">
+            <div class="mockup-app-icon">🌱</div>
+            <div class="mockup-app-label">Kula</div>
+          </div>
+        </div>
+      </div>
+      <button class="pwa-install-now" id="btn-install-modal">Installer maintenant ↗</button>
+    </div>
+
+    <!-- iOS guide -->
+    <div class="pwa-guide" id="guide-ios">
+      <div class="pwa-step">
+        <div class="pwa-step-num">1</div>
+        <div class="pwa-step-content">
+          <div class="pwa-step-title">Appuie sur l'icône <strong>Partager</strong> en bas de Safari</div>
+          <div class="pwa-mockup">
+            <div class="mockup-safari-bar">
+              <span class="mockup-url">kula-app.onrender.com</span>
+            </div>
+            <div class="mockup-safari-bottom">
+              <span>◁</span>
+              <span>▷</span>
+              <span class="mockup-share-btn">⬆︎</span>
+              <span>□</span>
+              <span>⊕</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pwa-step">
+        <div class="pwa-step-num">2</div>
+        <div class="pwa-step-content">
+          <div class="pwa-step-title">Fais défiler et appuie sur <strong>"Sur l'écran d'accueil"</strong></div>
+          <div class="pwa-mockup">
+            <div class="mockup-sheet">
+              <div class="mockup-sheet-item">📤 Copier le lien</div>
+              <div class="mockup-sheet-item">📖 Ajouter aux favoris</div>
+              <div class="mockup-sheet-item mockup-sheet-highlight">＋ Sur l'écran d'accueil</div>
+              <div class="mockup-sheet-item">📩 Envoyer par message</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pwa-step">
+        <div class="pwa-step-num">3</div>
+        <div class="pwa-step-content">
+          <div class="pwa-step-title">Appuie sur <strong>"Ajouter"</strong> en haut à droite</div>
+          <div class="pwa-mockup">
+            <div class="mockup-ios-dialog">
+              <div class="mockup-ios-top">
+                <span class="mockup-link">Annuler</span>
+                <span class="mockup-ios-title">Sur l'écran d'accueil</span>
+                <span class="mockup-btn-primary">Ajouter</span>
+              </div>
+              <div class="mockup-ios-icon">🌱</div>
+              <div class="mockup-ios-name">Kula</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pwa-note">⚠️ Sur iPhone, utilise <strong>Safari</strong> (pas Chrome ni Firefox)</div>
+    </div>
+
+  </div>
 </div>
 
 <!-- Welcome popup -->

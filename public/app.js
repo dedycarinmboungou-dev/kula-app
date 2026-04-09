@@ -801,6 +801,102 @@ function init() {
   });
 }
 
+// ── PWA Install ────────────────────────────────────────────────────────────────
+(function initPWA() {
+  // Already installed (running in standalone mode) → nothing to do
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) return;
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  let deferredPrompt = null;
+
+  function showInstallPrompt() {
+    const prompt = document.getElementById('install-prompt');
+    if (prompt) prompt.style.display = 'flex';
+  }
+
+  function hideInstallPrompt() {
+    const prompt = document.getElementById('install-prompt');
+    if (prompt) prompt.style.display = 'none';
+  }
+
+  // Android/Chrome: capture the native install prompt
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallPrompt();
+  });
+
+  // iOS: always show the banner (no beforeinstallprompt on Safari)
+  if (isIOS) showInstallPrompt();
+
+  // App installed → hide banner
+  window.addEventListener('appinstalled', () => {
+    hideInstallPrompt();
+    document.getElementById('pwa-modal')?.style && (document.getElementById('pwa-modal').style.display = 'none');
+  });
+
+  // Banner "Installer" button
+  document.getElementById('btn-install')?.addEventListener('click', () => {
+    if (deferredPrompt) {
+      // Android native dialog
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(choice => {
+        deferredPrompt = null;
+        if (choice.outcome === 'accepted') hideInstallPrompt();
+      });
+    } else {
+      // iOS or no prompt: show guide modal
+      openPWAModal(isIOS ? 'ios' : 'android');
+    }
+  });
+
+  // Banner close
+  document.getElementById('btn-install-close')?.addEventListener('click', hideInstallPrompt);
+
+  // Modal "Installer maintenant" button (Android only)
+  document.getElementById('btn-install-modal')?.addEventListener('click', () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(choice => {
+        deferredPrompt = null;
+        if (choice.outcome === 'accepted') {
+          hideInstallPrompt();
+          document.getElementById('pwa-modal').style.display = 'none';
+        }
+      });
+    }
+  });
+
+  // Modal close
+  document.getElementById('pwa-modal-close')?.addEventListener('click', () => {
+    document.getElementById('pwa-modal').style.display = 'none';
+  });
+  document.getElementById('pwa-modal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('pwa-modal'))
+      document.getElementById('pwa-modal').style.display = 'none';
+  });
+
+  // OS tabs
+  document.querySelectorAll('.pwa-os-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.pwa-os-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.pwa-guide').forEach(g => g.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(`guide-${tab.dataset.os}`)?.classList.add('active');
+    });
+  });
+
+  function openPWAModal(os = 'android') {
+    const modal = document.getElementById('pwa-modal');
+    if (!modal) return;
+    // Activate correct OS tab
+    document.querySelectorAll('.pwa-os-tab').forEach(t => t.classList.toggle('active', t.dataset.os === os));
+    document.querySelectorAll('.pwa-guide').forEach(g => g.classList.remove('active'));
+    document.getElementById(`guide-${os}`)?.classList.add('active');
+    modal.style.display = 'flex';
+  }
+})();
+
 // Make deleteTransaction global for inline onclick
 window.deleteTransaction = deleteTransaction;
 window.switchTab = switchTab;
