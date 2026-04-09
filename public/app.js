@@ -249,19 +249,19 @@ async function loadDashboard() {
 
     // Budget state for this month (passed to renderCategoryChart)
     state.budgets = {};
-    if (data.budgets) data.budgets.forEach(b => { state.budgets[b.category] = b.limite; });
+    (data.budgets || []).forEach(b => { state.budgets[b.category] = b.limite; });
 
     // Category breakdown (with budgets)
-    renderCategoryChart(data.categories, data.monthlyExpense, state.budgets);
+    renderCategoryChart(data.categories || [], data.monthlyExpense || 0, state.budgets);
 
     // Trend chart
-    renderTrendChart(data.trend);
+    renderTrendChart(data.trend || []);
 
     // Recent transactions
-    renderTransactionList('recent-tx-list', data.recentTransactions);
+    renderTransactionList('recent-tx-list', data.recentTransactions || []);
 
     // Budget notifications (check after data loaded)
-    checkBudgetNotifications(data.categories, state.budgets);
+    checkBudgetNotifications(data.categories || [], state.budgets);
   } catch (err) {
     console.error('Dashboard error:', err.message, err);
     const balEl = document.getElementById('total-balance');
@@ -272,7 +272,7 @@ async function loadDashboard() {
 
 // ── Category chart ──────────────────────────────────────────────────────────────
 function renderCategoryChart(categories, totalExpense, budgets = {}) {
-  const expenseCats = categories.filter(c => c.type === 'expense');
+  const expenseCats = (categories || []).filter(c => c.type === 'expense');
   const listEl = document.getElementById('category-list');
   const ctx = document.getElementById('category-chart');
 
@@ -1263,7 +1263,7 @@ const budgetAlertsSent = {};
 
 function checkBudgetNotifications(categories, budgets) {
   if (Notification.permission !== 'granted') return;
-  categories.filter(c => c.type === 'expense').forEach(c => {
+  (categories || []).filter(c => c.type === 'expense').forEach(c => {
     const limite = budgets[c.category];
     if (!limite || limite <= 0) return;
     const pct = c.total / limite * 100;
@@ -1305,7 +1305,7 @@ function openBudgets() {
     // Also get current spending for progress
     api(`/api/dashboard?month=${month}`).then(data => {
       const spending = {};
-      data.categories.filter(c => c.type === 'expense').forEach(c => { spending[c.category] = c.total; });
+      (data.categories || []).filter(c => c.type === 'expense').forEach(c => { spending[c.category] = c.total; });
       renderBudgetList(map, spending);
     }).catch(() => renderBudgetList(map, {}));
   }).catch(() => {});

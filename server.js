@@ -364,7 +364,7 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
     const categories = stmts.getCategoryStats.all({ userId, month });
     const recent     = stmts.getRecentTransactions.all({ userId, limit: 5 });
     const trend      = stmts.getMonthlyTrend.all({ userId });
-    const budgets    = stmts.getBudgets.all({ userId, mois: month });
+    const budgets    = stmts.getBudgets.all({ userId, mois: month }) || [];
 
     res.json({
       month,
