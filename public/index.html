@@ -26,9 +26,10 @@
         </div>
       </div>
       <div class="header-right">
-        <div class="user-badge" id="user-badge" title="Mon compte">
+        <button class="user-badge" id="user-badge" title="Mon profil" onclick="openProfile()">
           <span id="user-initial">K</span>
-        </div>
+          <span class="update-dot" id="update-dot" style="display:none"></span>
+        </button>
         <button class="btn-logout" id="btn-logout" title="Déconnexion">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -275,10 +276,72 @@
   </div>
 </div>
 
-<!-- Update banner -->
-<div class="update-banner" id="update-banner" style="display:none">
-  <span>🔄 Nouvelle version disponible</span>
-  <button id="btn-update">Mettre à jour</button>
+<!-- Profile backdrop -->
+<div class="profile-overlay" id="profile-overlay" style="display:none"></div>
+
+<!-- Profile panel — fixed, slides up from bottom -->
+<div class="profile-panel" id="profile-panel">
+
+  <!-- Top bar -->
+  <div class="profile-topbar">
+    <button class="profile-back" id="profile-back" aria-label="Fermer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+    </button>
+    <span class="profile-topbar-title">Mon Profil</span>
+  </div>
+
+  <!-- Avatar -->
+  <div class="profile-avatar-wrap">
+    <div class="profile-avatar" id="profile-avatar">
+      <span class="profile-avatar-initial" id="profile-avatar-initial">K</span>
+      <img class="profile-avatar-img" id="profile-avatar-img" src="" alt="" style="display:none">
+    </div>
+    <button class="profile-camera-btn" id="profile-camera-btn" title="Changer la photo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+    </button>
+    <input type="file" id="profile-photo-input" accept="image/*" style="display:none">
+  </div>
+
+  <!-- Info -->
+  <div class="profile-info">
+    <div class="profile-name-row">
+      <span class="profile-name" id="profile-name">—</span>
+      <button class="profile-edit-btn" id="profile-edit-name-btn" title="Modifier le nom">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        Modifier
+      </button>
+    </div>
+    <div class="profile-name-edit" id="profile-name-edit" style="display:none">
+      <input type="text" class="profile-name-input" id="profile-name-input" maxlength="60" placeholder="Votre nom">
+      <div class="profile-name-edit-actions">
+        <button class="btn-profile-save" id="btn-profile-save-name">Enregistrer</button>
+        <button class="btn-profile-cancel" id="btn-profile-cancel-name">Annuler</button>
+      </div>
+    </div>
+    <span class="profile-email" id="profile-email">—</span>
+    <span class="profile-since" id="profile-since"></span>
+  </div>
+
+  <!-- Subscription -->
+  <div class="profile-section">
+    <div class="profile-section-title">Mon abonnement</div>
+    <div class="profile-plan-card">
+      <div class="profile-plan-info">
+        <div class="profile-plan-name">Plan Gratuit</div>
+        <div class="profile-plan-desc">Transactions illimitées · PDF exports · Coach IA</div>
+      </div>
+      <span class="profile-plan-badge">Actif</span>
+    </div>
+  </div>
+
 </div>
 
 <!-- Toast -->

@@ -964,21 +964,17 @@ async function initNotifications() {
 }
 
 function init() {
-  // Service worker + update banner
+  // Service worker — show red dot on profile badge when update available
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
 
     navigator.serviceWorker.addEventListener('message', (e) => {
       if (e.data?.type === 'UPDATE_AVAILABLE') {
-        const banner = document.getElementById('update-banner');
-        if (banner) banner.style.display = 'flex';
+        const dot = document.getElementById('update-dot');
+        if (dot) dot.style.display = 'block';
       }
     });
   }
-
-  document.getElementById('btn-update')?.addEventListener('click', () => {
-    window.location.reload();
-  });
 
   // Month selectors
   initMonthSelectors();
@@ -1057,6 +1053,17 @@ function init() {
 
   // Schedule notifications after permission is obtained
   setTimeout(() => scheduleNotifications(), 6000);
+
+  // Profile panel
+  initProfileHandlers();
+
+  // Load saved photo into user-badge if present
+  (async () => {
+    try {
+      const data = await api('/api/profile');
+      if (data?.photo) setProfilePhoto(data.photo);
+    } catch { /* silent */ }
+  })();
 
   // PDF export modal
   document.getElementById('pdf-modal-close')?.addEventListener('click', () => {
@@ -1165,9 +1172,182 @@ function init() {
   }
 })();
 
+// ── Profile panel ──────────────────────────────────────────────────────────────
+function openProfile() {
+  const overlay = document.getElementById('profile-overlay');
+  const panel   = document.getElementById('profile-panel');
+  if (!overlay || !panel) return;
+
+  // ── 1. Pre-fill with cached localStorage data immediately ────────────────
+  const cached = getUser();
+  if (cached.name) {
+    document.getElementById('profile-name').textContent        = cached.name;
+    document.getElementById('profile-name-input').value        = cached.name;
+    document.getElementById('profile-avatar-initial').textContent =
+      cached.name.charAt(0).toUpperCase();
+  }
+  if (cached.email) {
+    document.getElementById('profile-email').textContent = cached.email;
+  }
+
+  // ── 2. Show overlay + slide panel up ────────────────────────────────────
+  overlay.style.display = 'block';
+  // setTimeout(0) guarantees the browser paints display:block before the
+  // transform change, so the CSS transition always fires.
+  setTimeout(() => { panel.style.transform = 'translateY(0)'; }, 0);
+
+  // ── 3. Refresh with fresh API data in the background ────────────────────
+  api('/api/profile').then(data => {
+    if (!data) return;
+    document.getElementById('profile-name').textContent        = data.name || '—';
+    document.getElementById('profile-name-input').value        = data.name || '';
+    document.getElementById('profile-avatar-initial').textContent =
+      (data.name || 'K').charAt(0).toUpperCase();
+    document.getElementById('profile-email').textContent       = data.email || '—';
+    if (data.created_at) {
+      const d = new Date(data.created_at);
+      document.getElementById('profile-since').textContent =
+        'Membre depuis ' + d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    }
+    if (data.photo) {
+      setProfilePhoto(data.photo);
+    } else {
+      document.getElementById('profile-avatar-img').style.display  = 'none';
+      document.getElementById('profile-avatar-initial').style.display = '';
+    }
+  }).catch(() => { /* panel already open — silent fail on data refresh */ });
+}
+
+function closeProfile() {
+  document.getElementById('profile-panel').style.transform = 'translateY(100%)';
+  setTimeout(() => {
+    document.getElementById('profile-overlay').style.display = 'none';
+    document.getElementById('profile-name-edit').style.display = 'none';
+  }, 300);
+}
+
+function setProfilePhoto(src) {
+  const img     = document.getElementById('profile-avatar-img');
+  const initial = document.getElementById('profile-avatar-initial');
+  img.src             = src;
+  img.style.display   = 'block';
+  initial.style.display = 'none';
+
+  // Also update the user-badge in header
+  const badge = document.querySelector('.user-badge');
+  if (badge) {
+    let badgeImg = badge.querySelector('img');
+    if (!badgeImg) {
+      badgeImg = document.createElement('img');
+      badgeImg.alt = '';
+      badge.appendChild(badgeImg);
+    }
+    badgeImg.src = src;
+    badgeImg.style.display = 'block';
+    const initialEl = badge.querySelector('#user-initial');
+    if (initialEl) initialEl.style.display = 'none';
+  }
+}
+
+function initProfileHandlers() {
+  // Back button
+  document.getElementById('profile-back')?.addEventListener('click', closeProfile);
+
+  // Backdrop click
+  document.getElementById('profile-overlay')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('profile-overlay')) closeProfile();
+  });
+
+  // Camera button → trigger file input
+  document.getElementById('profile-camera-btn')?.addEventListener('click', () => {
+    document.getElementById('profile-photo-input').click();
+  });
+
+  // File input → read → upload
+  document.getElementById('profile-photo-input')?.addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Max ~2MB check (base64 will be ~4/3 larger)
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Image trop grande (max 2 Mo)', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      const base64 = ev.target.result; // data:image/...;base64,...
+      try {
+        const res = await api('/api/profile/photo', {
+          method: 'PUT',
+          body: JSON.stringify({ photo: base64 })
+        });
+        setProfilePhoto(res.photo);
+        showToast('Photo mise à jour', 'success');
+      } catch (err) {
+        showToast('Erreur upload photo : ' + err.message, 'error');
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
+
+  // Edit name button
+  document.getElementById('profile-edit-name-btn')?.addEventListener('click', () => {
+    document.getElementById('profile-name-edit').style.display = 'flex';
+    document.getElementById('profile-name-input').focus();
+  });
+
+  // Cancel name edit
+  document.getElementById('btn-profile-cancel-name')?.addEventListener('click', () => {
+    document.getElementById('profile-name-edit').style.display = 'none';
+  });
+
+  // Save name
+  document.getElementById('btn-profile-save-name')?.addEventListener('click', async () => {
+    const input = document.getElementById('profile-name-input');
+    const newName = input.value.trim();
+    if (!newName) { showToast('Le nom ne peut pas être vide', 'error'); return; }
+
+    try {
+      const res = await api('/api/profile/name', {
+        method: 'PUT',
+        body: JSON.stringify({ name: newName })
+      });
+      // Update display
+      document.getElementById('profile-name').textContent = res.name;
+      document.getElementById('profile-avatar-initial').textContent =
+        res.name.charAt(0).toUpperCase();
+      document.getElementById('profile-name-edit').style.display = 'none';
+
+      // Update localStorage + header
+      const user = getUser();
+      user.name = res.name;
+      localStorage.setItem('kula_user', JSON.stringify(user));
+      document.getElementById('user-initial').textContent = res.name.charAt(0).toUpperCase();
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+      document.getElementById('user-greeting').textContent =
+        `${greeting}, ${res.name.split(' ')[0]} 👋`;
+
+      showToast('Nom mis à jour', 'success');
+    } catch (err) {
+      showToast('Erreur : ' + err.message, 'error');
+    }
+  });
+
+  // Save on Enter in name input
+  document.getElementById('profile-name-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btn-profile-save-name').click();
+    if (e.key === 'Escape') document.getElementById('btn-profile-cancel-name').click();
+  });
+}
+
 // Make deleteTransaction global for inline onclick
 window.deleteTransaction = deleteTransaction;
 window.openExportModal  = openExportModal;
+window.openProfile      = openProfile;
 window.switchTab = switchTab;
 
 document.addEventListener('DOMContentLoaded', init);
