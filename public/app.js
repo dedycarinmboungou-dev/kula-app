@@ -191,7 +191,7 @@ async function api(path, opts = {}) {
     return;
   }
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
@@ -1331,7 +1331,8 @@ function initProfileHandlers() {
           });
           showToast('Photo mise à jour ✓', 'success');
         } catch (err) {
-          showToast('Erreur sauvegarde photo : ' + err.message, 'error');
+          console.error('[photo upload]', err);
+          showToast('Erreur sauvegarde : ' + err.message, 'error');
         }
       };
       img.src = ev.target.result;

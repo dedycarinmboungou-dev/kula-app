@@ -301,11 +301,10 @@ app.put('/api/profile/photo', requireAuth, (req, res) => {
   const { photo } = req.body;
   if (!photo || !photo.startsWith('data:image/'))
     return res.status(400).json({ error: 'Format photo invalide' });
-  // Limit to ~2MB base64
-  if (photo.length > 2_800_000)
+  if (photo.length > 3_800_000)
     return res.status(400).json({ error: 'Photo trop grande (max 2 Mo)' });
   stmts.updateUserPhoto.run({ photo, id: req.userId });
-  res.json({ photo });
+  res.json({ ok: true }); // don't echo the base64 back
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
