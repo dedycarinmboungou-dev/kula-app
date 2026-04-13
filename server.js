@@ -173,7 +173,7 @@ async function sendWelcomeEmail(toEmail, toName) {
   }
 }
 
-// ── Kola Coach — citations africaines ────────────────────────────────────────
+// ── Kula Coach — citations africaines ────────────────────────────────────────
 const KOLA_QUOTES = [
   { text: "L'argent est un bon serviteur mais un mauvais maître.", author: "Proverbe africain" },
   { text: "Celui qui n'économise pas quand il gagne pleurera quand il vieillira.", author: "Sagesse africaine" },
@@ -185,16 +185,16 @@ const KOLA_QUOTES = [
   { text: "Un seul arbre ne fait pas une forêt, mais il en est le début.", author: "Proverbe africain" },
   { text: "Le sage construit sa maison, le fou mange ses briques.", author: "Proverbe africain" },
   { text: "La patience est le chemin le plus court vers l'objectif.", author: "Sagesse africaine" },
-  { text: "Économiser n'est pas une privation, c'est une préparation.", author: "Kola 🌱" },
+  { text: "Économiser n'est pas une privation, c'est une préparation.", author: "Kula 🌱" },
   { text: "Même une longue marche commence par un premier pas.", author: "Sagesse africaine" },
   { text: "Le cacao ne pousse pas en un jour, mais il vaut tout l'or.", author: "Proverbe africain" },
   { text: "Connais tes dépenses avant de connaître tes désirs.", author: "Sagesse financière" },
-  { text: "Ce que tu surveilles, tu le contrôles. Ce que tu ignores te contrôle.", author: "Kola 🌱" },
+  { text: "Ce que tu surveilles, tu le contrôles. Ce que tu ignores te contrôle.", author: "Kula 🌱" },
   { text: "L'argent de demain se prépare avec les décisions d'aujourd'hui.", author: "Sagesse africaine" },
   { text: "Même le grand baobab a commencé comme une petite graine.", author: "Proverbe africain" },
-  { text: "Ne laisse pas la dépense d'aujourd'hui voler la paix de demain.", author: "Kola 🌱" },
+  { text: "Ne laisse pas la dépense d'aujourd'hui voler la paix de demain.", author: "Kula 🌱" },
   { text: "La prospérité n'est pas ce que tu possèdes, mais ce que tu bâtis.", author: "Sagesse africaine" },
-  { text: "Un budget bien tenu est une liberté bien méritée.", author: "Kola 🌱" },
+  { text: "Un budget bien tenu est une liberté bien méritée.", author: "Kula 🌱" },
   { text: "L'eau qui dort dans la rivière creuse aussi les rochers.", author: "Proverbe africain" },
   { text: "Ce qui est fait avec soin reste, ce qui est fait à la hâte se défait.", author: "Proverbe africain" },
   { text: "La rivière qui oublie ses sources se tarit.", author: "Sagesse africaine" },
@@ -204,7 +204,7 @@ const KOLA_QUOTES = [
   { text: "L'arbre qui donne des fruits se souvient qu'il fut un jour une graine.", author: "Sagesse africaine" },
   { text: "Un lion affamé chasse mieux qu'un lion rassasié.", author: "Proverbe africain" },
   { text: "Mieux vaut dépenser moins et vivre plus longtemps.", author: "Sagesse africaine" },
-  { text: "Grandir, c'est apprendre à faire plus avec moins.", author: "Kola 🌱" }
+  { text: "Grandir, c'est apprendre à faire plus avec moins.", author: "Kula 🌱" }
 ];
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -870,7 +870,7 @@ app.get('/api/coach/analysis', requireAuth, async (req, res) => {
     const quote  = KOLA_QUOTES[dayIdx % KOLA_QUOTES.length];
     const fmt    = n => Math.round(n).toLocaleString('fr-FR');
 
-    const systemPrompt = `Tu es Kola, le coach financier personnel de l'application Kula. Tu es comme un grand frère africain bienveillant, direct, motivant et chaleureux. Tu utilises des emojis. Tu parles en français, style familier mais respectueux. Ton objectif : que ${user.name.split(' ')[0]} réussisse financièrement. Réponds UNIQUEMENT avec du JSON valide : {"message":"<ton message>"}.`;
+    const systemPrompt = `Tu es Kula, le coach financier personnel de l'application Kula. Tu es comme un grand frère africain bienveillant, direct, motivant et chaleureux. Tu utilises des emojis. Tu parles en français, style familier mais respectueux. Ton objectif : que ${user.name.split(' ')[0]} réussisse financièrement. Réponds UNIQUEMENT avec du JSON valide : {"message":"<ton message>"}.`;
 
     const userPrompt = `Il est ${hour}h (${moment}). Génère un message de coaching personnalisé pour ${user.name.split(' ')[0]}.
 
@@ -908,7 +908,7 @@ Sois précis avec les vrais chiffres. Max 4 phrases. Personnalise selon les donn
   }
 });
 
-// POST /api/coach/chat — conversation with Kola
+// POST /api/coach/chat — conversation with Kula
 app.post('/api/coach/chat', requireAuth, async (req, res) => {
   try {
     const { message, history = [] } = req.body;
@@ -919,7 +919,7 @@ app.post('/api/coach/chat', requireAuth, async (req, res) => {
     const fmt  = n => Math.round(n).toLocaleString('fr-FR');
     const name = user.name.split(' ')[0];
 
-    const systemPrompt = `Tu es Kola, le coach financier personnel de ${name} dans l'application Kula. Tu es comme un grand frère africain — bienveillant, direct, motivant, avec de l'humour. Tu utilises des emojis. Tu parles en français familier mais respectueux.
+    const systemPrompt = `Tu es Kula, le coach financier personnel de ${name} dans l'application Kula. Tu es comme un grand frère africain — bienveillant, direct, motivant, avec de l'humour. Tu utilises des emojis. Tu parles en français familier mais respectueux.
 
 Données financières actuelles de ${name} :
 - Cette semaine : revenus ${fmt(ctx.week.income)} FCFA, dépenses ${fmt(ctx.week.expense)} FCFA, solde ${fmt(ctx.week.balance)} FCFA
@@ -1036,7 +1036,7 @@ Top dépenses ce mois : ${topExpCats}
 Transactions récentes — 50 dernières (IDs à utiliser avec les outils) :
 ${recentTxLines}
 
-Poches d'épargne (utilise le nom exact ou l'ID pour add_to_poche) :
+Poches d'épargne (utilise TOUJOURS poche_id avec l'ID [ID:x] ci-dessous pour add_to_poche — ne pas deviner le nom) :
 ${pochesLines}
 
 Budgets du mois ${currentMonth} :
@@ -1099,10 +1099,11 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
         input_schema: {
           type: 'object',
           properties: {
-            nom_poche: { type: 'string', description: "Nom de la poche d'épargne (partiel suffit)" },
+            poche_id:  { type: 'integer', description: "ID numérique de la poche d'épargne (prioritaire — utilise-le si disponible depuis la liste)" },
+            nom_poche: { type: 'string', description: "Nom de la poche d'épargne (utilisé seulement si poche_id absent)" },
             montant:   { type: 'number', description: 'Montant en FCFA à ajouter à la poche' }
           },
-          required: ['nom_poche', 'montant']
+          required: ['montant']
         }
       },
       {
@@ -1190,13 +1191,26 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
               }
             }
           } else if (toolUse.name === 'add_to_poche') {
-            const { nom_poche, montant: toolMontant } = toolUse.input;
-            if (!nom_poche || !toolMontant || toolMontant <= 0) {
-              result = 'Nom de poche et montant positif requis.';
+            const { poche_id, nom_poche, montant: toolMontant } = toolUse.input;
+            if (!toolMontant || toolMontant <= 0) {
+              result = 'Montant positif requis.';
             } else {
-              const poche = stmts.getPocheByNom.get({ userId: req.userId, pattern: `%${nom_poche}%` });
+              let poche = null;
+              if (poche_id) {
+                poche = stmts.getPocheById.get({ id: poche_id, userId: req.userId });
+              } else if (nom_poche) {
+                poche = stmts.getPocheByNom.get({ userId: req.userId, pattern: `%${nom_poche}%` });
+              } else {
+                // No identifier — pick the first/only poche if there's exactly one
+                const allPoches = stmts.getPoches.all({ userId: req.userId });
+                if (allPoches.length === 1) poche = allPoches[0];
+              }
               if (!poche) {
-                result = `Aucune poche nommée "${nom_poche}" trouvée. Demande à l'utilisateur de la créer depuis l'onglet Épargne.`;
+                const allPoches = stmts.getPoches.all({ userId: req.userId });
+                const list = allPoches.length
+                  ? allPoches.map(p => `  [ID:${p.id}] "${p.nom}"`).join('\n')
+                  : '  Aucune poche';
+                result = `Poche introuvable. Voici les poches disponibles :\n${list}\nUtilise poche_id avec l'ID correct.`;
               } else {
                 const wasComplete = poche.montant_actuel >= poche.objectif_montant;
                 const m = parseFloat(toolMontant);

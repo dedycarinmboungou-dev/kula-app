@@ -770,7 +770,7 @@ async function sendChatMessage() {
       const msg = response.message || "Je n'ai pas compris. Pouvez-vous reformuler ?";
       addChatMessage('bot', msg);
       state.chatHistory.push({ role: 'assistant', content: msg });
-      // If Kola used a tool (delete/update/add_to_poche), refresh data
+      // If Kula used a tool (delete/update/add_to_poche), refresh data
       if (response.refresh) {
         loadDashboard();
         loadTransactions();
@@ -1161,7 +1161,7 @@ async function initNotifications() {
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.ready.then(reg => {
             reg.showNotification('Kula 🌱', {
-              body: "👋 Bienvenue sur Kula ! Je suis Kola, ton coach financier. Je t'enverrai des conseils et rappels pour faire grandir ton argent 🌱",
+              body: "👋 Bienvenue sur Kula ! Je suis Kula, ton coach financier. Je t'enverrai des conseils et rappels pour faire grandir ton argent 🌱",
               icon: '/icon-192.png',
               badge: '/icon-192.png',
               tag: 'kula-welcome'
