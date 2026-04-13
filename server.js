@@ -970,9 +970,11 @@ app.post('/api/chat', requireAuth, async (req, res) => {
     const firstName    = user?.name?.split(' ')[0] || 'toi';
     const dashStats    = stmts.getDashboard.get({ userId: req.userId, month: currentMonth }) || {};
     const allTime      = stmts.getAllTimeDashboard.get({ userId: req.userId }) || {};
-    const recentTx     = stmts.getRecentTransactions.all({ userId: req.userId, limit: 10 });
+    const recentTx     = stmts.getRecentTransactions.all({ userId: req.userId, limit: 50 });
     const catStats     = stmts.getCategoryStats.all({ userId: req.userId, month: currentMonth });
     const poches       = stmts.getPoches.all({ userId: req.userId });
+    const budgets      = stmts.getBudgets.all({ userId: req.userId, mois: currentMonth });
+    const userCatsList = stmts.getCategories.all({ userId: req.userId });
     const fmtN = n => Math.round(n || 0).toLocaleString('fr-FR');
 
     // Top 3 expense categories this month
@@ -990,13 +992,30 @@ app.post('/api/chat', requireAuth, async (req, res) => {
         ).join('\n')
       : '  Aucune transaction récente';
 
-    // Poches d'épargne
+    // Poches d'épargne (avec IDs explicites pour les outils)
     const pochesLines = poches.length
       ? poches.map(p => {
-          const pct = p.objectif_montant > 0 ? Math.round(p.montant_actuel / p.objectif_montant * 100) : 0;
-          return `  "${p.nom}" : ${fmtN(p.montant_actuel)} / ${fmtN(p.objectif_montant)} FCFA (${pct}%)`;
+          const pct  = p.objectif_montant > 0 ? Math.round(p.montant_actuel / p.objectif_montant * 100) : 0;
+          const rest = Math.max(0, p.objectif_montant - p.montant_actuel);
+          return `  [ID:${p.id}] "${p.nom}" — actuel:${fmtN(p.montant_actuel)} FCFA / objectif:${fmtN(p.objectif_montant)} FCFA (${pct}%, reste ${fmtN(rest)} FCFA)`;
         }).join('\n')
       : '  Aucune poche créée';
+
+    // Budgets du mois
+    const budgetsLines = budgets.length
+      ? budgets.map(b => {
+          const spent  = catStats.find(c => c.category === b.category && c.type === 'expense')?.total || 0;
+          const pct    = Math.round(spent / b.limite * 100);
+          return `  ${b.category} : budget ${fmtN(b.limite)} FCFA, dépensé ${fmtN(spent)} FCFA (${pct}%)`;
+        }).join('\n')
+      : '  Aucun budget défini';
+
+    // Catégories personnalisées de l'utilisateur
+    const incomeCats  = userCatsList.filter(c => c.type === 'income'  || c.type === 'both').map(c => c.nom);
+    const expenseCats = userCatsList.filter(c => c.type === 'expense' || c.type === 'both').map(c => c.nom);
+    const catsLine    = userCatsList.length
+      ? `Revenus : ${incomeCats.join(', ') || 'aucune'}\nDépenses : ${expenseCats.join(', ') || 'aucune'}`
+      : 'Revenus : Salaire, Business, Famille, Solde initial\nDépenses : Alimentation, Transport, Loisirs, Vêtements, Santé, Éducation, Téléphone, Logement, Autre';
 
     const systemPrompt = `Tu es Kula, un conseiller financier personnel de confiance. Kula signifie "grandir" en kituba — et c'est exactement ce que tu aides les gens à faire : grandir financièrement.
 
@@ -1014,16 +1033,18 @@ Mois en cours (${currentMonth}) :
   Solde mois : ${fmtN(dashStats.balance)} FCFA
 Top dépenses ce mois : ${topExpCats}
 
-Transactions récentes (avec leur ID — utilise ces IDs pour les outils) :
+Transactions récentes — 50 dernières (IDs à utiliser avec les outils) :
 ${recentTxLines}
 
-Poches d'épargne (utilise le nom exact pour add_to_poche) :
+Poches d'épargne (utilise le nom exact ou l'ID pour add_to_poche) :
 ${pochesLines}
+
+Budgets du mois ${currentMonth} :
+${budgetsLines}
 ────────────────────────────────────────────────
 
-CATÉGORIES DISPONIBLES :
-- Revenus (income) : Salaire, Business, Famille, Solde initial
-- Dépenses (expense) : Alimentation, Transport, Loisirs, Vêtements, Santé, Éducation, Téléphone, Logement, Autre
+CATÉGORIES DE ${firstName.toUpperCase()} :
+${catsLine}
 
 TES RÔLES :
 A) ENREGISTRER DES TRANSACTIONS — quand l'utilisateur décrit des dépenses ou revenus
