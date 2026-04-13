@@ -5,6 +5,8 @@ const STATIC_ASSETS = [
   '/style.css',
   '/app.js',
   '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
   'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
