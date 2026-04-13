@@ -14,8 +14,15 @@ self.addEventListener('install', (event) => {
       return cache.addAll(STATIC_ASSETS).catch(() => {});
     })
   );
-  // Don't skipWaiting here — we wait for the page to confirm before activating,
-  // so the UPDATE_AVAILABLE message is shown first.
+  // Activate immediately — don't wait for existing tabs to close.
+  self.skipWaiting();
+});
+
+// Allow the page to trigger skip manually (belt-and-suspenders).
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {

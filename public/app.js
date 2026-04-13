@@ -1217,18 +1217,35 @@ function initPocheHandlers() {
 }
 
 function init() {
-  // Service worker — show red dot on profile badge when update available
+  // Service worker — auto-reload when a new version activates
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    // Capture BEFORE register() so first-install doesn't trigger a reload.
+    const hadController = !!navigator.serviceWorker.controller;
 
-    navigator.serviceWorker.addEventListener('message', (e) => {
-      if (e.data?.type === 'UPDATE_AVAILABLE') {
-        // Red dot on profile badge
-        const dot = document.getElementById('update-dot');
-        if (dot) dot.style.display = 'block';
-        // Banner inside profile panel
-        const bar = document.getElementById('profile-update-bar');
-        if (bar) bar.style.display = 'flex';
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      // A new SW is already waiting (e.g. page was open during deploy) — skip it now.
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+
+      // A new SW found during this session — skip as soon as it finishes installing.
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            newWorker.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    }).catch(() => {});
+
+    // When the new SW takes control, reload silently (< 3 s after app open).
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController && !refreshing) {
+        refreshing = true;
+        window.location.reload();
       }
     });
   }
