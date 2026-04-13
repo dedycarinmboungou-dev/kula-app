@@ -791,6 +791,17 @@ app.post('/api/poches/:id/alimenter', requireAuth, (req, res) => {
     if (!before) return res.status(404).json({ error: 'Poche non trouvée' });
     stmts.alimenterPoche.run({ id, userId: req.userId, montant });
     const after = stmts.getPocheById.get({ id, userId: req.userId });
+
+    // Virement : déduire le montant du solde principal (transaction négative)
+    stmts.insertTransaction.run({
+      userId:      req.userId,
+      type:        'expense',
+      amount:      montant,
+      category:    'Autre',
+      description: `💰 Épargne : ${before.nom}`,
+      date:        new Date().toISOString().slice(0, 10)
+    });
+
     const goal_reached = before.montant_actuel < before.objectif_montant && after.montant_actuel >= after.objectif_montant;
     res.json({ ...after, goal_reached });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1167,10 +1178,18 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
                 result = `Aucune poche nommée "${nom_poche}" trouvée. Demande à l'utilisateur de la créer depuis l'onglet Épargne.`;
               } else {
                 const wasComplete = poche.montant_actuel >= poche.objectif_montant;
-                stmts.alimenterPoche.run({ id: poche.id, userId: req.userId, montant: parseFloat(toolMontant) });
+                const m = parseFloat(toolMontant);
+                stmts.alimenterPoche.run({ id: poche.id, userId: req.userId, montant: m });
+                // Virement : déduire du solde principal
+                stmts.insertTransaction.run({
+                  userId: req.userId, type: 'expense', amount: m,
+                  category: 'Autre',
+                  description: `💰 Épargne : ${poche.nom}`,
+                  date: new Date().toISOString().slice(0, 10)
+                });
                 const updated = stmts.getPocheById.get({ id: poche.id, userId: req.userId });
                 const pct = Math.round(updated.montant_actuel / updated.objectif_montant * 100);
-                result = `Poche "${poche.nom}" alimentée de ${fmtN(parseFloat(toolMontant))} FCFA. Solde : ${fmtN(updated.montant_actuel)} / ${fmtN(updated.objectif_montant)} FCFA (${pct}%).`;
+                result = `Poche "${poche.nom}" alimentée de ${fmtN(m)} FCFA. Solde : ${fmtN(updated.montant_actuel)} / ${fmtN(updated.objectif_montant)} FCFA (${pct}%). Une dépense de ${fmtN(m)} FCFA a été déduite de ton solde principal.`;
                 if (!wasComplete && updated.montant_actuel >= updated.objectif_montant) {
                   result += ` 🎉 OBJECTIF ATTEINT !`;
                   goalReachedPoche = { nom: poche.nom };
@@ -1290,16 +1309,19 @@ app.post('/api/categories', requireAuth, (req, res) => {
 });
 
 app.put('/api/categories/:id', requireAuth, (req, res) => {
-  const { nom, icone, couleur } = req.body;
+  const { nom, icone, couleur, type } = req.body;
   if (!nom?.trim()) return res.status(400).json({ error: 'Nom requis' });
   const existing = stmts.getCategoryById.get({ id: parseInt(req.params.id), userId: req.userId });
   if (!existing) return res.status(404).json({ error: 'Catégorie introuvable' });
+  if (type && !['income', 'expense', 'both'].includes(type))
+    return res.status(400).json({ error: 'Type invalide' });
   try {
     stmts.updateCategory.run({
       id: parseInt(req.params.id), userId: req.userId,
-      nom: nom.trim(),
+      nom:     nom.trim(),
       icone:   icone   ?? existing.icone,
-      couleur: couleur ?? existing.couleur
+      couleur: couleur ?? existing.couleur,
+      type:    type    ?? existing.type
     });
     res.json({ ok: true });
   } catch (e) {

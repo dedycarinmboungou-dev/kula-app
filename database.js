@@ -238,7 +238,7 @@ const stmts = {
     SELECT * FROM categories WHERE id = $id AND user_id = $userId
   `),
   updateCategory: db.prepare(`
-    UPDATE categories SET nom = $nom, icone = $icone, couleur = $couleur
+    UPDATE categories SET nom = $nom, icone = $icone, couleur = $couleur, type = $type
     WHERE id = $id AND user_id = $userId
   `),
   deleteCategory: db.prepare(`

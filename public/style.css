@@ -2741,6 +2741,9 @@ button, a, img, .nav-item, .nav-fab,
   padding: 2px 8px;
 }
 
+/* Category modal must float above the budget panel (z-index: 9999) */
+#cat-modal-overlay { z-index: 10001; }
+
 /* Poche modal */
 .poche-modal-overlay {
   position: fixed; inset: 0;
@@ -2840,6 +2843,19 @@ button, a, img, .nav-item, .nav-fab,
   transition: background .15s;
 }
 .btn-alimenter:active { background: #bbf7d0; }
+
+/* ─── Offline data banner (cached data mode) ───────────────────────────────── */
+.offline-data-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #EFF6FF;
+  border-bottom: 1px solid #BFDBFE;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #1E40AF;
+  font-weight: 500;
+}
 
 /* ─── Offline sync bar ─────────────────────────────────────────────────────── */
 .offline-sync-bar {

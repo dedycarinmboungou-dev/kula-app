@@ -28,6 +28,8 @@ function getUser() {
 function logout() {
   localStorage.removeItem('kula_token');
   localStorage.removeItem('kula_user');
+  // Clear cached API data so the next user doesn't see stale data
+  if ('caches' in window) caches.delete('kula-data-cache').catch(() => {});
   window.location.href = '/auth.html';
 }
 
@@ -63,6 +65,21 @@ const CATEGORIES = {
   Logement:         { icon: '🏠', color: '#F59E0B' },
   Autre:            { icon: '📦', color: '#6B7280' }
 };
+
+// ── Offline data banner ───────────────────────────────────────────────────────
+function showOfflineDataBanner(cachedAt) {
+  const bar = document.getElementById('offline-data-bar');
+  if (!bar) return;
+  const when = cachedAt
+    ? new Date(parseInt(cachedAt)).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : 'dernière connexion';
+  bar.querySelector('.offline-data-text').textContent = `📵 Mode hors ligne · données du ${when}`;
+  bar.style.display = 'flex';
+}
+function hideOfflineDataBanner() {
+  const bar = document.getElementById('offline-data-bar');
+  if (bar) bar.style.display = 'none';
+}
 
 // ── Category meta helper (merges user custom cats + hardcoded defaults) ───────
 function getCatMeta(nom) {
@@ -302,6 +319,13 @@ function switchTab(tab) {
 async function loadDashboard() {
   try {
     const data = await api(`/api/dashboard?month=${state.currentMonth}`);
+
+    // Offline cached data — show banner
+    if (data._kula_offline) {
+      showOfflineDataBanner(data._cached_at);
+    } else {
+      hideOfflineDataBanner();
+    }
 
     // Balance
     const balEl = document.getElementById('total-balance');
@@ -1850,7 +1874,7 @@ function initCatModalHandlers() {
     btnSave.textContent = '…';
     try {
       if (catId) {
-        await api(`/api/categories/${catId}`, { method: 'PUT', body: JSON.stringify({ nom, icone, couleur }) });
+        await api(`/api/categories/${catId}`, { method: 'PUT', body: JSON.stringify({ nom, icone, couleur, type }) });
         showToast(`Catégorie "${nom}" mise à jour`, 'success');
       } else {
         await api('/api/categories', { method: 'POST', body: JSON.stringify({ nom, icone, couleur, type }) });
