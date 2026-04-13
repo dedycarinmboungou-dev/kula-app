@@ -48,6 +48,13 @@
     </div>
   </header>
 
+  <!-- Offline sync bar — shown when transactions are queued -->
+  <div class="offline-sync-bar" id="offline-sync-bar" style="display:none">
+    <span class="offline-sync-icon">📡</span>
+    <span class="offline-sync-count" id="offline-sync-count">0 transaction en attente de sync</span>
+    <button class="offline-sync-btn" id="btn-sync-offline">Synchroniser</button>
+  </div>
+
   <!-- PWA Install prompt — in page flow, below header -->
   <div class="install-prompt" id="install-prompt" style="display:none">
     <div class="install-prompt-left">
@@ -456,6 +463,42 @@
       <button class="btn-create-poche" id="btn-create-poche">Créer la poche 🐷</button>
     </div>
 
+  </div>
+</div>
+
+<!-- Category create/edit modal -->
+<div class="poche-modal-overlay" id="cat-modal-overlay" style="display:none">
+  <div class="poche-modal" id="cat-modal">
+    <div class="poche-modal-header">
+      <div class="poche-modal-title">🏷️ <span id="cat-modal-title">Nouvelle catégorie</span></div>
+      <button class="poche-modal-close" id="cat-modal-close">✕</button>
+    </div>
+    <div class="poche-modal-body">
+      <input type="hidden" id="cat-modal-id">
+      <div class="poche-field">
+        <label for="cat-modal-nom">Nom</label>
+        <input type="text" id="cat-modal-nom" placeholder="ex : Courses, Loyer, Épargne…" maxlength="30" autocomplete="off">
+      </div>
+      <div class="cat-field-row">
+        <div class="poche-field" style="flex:1">
+          <label for="cat-modal-icone">Icône (emoji)</label>
+          <input type="text" id="cat-modal-icone" placeholder="📦" maxlength="4" autocomplete="off" class="cat-icone-input">
+        </div>
+        <div class="poche-field" style="flex:1">
+          <label for="cat-modal-couleur">Couleur</label>
+          <input type="color" id="cat-modal-couleur" value="#6B7280" class="cat-color-input">
+        </div>
+        <div class="poche-field" style="flex:1">
+          <label for="cat-modal-type">Type</label>
+          <select id="cat-modal-type" class="cat-type-select">
+            <option value="expense">Dépense</option>
+            <option value="income">Revenu</option>
+            <option value="both">Les deux</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-create-poche" id="btn-cat-save">Créer</button>
+    </div>
   </div>
 </div>
 

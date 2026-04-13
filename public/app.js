@@ -43,7 +43,8 @@ const state = {
   chatHistory: [],
   pendingTransaction: null,
   charts: { category: null, trend: null },
-  budgets: {}  // {category: limite} for current month
+  budgets:  {},        // {category: limite} for current month
+  userCats: []         // [{id, nom, icone, couleur, type}] loaded from API
 };
 
 // ── Category metadata ─────────────────────────────────────────────────────────
@@ -62,6 +63,67 @@ const CATEGORIES = {
   Logement:         { icon: '🏠', color: '#F59E0B' },
   Autre:            { icon: '📦', color: '#6B7280' }
 };
+
+// ── Category meta helper (merges user custom cats + hardcoded defaults) ───────
+function getCatMeta(nom) {
+  const u = state.userCats.find(c => c.nom === nom);
+  if (u) return { icon: u.icone, color: u.couleur };
+  return CATEGORIES[nom] || { icon: '📦', color: '#6B7280' };
+}
+
+async function loadUserCategories() {
+  try {
+    const cats = await api('/api/categories');
+    state.userCats = cats || [];
+  } catch { /* silent — fall back to hardcoded CATEGORIES */ }
+}
+
+// ── Offline queue ─────────────────────────────────────────────────────────────
+const OFFLINE_KEY = 'kula_offline_queue';
+
+function getOfflineQueue() {
+  try { return JSON.parse(localStorage.getItem(OFFLINE_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function enqueueOffline(tx) {
+  const q = getOfflineQueue();
+  q.push({ ...tx, _queuedAt: Date.now() });
+  localStorage.setItem(OFFLINE_KEY, JSON.stringify(q));
+  renderOfflineBadge();
+}
+
+function renderOfflineBadge() {
+  const q   = getOfflineQueue();
+  const bar = document.getElementById('offline-sync-bar');
+  if (!bar) return;
+  if (q.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  document.getElementById('offline-sync-count').textContent =
+    `${q.length} transaction${q.length > 1 ? 's' : ''} en attente de sync`;
+}
+
+async function syncOfflineQueue() {
+  const q = getOfflineQueue();
+  if (!q.length || !navigator.onLine) return;
+  let synced = 0;
+  const remaining = [];
+  for (const tx of q) {
+    const { _queuedAt, ...txData } = tx; // eslint-disable-line no-unused-vars
+    try {
+      await api('/api/transactions', { method: 'POST', body: JSON.stringify(txData) });
+      synced++;
+    } catch {
+      remaining.push(tx);
+    }
+  }
+  localStorage.setItem(OFFLINE_KEY, JSON.stringify(remaining));
+  renderOfflineBadge();
+  if (synced > 0) {
+    showToast(`${synced} transaction${synced > 1 ? 's synchronisées' : ' synchronisée'} ✅`, 'success');
+    loadDashboard();
+  }
+}
 
 // ── Notification safety helper (iOS Safari has no Notification API) ───────────
 const notifGranted = () =>
@@ -292,7 +354,7 @@ function renderCategoryChart(categories, totalExpense, budgets = {}) {
 
   const labels = expenseCats.map(c => c.category);
   const values = expenseCats.map(c => c.total);
-  const colors = labels.map(l => CATEGORIES[l]?.color || '#6B7280');
+  const colors = labels.map(l => getCatMeta(l).color || '#6B7280');
 
   if (state.charts.category) state.charts.category.destroy();
   state.charts.category = new Chart(ctx, {
@@ -316,7 +378,7 @@ function renderCategoryChart(categories, totalExpense, budgets = {}) {
   // Category list with optional budget progress
   const maxTotal = Math.max(...values, 1);
   listEl.innerHTML = expenseCats.slice(0, 6).map(c => {
-    const meta   = CATEGORIES[c.category] || { icon: '📦', color: '#6B7280' };
+    const meta   = getCatMeta(c.category);
     const pct    = Math.round(c.total / totalExpense * 100);
     const limite = budgets[c.category];
     let budgetHtml = '';
@@ -413,7 +475,7 @@ function renderTransactionList(containerId, transactions) {
   }
 
   el.innerHTML = transactions.map(tx => {
-    const meta = CATEGORIES[tx.category] || { icon: '📦', color: '#6B7280' };
+    const meta = getCatMeta(tx.category);
     const sign = tx.type === 'income' ? '+' : '-';
     return `
       <div class="tx-item" data-id="${tx.id}">
@@ -475,11 +537,14 @@ async function deleteTransaction(id) {
 
 // ── Save a transaction ──────────────────────────────────────────────────────────
 async function saveTransaction(tx) {
-  const saved = await api('/api/transactions', {
+  if (!navigator.onLine) {
+    enqueueOffline(tx);
+    return { offline: true };
+  }
+  return await api('/api/transactions', {
     method: 'POST',
     body: JSON.stringify(tx)
   });
-  return saved;
 }
 
 // ── Chat ────────────────────────────────────────────────────────────────────────
@@ -576,7 +641,7 @@ function removeTypingIndicator() {
 }
 
 function renderTransactionPreview(tx, parentDiv) {
-  const meta = CATEGORIES[tx.category] || { icon: '📦', color: '#6B7280' };
+  const meta = getCatMeta(tx.category);
   const sign = tx.type === 'income' ? '+' : '-';
   const typeLabel = tx.type === 'income' ? 'Revenu' : 'Dépense';
 
@@ -603,10 +668,16 @@ function renderTransactionPreview(tx, parentDiv) {
   preview.querySelector('#btn-confirm-tx').addEventListener('click', async () => {
     preview.querySelector('.tx-preview-actions').innerHTML = '<div style="text-align:center;color:#6B7280;font-size:13px">Enregistrement…</div>';
     try {
-      await saveTransaction(tx);
-      preview.querySelector('.tx-preview-actions').innerHTML =
-        '<div style="text-align:center;color:#10B981;font-weight:600;font-size:14px">✅ Enregistré !</div>';
-      showToast('Transaction enregistrée !', 'success');
+      const result = await saveTransaction(tx);
+      if (result.offline) {
+        preview.querySelector('.tx-preview-actions').innerHTML =
+          '<div style="text-align:center;color:#F59E0B;font-weight:600;font-size:13px">📡 Sauvegardé hors ligne — sync dès reconnexion</div>';
+        showToast('Hors ligne — transaction en file d\'attente', 'info');
+      } else {
+        preview.querySelector('.tx-preview-actions').innerHTML =
+          '<div style="text-align:center;color:#10B981;font-weight:600;font-size:14px">✅ Enregistré !</div>';
+        showToast('Transaction enregistrée !', 'success');
+      }
       state.pendingTransaction = null;
     } catch (err) {
       preview.querySelector('.tx-preview-actions').innerHTML =
@@ -622,7 +693,7 @@ function renderTransactionPreview(tx, parentDiv) {
 
 // Carte affichée après qu'une transaction a été sauvegardée par le backend
 function renderSavedTransaction(tx, parentDiv) {
-  const meta = CATEGORIES[tx.category] || { icon: '📦', color: '#6B7280' };
+  const meta = getCatMeta(tx.category);
   const sign = tx.type === 'income' ? '+' : '-';
   const card = document.createElement('div');
   card.className = 'tx-saved-card';
@@ -1433,6 +1504,17 @@ function init() {
   // Profile panel
   initProfileHandlers();
 
+  // Offline queue — badge + auto-sync on reconnect
+  renderOfflineBadge();
+  window.addEventListener('online', () => {
+    showToast('Connexion rétablie 🌐', 'success');
+    syncOfflineQueue();
+  });
+  document.getElementById('btn-sync-offline')?.addEventListener('click', syncOfflineQueue);
+
+  // User categories (non-blocking — fallback to hardcoded CATEGORIES)
+  loadUserCategories();
+
   // Poches Épargne
   initPocheHandlers();
   initAlimenterHandlers();
@@ -1604,18 +1686,19 @@ function openBudgets() {
   overlay.style.display = 'block';
   setTimeout(() => { panel.style.transform = 'translateY(0)'; }, 0);
 
-  // Render rows immediately with cached budgets, then refresh
-  renderBudgetList(state.budgets, {});
-  api(`/api/budgets?month=${month}`).then(rows => {
-    const map = {};
-    rows.forEach(r => { map[r.category] = r.limite; });
-    // Also get current spending for progress
-    api(`/api/dashboard?month=${month}`).then(data => {
-      const spending = {};
-      (data.categories || []).filter(c => c.type === 'expense').forEach(c => { spending[c.category] = c.total; });
-      renderBudgetList(map, spending);
-    }).catch(() => renderBudgetList(map, {}));
-  }).catch(() => {});
+  // Load categories then budgets + spending
+  loadUserCategories().then(() => {
+    renderBudgetList(state.budgets, {});
+    api(`/api/budgets?month=${month}`).then(rows => {
+      const map = {};
+      rows.forEach(r => { map[r.category] = r.limite; });
+      api(`/api/dashboard?month=${month}`).then(data => {
+        const spending = {};
+        (data.categories || []).filter(c => c.type === 'expense').forEach(c => { spending[c.category] = c.total; });
+        renderBudgetList(map, spending);
+      }).catch(() => renderBudgetList(map, {}));
+    }).catch(() => {});
+  });
 }
 
 function renderBudgetList(budgetMap, spending) {
@@ -1623,34 +1706,59 @@ function renderBudgetList(budgetMap, spending) {
   if (!list) return;
   const month = state.currentMonth;
 
-  list.innerHTML = EXPENSE_CATEGORIES.map(cat => {
-    const meta    = CATEGORIES[cat] || { icon: '📦', color: '#6B7280' };
-    const limite  = budgetMap[cat] || 0;
-    const spent   = spending[cat] || 0;
-    const bPct    = limite > 0 ? Math.min(100, Math.round(spent / limite * 100)) : 0;
-    const barColor= bPct >= 100 ? '#EF4444' : bPct >= 80 ? '#F59E0B' : meta.color;
-    const progressHtml = limite > 0
-      ? `<div class="budget-progress-wrap">
-           <div class="budget-progress-bar" style="width:${bPct}%;background:${barColor}"></div>
-         </div>
-         <div class="budget-progress-label">${formatAmount(spent)} / ${formatAmount(limite)} FCFA (${bPct}%)</div>`
-      : '';
-    return `
-      <div class="budget-row">
-        <div class="budget-row-icon">${meta.icon}</div>
-        <div class="budget-row-info">
-          <div class="budget-row-name">${cat}</div>
-          ${progressHtml}
-        </div>
-        <div class="budget-input-wrap">
-          <input class="budget-input" type="number" inputmode="numeric" min="0" step="500"
-            placeholder="—" value="${limite > 0 ? limite : ''}"
-            data-cat="${cat}" data-month="${month}"
-            onchange="saveBudget(this)">
-          <span class="budget-input-unit">FCFA</span>
-        </div>
-      </div>`;
-  }).join('');
+  // Use user's expense + both categories; fall back to hardcoded if not loaded yet
+  const expenseCats = state.userCats.length
+    ? state.userCats.filter(c => c.type !== 'income')
+    : EXPENSE_CATEGORIES.map(nom => ({ id: null, nom, icone: CATEGORIES[nom]?.icon || '📦', couleur: CATEGORIES[nom]?.color || '#6B7280', type: 'expense' }));
+
+  list.innerHTML = `
+    <div class="cat-manage-header">
+      <span class="cat-manage-title">Catégories de dépenses</span>
+      <button class="btn-add-cat" id="btn-add-cat">+ Nouvelle</button>
+    </div>` +
+    expenseCats.map(cat => {
+      const limite   = budgetMap[cat.nom] || 0;
+      const spent    = spending[cat.nom]  || 0;
+      const bPct     = limite > 0 ? Math.min(100, Math.round(spent / limite * 100)) : 0;
+      const barColor = bPct >= 100 ? '#EF4444' : bPct >= 80 ? '#F59E0B' : cat.couleur;
+      const progressHtml = limite > 0
+        ? `<div class="budget-progress-wrap">
+             <div class="budget-progress-bar" style="width:${bPct}%;background:${barColor}"></div>
+           </div>
+           <div class="budget-progress-label">${formatAmount(spent)} / ${formatAmount(limite)} FCFA (${bPct}%)</div>`
+        : '';
+      const catActions = cat.id
+        ? `<button class="btn-cat-edit"   data-cat-id="${cat.id}" title="Modifier">✏️</button>
+           <button class="btn-cat-delete" data-cat-id="${cat.id}" data-cat-nom="${escapeHtml(cat.nom)}" title="Supprimer">✕</button>`
+        : '';
+      return `
+        <div class="budget-row">
+          <div class="budget-row-icon">${escapeHtml(cat.icone)}</div>
+          <div class="budget-row-info">
+            <div class="budget-row-name">${escapeHtml(cat.nom)}</div>
+            ${progressHtml}
+          </div>
+          <div class="budget-row-right">
+            <div class="budget-input-wrap">
+              <input class="budget-input" type="number" inputmode="numeric" min="0" step="500"
+                placeholder="—" value="${limite > 0 ? limite : ''}"
+                data-cat="${escapeHtml(cat.nom)}" data-month="${month}"
+                onchange="saveBudget(this)">
+              <span class="budget-input-unit">FCFA</span>
+            </div>
+            <div class="budget-cat-actions">${catActions}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+  // Attach category management listeners
+  list.querySelector('#btn-add-cat')?.addEventListener('click', () => openCatModal(null));
+  list.querySelectorAll('.btn-cat-edit').forEach(btn => {
+    btn.addEventListener('click', () => openCatModal(parseInt(btn.dataset.catId)));
+  });
+  list.querySelectorAll('.btn-cat-delete').forEach(btn => {
+    btn.addEventListener('click', () => deleteCat(parseInt(btn.dataset.catId), btn.dataset.catNom));
+  });
 }
 
 async function saveBudget(input) {
@@ -1681,9 +1789,89 @@ function closeBudgets() {
   setTimeout(() => { document.getElementById('budget-overlay').style.display = 'none'; }, 300);
 }
 
+function openCatModal(catId) {
+  const overlay = document.getElementById('cat-modal-overlay');
+  if (!overlay) return;
+  document.getElementById('cat-modal-id').value      = catId || '';
+  document.getElementById('cat-modal-nom').value     = '';
+  document.getElementById('cat-modal-icone').value   = '📦';
+  document.getElementById('cat-modal-couleur').value = '#6B7280';
+  document.getElementById('cat-modal-type').value    = 'expense';
+  document.getElementById('cat-modal-title').textContent = catId ? 'Modifier la catégorie' : 'Nouvelle catégorie';
+  document.getElementById('btn-cat-save').textContent = catId ? 'Enregistrer' : 'Créer';
+
+  if (catId) {
+    const cat = state.userCats.find(c => c.id === catId);
+    if (cat) {
+      document.getElementById('cat-modal-nom').value     = cat.nom;
+      document.getElementById('cat-modal-icone').value   = cat.icone;
+      document.getElementById('cat-modal-couleur').value = cat.couleur;
+      document.getElementById('cat-modal-type').value    = cat.type;
+    }
+  }
+  overlay.style.display = 'flex';
+  setTimeout(() => document.getElementById('cat-modal-nom').focus(), 120);
+}
+
+async function deleteCat(catId, nom) {
+  if (!confirm(`Supprimer la catégorie "${nom}" ?`)) return;
+  try {
+    await api(`/api/categories/${catId}`, { method: 'DELETE' });
+    showToast(`Catégorie "${nom}" supprimée`, 'success');
+    await loadUserCategories();
+    openBudgets();
+  } catch (err) {
+    showToast('Erreur : ' + err.message, 'error');
+  }
+}
+
+function initCatModalHandlers() {
+  const overlay  = document.getElementById('cat-modal-overlay');
+  const modal    = document.getElementById('cat-modal');
+  const btnClose = document.getElementById('cat-modal-close');
+  const btnSave  = document.getElementById('btn-cat-save');
+  if (!overlay) return;
+
+  function closeModal() { overlay.style.display = 'none'; }
+  btnClose?.addEventListener('click', closeModal);
+  overlay?.addEventListener('click', closeModal);
+  modal?.addEventListener('click', e => e.stopPropagation());
+
+  btnSave?.addEventListener('click', async () => {
+    const catId   = document.getElementById('cat-modal-id').value;
+    const nom     = document.getElementById('cat-modal-nom').value.trim();
+    const icone   = document.getElementById('cat-modal-icone').value.trim() || '📦';
+    const couleur = document.getElementById('cat-modal-couleur').value || '#6B7280';
+    const type    = document.getElementById('cat-modal-type').value;
+    if (!nom) return showToast('Nom requis', 'error');
+
+    btnSave.disabled = true;
+    const origLabel = btnSave.textContent;
+    btnSave.textContent = '…';
+    try {
+      if (catId) {
+        await api(`/api/categories/${catId}`, { method: 'PUT', body: JSON.stringify({ nom, icone, couleur }) });
+        showToast(`Catégorie "${nom}" mise à jour`, 'success');
+      } else {
+        await api('/api/categories', { method: 'POST', body: JSON.stringify({ nom, icone, couleur, type }) });
+        showToast(`Catégorie "${nom}" créée`, 'success');
+      }
+      closeModal();
+      await loadUserCategories();
+      openBudgets();
+    } catch (err) {
+      showToast('Erreur : ' + err.message, 'error');
+    } finally {
+      btnSave.disabled = false;
+      btnSave.textContent = origLabel;
+    }
+  });
+}
+
 function initBudgetHandlers() {
   document.getElementById('budget-back')?.addEventListener('click', closeBudgets);
   document.getElementById('budget-overlay')?.addEventListener('click', closeBudgets);
+  initCatModalHandlers();
 }
 
 // ── Profile panel ──────────────────────────────────────────────────────────────

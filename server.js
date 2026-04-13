@@ -6,13 +6,21 @@ const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const Anthropic = require('@anthropic-ai/sdk');
 const webpush  = require('web-push');
-const { stmts, VALID_CATEGORIES } = require('./database');
+const { stmts, VALID_CATEGORIES, DEFAULT_CATEGORIES } = require('./database');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'kula_fallback_secret';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// ── Category helpers ──────────────────────────────────────────────────────────
+// Returns Set of valid category names for a user (static defaults + user's custom ones)
+function getUserCatNames(userId) {
+  const cats = stmts.getCategories.all({ userId });
+  if (cats.length === 0) return new Set(VALID_CATEGORIES);
+  return new Set([...VALID_CATEGORIES, ...cats.map(c => c.nom)]);
+}
 
 // ── Web Push (VAPID) ──────────────────────────────────────────────────────────
 const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY;
@@ -252,6 +260,11 @@ app.post('/api/auth/register', async (req, res) => {
     const user = { id: result.lastInsertRowid, name: name.trim(), email: email.toLowerCase().trim() };
     const token = jwt.sign({ userId: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
+    // Insert default categories for new user
+    DEFAULT_CATEGORIES.forEach(cat => {
+      stmts.insertCategory.run({ userId: user.id, nom: cat.nom, icone: cat.icone, couleur: cat.couleur, type: cat.type });
+    });
+
     // Non-blocking: send welcome email in background
     sendWelcomeEmail(user.email, user.name).catch(() => {});
 
@@ -348,7 +361,7 @@ app.put('/api/budgets', requireAuth, (req, res) => {
   try {
     const { category, limite, month } = req.body;
     const mois = month || new Date().toISOString().slice(0, 7);
-    if (!category || !VALID_CATEGORIES.includes(category))
+    if (!category || !getUserCatNames(req.userId).has(category))
       return res.status(400).json({ error: 'Catégorie invalide' });
     const lim = parseFloat(limite);
     if (isNaN(lim) || lim < 0)
@@ -421,7 +434,7 @@ app.post('/api/transactions', requireAuth, (req, res) => {
       return res.status(400).json({ error: 'Type invalide' });
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0)
       return res.status(400).json({ error: 'Montant invalide' });
-    if (!category || !VALID_CATEGORIES.includes(category))
+    if (!category || !getUserCatNames(req.userId).has(category))
       return res.status(400).json({ error: 'Catégorie invalide' });
     if (!description || !description.trim())
       return res.status(400).json({ error: 'Description requise' });
@@ -1065,7 +1078,7 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
             transaction_id: { type: 'integer', description: "L'ID de la transaction à modifier" },
             type:        { type: 'string', enum: ['income', 'expense'], description: 'Nouveau type' },
             amount:      { type: 'number', description: 'Nouveau montant positif en FCFA' },
-            category:    { type: 'string', enum: VALID_CATEGORIES, description: 'Nouvelle catégorie' },
+            category:    { type: 'string', enum: [...getUserCatNames(req.userId)], description: 'Nouvelle catégorie' },
             description: { type: 'string', description: 'Nouvelle description courte' },
             date:        { type: 'string', description: 'Nouvelle date au format YYYY-MM-DD' }
           },
@@ -1129,7 +1142,7 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
                 result = 'Type invalide.';
               } else if (isNaN(newAmt) || newAmt <= 0) {
                 result = 'Montant invalide.';
-              } else if (!VALID_CATEGORIES.includes(newCat)) {
+              } else if (!getUserCatNames(req.userId).has(newCat)) {
                 result = `Catégorie invalide : "${newCat}".`;
               } else {
                 stmts.updateTransaction.run({
@@ -1204,7 +1217,7 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
             throw new Error(`type invalide: ${tx.type}`);
           if (!tx.amount || isNaN(tx.amount) || parseFloat(tx.amount) <= 0)
             throw new Error(`montant invalide: ${tx.amount}`);
-          if (!tx.category || !VALID_CATEGORIES.includes(tx.category))
+          if (!tx.category || !getUserCatNames(req.userId).has(tx.category))
             throw new Error(`catégorie inconnue: "${tx.category}"`);
           if (!tx.description?.trim())
             throw new Error('description manquante');
@@ -1241,6 +1254,59 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
     const msg = err.status === 401 ? 'Clé API invalide.' : "Erreur, réessayez.";
     res.status(500).json({ type: 'message', message: msg });
   }
+});
+
+// ── Categories CRUD ───────────────────────────────────────────────────────────
+
+app.get('/api/categories', requireAuth, (req, res) => {
+  let cats = stmts.getCategories.all({ userId: req.userId });
+  // Seed defaults for existing users who have no categories yet
+  if (cats.length === 0) {
+    DEFAULT_CATEGORIES.forEach(cat => {
+      stmts.insertCategory.run({ userId: req.userId, nom: cat.nom, icone: cat.icone, couleur: cat.couleur, type: cat.type });
+    });
+    cats = stmts.getCategories.all({ userId: req.userId });
+  }
+  res.json(cats);
+});
+
+app.post('/api/categories', requireAuth, (req, res) => {
+  const { nom, icone = '📦', couleur = '#6B7280', type = 'expense' } = req.body;
+  if (!nom?.trim()) return res.status(400).json({ error: 'Nom requis' });
+  if (!['income', 'expense', 'both'].includes(type))
+    return res.status(400).json({ error: 'Type invalide' });
+  try {
+    const r = stmts.insertCategory.run({ userId: req.userId, nom: nom.trim(), icone, couleur, type });
+    if (r.changes === 0) return res.status(409).json({ error: 'Cette catégorie existe déjà' });
+    const cat = stmts.getCategoryById.get({ id: r.lastInsertRowid, userId: req.userId });
+    res.status(201).json(cat);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/categories/:id', requireAuth, (req, res) => {
+  const { nom, icone, couleur } = req.body;
+  if (!nom?.trim()) return res.status(400).json({ error: 'Nom requis' });
+  const existing = stmts.getCategoryById.get({ id: parseInt(req.params.id), userId: req.userId });
+  if (!existing) return res.status(404).json({ error: 'Catégorie introuvable' });
+  try {
+    stmts.updateCategory.run({
+      id: parseInt(req.params.id), userId: req.userId,
+      nom: nom.trim(),
+      icone:   icone   ?? existing.icone,
+      couleur: couleur ?? existing.couleur
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'Ce nom est déjà utilisé' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/categories/:id', requireAuth, (req, res) => {
+  stmts.deleteCategory.run({ id: parseInt(req.params.id), userId: req.userId });
+  res.json({ ok: true });
 });
 
 // ── Web Push routes ───────────────────────────────────────────────────────────

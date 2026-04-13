@@ -88,6 +88,19 @@ db.exec(`
   );
 `);
 
+// ── User categories table ─────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS categories (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    nom        TEXT    NOT NULL,
+    icone      TEXT    NOT NULL DEFAULT '📦',
+    couleur    TEXT    NOT NULL DEFAULT '#6B7280',
+    type       TEXT    NOT NULL DEFAULT 'expense' CHECK(type IN ('income', 'expense', 'both')),
+    UNIQUE(user_id, nom)
+  );
+`);
+
 // ── Push subscriptions table ─────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -212,6 +225,29 @@ const stmts = {
     WHERE id = $id AND user_id = $userId
   `),
 
+  // Categories
+  insertCategory: db.prepare(`
+    INSERT OR IGNORE INTO categories (user_id, nom, icone, couleur, type)
+    VALUES ($userId, $nom, $icone, $couleur, $type)
+  `),
+  getCategories: db.prepare(`
+    SELECT * FROM categories WHERE user_id = $userId ORDER BY
+      CASE type WHEN 'income' THEN 0 WHEN 'both' THEN 1 ELSE 2 END, nom ASC
+  `),
+  getCategoryById: db.prepare(`
+    SELECT * FROM categories WHERE id = $id AND user_id = $userId
+  `),
+  updateCategory: db.prepare(`
+    UPDATE categories SET nom = $nom, icone = $icone, couleur = $couleur
+    WHERE id = $id AND user_id = $userId
+  `),
+  deleteCategory: db.prepare(`
+    DELETE FROM categories WHERE id = $id AND user_id = $userId
+  `),
+  countUserCategories: db.prepare(`
+    SELECT COUNT(*) as cnt FROM categories WHERE user_id = $userId
+  `),
+
   // Push subscriptions
   upsertPushSubscription: db.prepare(`
     INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
@@ -273,4 +309,20 @@ const stmts = {
   `)
 };
 
-module.exports = { db, stmts, VALID_CATEGORIES };
+const DEFAULT_CATEGORIES = [
+  { nom: 'Salaire',        icone: '💼', couleur: '#10B981', type: 'income'  },
+  { nom: 'Business',       icone: '🏢', couleur: '#059669', type: 'income'  },
+  { nom: 'Famille',        icone: '👨‍👩‍👧', couleur: '#34D399', type: 'income'  },
+  { nom: 'Solde initial',  icone: '🏦', couleur: '#0EA5E9', type: 'income'  },
+  { nom: 'Alimentation',   icone: '🛒', couleur: '#EF4444', type: 'expense' },
+  { nom: 'Transport',      icone: '🚌', couleur: '#F97316', type: 'expense' },
+  { nom: 'Loisirs',        icone: '🎉', couleur: '#A855F7', type: 'expense' },
+  { nom: 'Vêtements',      icone: '👗', couleur: '#EC4899', type: 'expense' },
+  { nom: 'Santé',          icone: '🏥', couleur: '#14B8A6', type: 'expense' },
+  { nom: 'Éducation',      icone: '📚', couleur: '#3B82F6', type: 'expense' },
+  { nom: 'Téléphone',      icone: '📱', couleur: '#8B5CF6', type: 'expense' },
+  { nom: 'Logement',       icone: '🏠', couleur: '#F59E0B', type: 'expense' },
+  { nom: 'Autre',          icone: '📦', couleur: '#6B7280', type: 'both'    },
+];
+
+module.exports = { db, stmts, VALID_CATEGORIES, DEFAULT_CATEGORIES };
