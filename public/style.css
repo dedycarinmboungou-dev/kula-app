@@ -968,40 +968,149 @@ button, a, img, .nav-item, .nav-fab,
 
 .btn-mic:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* Voice waveform canvas */
-#voice-wave {
+/* ── Voice recording panel ────────────────────────────────────────────────── */
+.voice-rec-panel,
+.voice-processing {
   display: none;
-  width: 100%;
-  height: 36px;
-  border-radius: 8px;
-  background: transparent;
+  padding: 14px 16px 16px;
+  background: var(--white);
 }
-#voice-wave.active { display: block; }
 
-/* Mic status banner */
-.mic-status {
-  display: none;
+.voice-rec-panel.active {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 16px 0;
-  padding: 8px 16px;
-  background: rgba(239,68,68,0.08);
-  border-top: 1px solid rgba(239,68,68,0.15);
-  font-size: 13px;
-  color: var(--danger);
-  font-weight: 500;
+  gap: 14px;
+  animation: slideUp 0.18s ease;
 }
 
-.mic-status.visible { display: flex; }
+.voice-processing.active {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--gray);
+  min-height: 68px;
+}
 
-.mic-dot {
-  width: 8px;
-  height: 8px;
+/* Cancel (×) button */
+.voice-cancel-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--light-gray);
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray);
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.voice-cancel-btn svg { width: 14px; height: 14px; }
+.voice-cancel-btn:hover { background: var(--border); border-color: var(--gray); }
+
+/* Bars area */
+.voice-bars-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.voice-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 32px;
+  width: 100%;
+  justify-content: center;
+}
+
+.vb {
+  width: 4px;
+  border-radius: 3px;
+  background: var(--primary);
+  flex-shrink: 0;
+  height: 4px;
+  will-change: height;
+  transition: height 0.06s ease;
+}
+
+/* Idle animation — staggered per bar, overridden by JS when audio data flows */
+.voice-rec-panel.active .vb { animation: vb-idle 1.4s ease-in-out infinite; }
+.voice-rec-panel.active .vb:nth-child(1)  { animation-delay: 0.00s; }
+.voice-rec-panel.active .vb:nth-child(2)  { animation-delay: 0.13s; }
+.voice-rec-panel.active .vb:nth-child(3)  { animation-delay: 0.26s; }
+.voice-rec-panel.active .vb:nth-child(4)  { animation-delay: 0.39s; }
+.voice-rec-panel.active .vb:nth-child(5)  { animation-delay: 0.52s; }
+.voice-rec-panel.active .vb:nth-child(6)  { animation-delay: 0.65s; }
+.voice-rec-panel.active .vb:nth-child(7)  { animation-delay: 0.52s; }
+.voice-rec-panel.active .vb:nth-child(8)  { animation-delay: 0.39s; }
+.voice-rec-panel.active .vb:nth-child(9)  { animation-delay: 0.26s; }
+.voice-rec-panel.active .vb:nth-child(10) { animation-delay: 0.13s; }
+.voice-rec-panel.active .vb:nth-child(11) { animation-delay: 0.00s; }
+/* Disable idle animation when real audio data is being drawn */
+.voice-rec-panel.active .voice-bars.has-data .vb { animation: none; }
+
+@keyframes vb-idle {
+  0%, 100% { height: 4px; }
+  50%       { height: 28px; }
+}
+
+.voice-rec-label {
+  font-size: 11px;
+  color: var(--gray);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* Timer */
+.voice-timer {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--dark);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* Stop (■) button — large red circle */
+.voice-stop-btn {
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   background: var(--danger);
-  animation: micPulse 1.2s ease-in-out infinite;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(239,68,68,0.2);
+  animation: micPulse 1.4s ease-in-out infinite;
+  transition: transform 0.1s;
+}
+.voice-stop-btn:active { transform: scale(0.93); }
+.voice-stop-btn svg { width: 18px; height: 18px; }
+
+/* Processing spinner */
+.voice-proc-ring {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
   flex-shrink: 0;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .btn-send {
   width: 44px;

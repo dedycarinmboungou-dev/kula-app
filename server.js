@@ -2,11 +2,15 @@ require('dotenv').config();
 const express  = require('express');
 const cors     = require('cors');
 const path     = require('path');
+const fs       = require('fs');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const Anthropic = require('@anthropic-ai/sdk');
 const webpush  = require('web-push');
 const { stmts, VALID_CATEGORIES, DEFAULT_CATEGORIES } = require('./database');
+
+// Unique build ID — changes on every server restart / deploy
+const BUILD_ID = Date.now();
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -210,6 +214,21 @@ const KOLA_QUOTES = [
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json({ limit: '4mb' }));
+
+// Serve sw.js dynamically so __BUILD_TIME__ is replaced on every deploy,
+// which forces the browser to install a fresh Service Worker and bust old caches.
+const SW_PATH = path.join(__dirname, 'public', 'sw.js');
+app.get('/sw.js', (req, res) => {
+  try {
+    const raw = fs.readFileSync(SW_PATH, 'utf8');
+    res.setHeader('Content-Type', 'application/javascript');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.send(raw.replace('__BUILD_TIME__', BUILD_ID));
+  } catch (e) {
+    res.status(500).send('// sw.js unavailable');
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0 }));
 
 // ── Auth middleware ───────────────────────────────────────────────────────────
@@ -1400,51 +1419,59 @@ app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Daily push notification at 20:00 (server local time) ─────────────────────
-async function sendDailyPush() {
+// ── Scheduled push notifications — 3 slots per day (UTC) ─────────────────────
+// UTC times: 08h ≈ 8-9h local for West/Central Africa, 20h ≈ 20-21h local
+const PUSH_SLOTS = [
+  {
+    utcHour: 8,
+    payload: { title: 'Kula 🌱', body: '🌅 Bonne journée ! Pense à noter tes dépenses et revenus du matin.', tag: 'kula-morning', icon: '/icon-192.png', badge: '/icon-192.png' }
+  },
+  {
+    utcHour: 13,
+    payload: { title: 'Kula 🌱', body: '☀️ Pause déjeuner ! Quelques dépenses à enregistrer dans Kula ?', tag: 'kula-midday', icon: '/icon-192.png', badge: '/icon-192.png' }
+  },
+  {
+    utcHour: 20,
+    payload: { title: 'Kula 🌱', body: '🌙 Bonsoir ! Prends 2 minutes pour faire le bilan financier de ta journée.', tag: 'kula-evening', icon: '/icon-192.png', badge: '/icon-192.png' }
+  }
+];
+
+async function sendPushToAll(payload) {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
   const subs = stmts.getAllPushSubscriptions.all();
   if (!subs.length) return;
-
-  const payload = JSON.stringify({
-    title: 'Kula 🌱',
-    body:  '💸 Tu as pensé à noter tes dépenses du jour ? Ouvre Kula et reste à jour !',
-    icon:  '/icon-192.png',
-    badge: '/icon-192.png',
-    tag:   'kula-daily-reminder'
-  });
-
-  const failed = [];
+  const payloadStr = JSON.stringify(payload);
+  let ok = 0;
   for (const sub of subs) {
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-        payload
+        payloadStr
       );
+      ok++;
     } catch (err) {
       if (err.statusCode === 410 || err.statusCode === 404) {
-        // Subscription expired — remove it
         stmts.deletePushSubscription.run({ endpoint: sub.endpoint });
       }
-      failed.push(sub.endpoint);
     }
   }
-  console.log(`[Push] Daily sent to ${subs.length - failed.length}/${subs.length} subscribers`);
+  console.log(`[Push] "${payload.tag}" sent to ${ok}/${subs.length} subscribers`);
 }
 
-function scheduleDailyPush() {
-  const now   = new Date();
-  const next  = new Date(now);
-  next.setHours(20, 0, 0, 0);
-  if (next <= now) next.setDate(next.getDate() + 1); // already past 20h today
+function schedulePushSlot(slot) {
+  const now  = new Date();
+  const next = new Date(now);
+  next.setUTCHours(slot.utcHour, 0, 0, 0);
+  if (next <= now) next.setUTCDate(next.getUTCDate() + 1); // already past today
   const delay = next - now;
   setTimeout(() => {
-    sendDailyPush();
-    setInterval(sendDailyPush, 24 * 60 * 60 * 1000); // repeat every 24h
+    sendPushToAll(slot.payload);
+    setInterval(() => sendPushToAll(slot.payload), 24 * 60 * 60 * 1000);
   }, delay);
-  console.log(`  Daily push scheduled in ${Math.round(delay / 60000)} min`);
+  console.log(`  Push slot ${slot.utcHour}h UTC scheduled in ${Math.round(delay / 60000)} min`);
 }
-scheduleDailyPush();
+
+PUSH_SLOTS.forEach(schedulePushSlot);
 
 // ── Widget page (lightweight, for PWA shortcut / home screen pin) ────────────
 app.get('/widget', requireAuth, (req, res) => {

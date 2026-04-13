@@ -47,6 +47,27 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Handle notification click — open/focus the app and go to chat tab
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const tab = event.notification.data?.tab || 'chat';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      const focused = clients.find(c => c.visibilityState === 'visible' || c.focused);
+      if (focused) {
+        focused.postMessage({ type: 'NOTIF_CLICK', tab });
+        return focused.focus();
+      }
+      const any = clients[0];
+      if (any) {
+        any.postMessage({ type: 'NOTIF_CLICK', tab });
+        return any.focus();
+      }
+      return self.clients.openWindow('/');
+    })
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);

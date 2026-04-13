@@ -181,13 +181,11 @@
     </div>
 
     <div class="chat-bottom" id="chat-bottom">
-      <div class="mic-status" id="mic-status">
-        <div class="mic-dot"></div>
-        <span id="mic-status-text">Écoute en cours… parlez maintenant</span>
-      </div>
-      <div class="chat-input-area">
+
+      <!-- ── Normal input row ────────────────────────────── -->
+      <div class="chat-input-area" id="chat-input-area">
         <button class="btn-mic" id="btn-mic" title="Dicter un message">
-          <svg id="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2"/>
             <line stroke-linecap="round" x1="12" y1="19" x2="12" y2="23"/>
@@ -201,7 +199,6 @@
             rows="1"
             maxlength="500"
           ></textarea>
-          <canvas id="voice-wave" aria-hidden="true"></canvas>
         </div>
         <button class="btn-send" id="btn-send" title="Envoyer">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -209,6 +206,38 @@
           </svg>
         </button>
       </div>
+
+      <!-- ── Voice recording panel (shown during recording) ── -->
+      <div class="voice-rec-panel" id="voice-rec-panel" aria-hidden="true">
+        <button class="voice-cancel-btn" id="voice-cancel-btn" title="Annuler">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line stroke-linecap="round" x1="18" y1="6" x2="6" y2="18"/>
+            <line stroke-linecap="round" x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <div class="voice-bars-area">
+          <div class="voice-bars" id="voice-bars">
+            <span class="vb"></span><span class="vb"></span><span class="vb"></span>
+            <span class="vb"></span><span class="vb"></span><span class="vb"></span>
+            <span class="vb"></span><span class="vb"></span><span class="vb"></span>
+            <span class="vb"></span><span class="vb"></span>
+          </div>
+          <div class="voice-rec-label" id="voice-rec-label">Écoute en cours…</div>
+        </div>
+        <div class="voice-timer" id="voice-timer">0:00</div>
+        <button class="voice-stop-btn" id="voice-stop-btn" title="Terminer l'enregistrement">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <rect x="5" y="5" width="14" height="14" rx="3"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- ── Processing state ────────────────────────────── -->
+      <div class="voice-processing" id="voice-processing" aria-hidden="true">
+        <div class="voice-proc-ring"></div>
+        <span>Traitement vocal…</span>
+      </div>
+
     </div>
   </section>
 

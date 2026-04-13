@@ -840,11 +840,30 @@ function getDailyQuote() {
   return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
 }
 
+// Show a notification via the Service Worker (works even when app is in background/PWA)
+async function swNotify(title, body, tag) {
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(title, {
+        body,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag,
+        renotify: false,
+        data: { tab: 'chat' }
+      });
+    } else if (typeof Notification !== 'undefined') {
+      new Notification(title, { body, icon: '/icon-192.png', badge: '/icon-192.png', tag });
+    }
+  } catch { /* silent */ }
+}
+
 function scheduleNotifications() {
   if (!notifGranted()) return;
 
   const SLOTS = [
-    { hour: 8,  key: 'morning',   msg: '🌅 Bonjour ! Note tes dépenses et revenus du matin dans Kula.' },
+    { hour: 8,  key: 'morning',   msg: null /* uses daily quote */ },
     { hour: 13, key: 'afternoon', msg: '☀️ Pause déjeuner ! Quelques dépenses à enregistrer dans Kula ?' },
     { hour: 20, key: 'evening',   msg: '🌙 Bonsoir ! Prends 2 minutes pour faire le bilan de ta journée.' }
   ];
@@ -861,183 +880,205 @@ function scheduleNotifications() {
     target.setHours(slot.hour, 0, 0, 0);
     if (target <= now) return;
 
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!notifGranted()) return;
-      const body = slot.key === 'morning'
-        ? `💡 Citation du jour : ${getDailyQuote()}`
-        : slot.msg;
-      if (typeof Notification !== 'undefined') {
-        const notif = new Notification('Kula 🌱', {
-          body,
-          icon: '/icon-192.png',
-          badge: '/icon-192.png',
-          tag: `kula-notif-${slot.key}`,
-          renotify: false
-        });
-        notif.onclick = () => { window.focus(); switchTab('chat'); notif.close(); };
-      }
+      const body = slot.msg ?? `💡 Citation du jour : ${getDailyQuote()}`;
+      await swNotify('Kula 🌱', body, `kula-notif-${slot.key}`);
       localStorage.setItem(storageKey, Date.now().toString());
     }, target - now);
   });
 }
 
-// ── Voice recognition + waveform visualiser ───────────────────────────────────
+// ── Voice recognition — professional recorder UI ──────────────────────────────
 const voice = (() => {
   try {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return null;
 
-    let isListening   = false;
-    let audioCtx      = null;
-    let analyser      = null;
-    let mediaStream   = null;
-    let animFrame     = null;
+    let isListening    = false;
+    let audioCtx       = null;
+    let analyser       = null;
+    let mediaStream    = null;
+    let animFrame      = null;
+    let timerInterval  = null;
+    let timerSec       = 0;
+    let recognitionRef = null;
+    let cancelled      = false;
 
-    // ── UI helpers ────────────────────────────────────────────────────────
-    function showWave() {
-      document.getElementById('chat-input').style.display  = 'none';
-      document.getElementById('voice-wave').classList.add('active');
+    // ── Panel helpers ─────────────────────────────────────────────────────
+    const $  = id => document.getElementById(id);
+
+    function showPanel() {
+      $('chat-input-area').style.display  = 'none';
+      $('voice-rec-panel').classList.add('active');
+      $('voice-rec-panel').setAttribute('aria-hidden', 'false');
+      $('voice-processing').classList.remove('active');
     }
 
-    function hideWave() {
-      document.getElementById('voice-wave').classList.remove('active');
-      document.getElementById('chat-input').style.display  = '';
+    function showProcessing() {
+      $('voice-rec-panel').classList.remove('active');
+      $('voice-processing').classList.add('active');
+      $('voice-processing').setAttribute('aria-hidden', 'false');
     }
 
-    function setBtn(active) {
-      const btn = document.getElementById('btn-mic');
-      if (!btn) return;
-      btn.classList.toggle('recording', active);
-      btn.title = active ? 'Arrêter' : 'Dicter un message';
+    function hidePanel() {
+      $('chat-input-area').style.display  = '';
+      $('voice-rec-panel').classList.remove('active');
+      $('voice-rec-panel').setAttribute('aria-hidden', 'true');
+      $('voice-processing').classList.remove('active');
+      $('voice-processing').setAttribute('aria-hidden', 'true');
+      $('voice-bars').classList.remove('has-data');
     }
 
-    // ── Waveform drawing loop ─────────────────────────────────────────────
-    function drawWave() {
-      const canvas = document.getElementById('voice-wave');
-      if (!canvas || !analyser) return;
+    // ── Timer ─────────────────────────────────────────────────────────────
+    function startTimer() {
+      timerSec = 0;
+      _tickTimer();
+      timerInterval = setInterval(_tickTimer, 1000);
+    }
 
-      // Match canvas resolution to its CSS size
-      const dpr = window.devicePixelRatio || 1;
-      const W   = canvas.offsetWidth;
-      const H   = canvas.offsetHeight;
-      if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
-        canvas.width  = W * dpr;
-        canvas.height = H * dpr;
-      }
+    function _tickTimer() {
+      const m = Math.floor(timerSec / 60);
+      const s = timerSec % 60;
+      const el = $('voice-timer');
+      if (el) el.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+      timerSec++;
+    }
 
-      const ctx    = canvas.getContext('2d');
-      const bufLen = analyser.frequencyBinCount;
-      const data   = new Uint8Array(bufLen);
+    function stopTimer() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+
+    // ── Bar visualiser ────────────────────────────────────────────────────
+    const BARS = 11;
+
+    function startBars() {
+      if (!analyser) return;
+      const barsEl  = $('voice-bars');
+      const barEls  = barsEl ? [...barsEl.querySelectorAll('.vb')] : [];
+      const freqData = new Uint8Array(analyser.frequencyBinCount);
+      const maxH = 28; // px
+      const minH = 3;
 
       function loop() {
         animFrame = requestAnimationFrame(loop);
-        analyser.getByteTimeDomainData(data);
+        analyser.getByteFrequencyData(freqData);
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Map freq bins to bar count — use low-to-mid range (most speech energy)
+        const binCount = freqData.length;
+        const step = Math.floor(binCount * 0.4 / BARS); // use first 40% of spectrum
 
-        // Gradient stroke
-        const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        grad.addColorStop(0,   '#10B981');
-        grad.addColorStop(0.5, '#1a7a4a');
-        grad.addColorStop(1,   '#10B981');
+        let hasSignal = false;
+        barEls.forEach((bar, i) => {
+          const binIdx = Math.floor(i * step + step * 0.5);
+          const val    = freqData[Math.min(binIdx, binCount - 1)];
+          if (val > 10) hasSignal = true;
+          const h = minH + Math.round((val / 255) * (maxH - minH));
+          bar.style.height = h + 'px';
+        });
 
-        ctx.lineWidth   = 2.5 * dpr;
-        ctx.strokeStyle = grad;
-        ctx.lineCap     = 'round';
-        ctx.lineJoin    = 'round';
-        ctx.beginPath();
-
-        const sliceW = canvas.width / bufLen;
-        let   x      = 0;
-
-        for (let i = 0; i < bufLen; i++) {
-          const v = data[i] / 128.0;
-          const y = (v * canvas.height) / 2;
-          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-          x += sliceW;
-        }
-        ctx.lineTo(canvas.width, canvas.height / 2);
-        ctx.stroke();
+        if (hasSignal) barsEl.classList.add('has-data');
       }
       loop();
     }
 
-    function stopWave() {
+    function stopBars() {
       if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(t => t.stop());
-        mediaStream = null;
-      }
-      if (audioCtx) {
-        audioCtx.close().catch(() => {});
-        audioCtx  = null;
-        analyser  = null;
-      }
+      // Reset bar heights
+      const barEls = document.querySelectorAll('.vb');
+      barEls.forEach(b => { b.style.height = ''; });
+    }
+
+    function stopAudio() {
+      stopBars();
+      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+      if (audioCtx)    { audioCtx.close().catch(() => {}); audioCtx = null; analyser = null; }
+    }
+
+    function cleanup(showInput = true) {
+      stopAudio();
+      stopTimer();
+      if (showInput) hidePanel();
+      isListening = false;
+      recognitionRef = null;
+    }
+
+    // ── Cancel ────────────────────────────────────────────────────────────
+    function cancel() {
+      cancelled = true;
+      if (recognitionRef) { try { recognitionRef.abort(); } catch {} }
+      cleanup(true);
     }
 
     // ── Main toggle ───────────────────────────────────────────────────────
     async function toggle() {
-      if (isListening) return; // one session at a time
+      if (isListening) return;
+      cancelled = false;
 
       const recognition = new SpeechRecognition();
       recognition.lang            = 'fr-FR';
       recognition.interimResults  = false;
       recognition.continuous      = false;
       recognition.maxAlternatives = 1;
+      recognitionRef = recognition;
 
       // Start audio visualiser
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioCtx    = new (window.AudioContext || window.webkitAudioContext)();
+        const AC    = window.AudioContext || window.webkitAudioContext;
+        audioCtx    = new AC();
         analyser    = audioCtx.createAnalyser();
-        analyser.fftSize = 256;
+        analyser.fftSize        = 512;
+        analyser.smoothingTimeConstant = 0.7;
         audioCtx.createMediaStreamSource(mediaStream).connect(analyser);
-        showWave();
-        drawWave();
+        showPanel();
+        startTimer();
+        startBars();
       } catch {
-        // getUserMedia failed (denied or unavailable) — still run speech without wave
-        showWave();
+        showPanel();
+        startTimer();
       }
 
       isListening = true;
-      setBtn(true);
       recognition.start();
 
-      // ── Result: fill textarea, stop visualiser, DON'T auto-send ─────────
+      // ── Result ────────────────────────────────────────────────────────
       recognition.onresult = (e) => {
+        if (cancelled) return;
         const transcript = e.results[0]?.[0]?.transcript?.trim();
-        stopWave();
-        hideWave();
+        stopAudio();
+        stopTimer();
+        showProcessing();
         isListening = false;
-        setBtn(false);
 
-        const input = document.getElementById('chat-input');
-        if (transcript) {
-          input.value = input.value.trim()
-            ? input.value.trim() + ' ' + transcript
-            : transcript;
-          autoResize(input);
-        }
-        input.focus();
-        recognition.stop();
+        // Brief processing display, then fill input
+        setTimeout(() => {
+          hidePanel();
+          const input = $('chat-input');
+          if (transcript && input) {
+            input.value = input.value.trim()
+              ? input.value.trim() + ' ' + transcript
+              : transcript;
+            autoResize(input);
+          }
+          if (input) input.focus();
+        }, 500);
+
+        try { recognition.stop(); } catch {}
       };
 
-      // ── End (no result / aborted) ─────────────────────────────────────
+      // ── End (no speech detected) ───────────────────────────────────────
       recognition.onend = () => {
-        if (!isListening) return; // already handled by onresult
-        stopWave();
-        hideWave();
-        isListening = false;
-        setBtn(false);
+        if (!isListening) return; // handled by onresult
+        cleanup(true);
       };
 
       // ── Errors ────────────────────────────────────────────────────────
       recognition.onerror = (e) => {
-        stopWave();
-        hideWave();
-        isListening = false;
-        setBtn(false);
-        if (e.error === 'aborted' || e.error === 'no-speech') return;
+        const silent = cancelled || e.error === 'aborted' || e.error === 'no-speech';
+        cleanup(true);
+        if (silent) return;
         if (e.error === 'not-allowed') {
           showToast('Accès au micro refusé. Autorisez-le dans votre navigateur.', 'error');
         } else {
@@ -1046,7 +1087,15 @@ const voice = (() => {
       };
     }
 
-    return { toggle, isListening: () => isListening };
+    // Wire up stop/cancel buttons once DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      const stopBtn   = document.getElementById('voice-stop-btn');
+      const cancelBtn = document.getElementById('voice-cancel-btn');
+      if (stopBtn)   stopBtn.addEventListener('click',   () => { if (recognitionRef) try { recognitionRef.stop(); } catch {} });
+      if (cancelBtn) cancelBtn.addEventListener('click', () => cancel());
+    });
+
+    return { toggle, cancel, isListening: () => isListening };
   } catch (e) {
     console.warn('Voice recognition init error:', e);
     return null;
@@ -1438,6 +1487,13 @@ function init() {
       if (hadController && !refreshing) {
         refreshing = true;
         window.location.reload();
+      }
+    });
+
+    // Handle notification click — SW tells us to open a specific tab
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data?.type === 'NOTIF_CLICK' && e.data.tab) {
+        switchTab(e.data.tab);
       }
     });
   }
