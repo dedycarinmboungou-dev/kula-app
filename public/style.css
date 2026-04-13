@@ -396,6 +396,94 @@ button, a, img, .nav-item, .nav-fab,
   background: rgba(255,255,255,0.04);
 }
 
+/* ─── Score Kula card ───────────────────────────────────────────────────────── */
+.score-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  margin: 0 16px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+.score-gauge-wrap {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  flex-shrink: 0;
+}
+
+.score-gauge {
+  width: 68px;
+  height: 68px;
+  transform: rotate(-90deg);
+}
+
+.score-track {
+  fill: none;
+  stroke: #F1F5F9;
+  stroke-width: 3.5;
+}
+
+.score-fill {
+  fill: none;
+  stroke: #10B981;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  transition: stroke-dasharray 1s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.4s ease;
+}
+
+.score-number {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--dark);
+  letter-spacing: -0.5px;
+}
+
+.score-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.score-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+
+.score-status {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 4px;
+}
+
+.score-detail {
+  font-size: 12px;
+  color: var(--gray);
+  line-height: 1.4;
+}
+
+/* ── Score color states ── */
+.score-card[data-level="great"] .score-fill  { stroke: #10B981; }
+.score-card[data-level="great"] .score-status { color: #059669; }
+.score-card[data-level="good"]  .score-fill  { stroke: #34D399; }
+.score-card[data-level="good"]  .score-status { color: #059669; }
+.score-card[data-level="warn"]  .score-fill  { stroke: #F59E0B; }
+.score-card[data-level="warn"]  .score-status { color: #D97706; }
+.score-card[data-level="bad"]   .score-fill  { stroke: #EF4444; }
+.score-card[data-level="bad"]   .score-status { color: #DC2626; }
+
 /* Stats row */
 .stats-row {
   display: grid;
@@ -652,9 +740,7 @@ button, a, img, .nav-item, .nav-fab,
   padding: 10px 16px;
   background: var(--white);
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  flex-shrink: 0; /* never compressed by flex layout */
 }
 
 .btn-back {
@@ -685,15 +771,27 @@ button, a, img, .nav-item, .nav-fab,
   color: var(--dark);
 }
 
-/* ─── Chat Tab ──────────────────────────────────────────────────────────────── */
+/* ─── Chat Tab — full-screen fixed overlay so topbar never scrolls away ─────── */
 #tab-chat {
   display: none;
-  flex-direction: column;
-  padding-bottom: 0;
 }
 
 #tab-chat.active {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  /* center within #app (max-width 480px) */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  z-index: 150;
   display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--light-gray);
+  /* Safe-area support */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .chat-messages {
@@ -3020,26 +3118,30 @@ button, a, img, .nav-item, .nav-fab,
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: 6px;
 }
 .budget-cat-actions {
   display: flex;
-  gap: 4px;
+  gap: 2px;
 }
 .btn-cat-edit,
 .btn-cat-delete {
-  width: 26px; height: 26px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   border: none;
+  background: transparent;
   cursor: pointer;
-  font-size: 12px;
-  display: flex; align-items: center; justify-content: center;
-  transition: background .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s;
 }
-.btn-cat-edit   { background: #EFF6FF; color: #3B82F6; }
-.btn-cat-delete { background: var(--danger-light); color: var(--danger); }
-.btn-cat-edit:active   { background: #DBEAFE; }
-.btn-cat-delete:active { background: #fca5a5; }
+.btn-cat-edit svg, .btn-cat-delete svg { width: 15px; height: 15px; }
+.btn-cat-edit   { color: #94A3B8; }
+.btn-cat-delete { color: #CBD5E1; }
+.btn-cat-edit:hover, .btn-cat-edit:active   { background: #EFF6FF; color: #3B82F6; transform: scale(1.1); }
+.btn-cat-delete:hover, .btn-cat-delete:active { background: var(--danger-light); color: var(--danger); transform: scale(1.1); }
 
 /* ─── Category modal fields ────────────────────────────────────────────────── */
 .cat-field-row {

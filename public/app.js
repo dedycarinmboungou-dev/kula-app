@@ -351,6 +351,9 @@ async function loadDashboard() {
     // Recent transactions
     renderTransactionList('recent-tx-list', data.recentTransactions || []);
 
+    // Score Kula
+    try { renderScoreKula(data.monthlyIncome || 0, data.monthlyExpense || 0, data.categories || [], state.budgets); } catch { /* silent */ }
+
     // Budget notifications — wrapped so any error never blocks the dashboard
     try { checkBudgetNotifications(data.categories || [], state.budgets); } catch { /* silent */ }
   } catch (err) {
@@ -359,6 +362,98 @@ async function loadDashboard() {
     if (balEl) balEl.textContent = 'Erreur';
     showToast('Erreur dashboard: ' + (err.message || 'réseau ?'), 'error');
   }
+}
+
+// ── Score Kula — financial health gauge (0–100) ────────────────────────────────
+function renderScoreKula(income, expense, categories, budgets) {
+  const card    = document.getElementById('score-card');
+  const numEl   = document.getElementById('score-number');
+  const fillEl  = document.getElementById('score-fill');
+  const statEl  = document.getElementById('score-status');
+  const detEl   = document.getElementById('score-detail');
+  if (!card) return;
+
+  // Not enough data yet
+  if (income === 0 && expense === 0) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'flex';
+
+  // ── Component 1 / 50 pts : income/expense ratio ───────────────────────────
+  let ratioScore = 0;
+  if (income > 0) {
+    const ratio = expense / income;
+    if      (ratio <= 0.60) ratioScore = 50;
+    else if (ratio <= 0.75) ratioScore = 40;
+    else if (ratio <= 0.90) ratioScore = 28;
+    else if (ratio <= 1.00) ratioScore = 15;
+    else                    ratioScore = 0;
+  } else if (expense > 0) {
+    ratioScore = 0; // spending but no income recorded
+  } else {
+    ratioScore = 35; // zero activity — neutral
+  }
+
+  // ── Component 2 / 50 pts : budget adherence ──────────────────────────────
+  const budgetKeys = Object.keys(budgets).filter(k => budgets[k] > 0);
+  let budgetScore = 50; // full score if no budgets defined
+  if (budgetKeys.length > 0) {
+    const expCatMap = {};
+    (categories || []).filter(c => c.type === 'expense').forEach(c => { expCatMap[c.category] = c.total; });
+    let ok = 0;
+    budgetKeys.forEach(cat => {
+      const spent = expCatMap[cat] || 0;
+      const lim   = budgets[cat];
+      if (spent <= lim * 0.80)       ok += 1;
+      else if (spent <= lim * 1.00)  ok += 0.5;
+      // else: exceeded — 0
+    });
+    budgetScore = Math.round((ok / budgetKeys.length) * 50);
+  }
+
+  const score = Math.min(100, Math.max(0, ratioScore + budgetScore));
+
+  // ── Gauge fill — circumference of r=18 circle ≈ 113.1 ───────────────────
+  const circ = 2 * Math.PI * 18; // ≈ 113.1
+  const dash = (score / 100) * circ;
+  fillEl.setAttribute('stroke-dasharray', `${dash.toFixed(1)} ${circ.toFixed(1)}`);
+
+  numEl.textContent = score;
+
+  // ── Status labels & level ─────────────────────────────────────────────────
+  let level, status, detail;
+  const saved = income > 0 ? Math.round(((income - expense) / income) * 100) : null;
+
+  if (score >= 80) {
+    level  = 'great';
+    status = '💚 Excellente gestion';
+    detail = saved !== null
+      ? `Tu épargnes ~${saved}% de tes revenus ce mois. Continue !`
+      : 'Tes finances sont sous contrôle.';
+  } else if (score >= 60) {
+    level  = 'good';
+    status = '✅ Bonne gestion';
+    detail = saved !== null && saved > 0
+      ? `Tu mets de côté ${saved}% de tes revenus. Bien joué !`
+      : 'Tes dépenses restent raisonnables.';
+  } else if (score >= 35) {
+    level  = 'warn';
+    status = '⚠️ Attention requise';
+    detail = expense > income
+      ? `Dépenses (${formatAmount(expense)}) > revenus (${formatAmount(income)}) ce mois.`
+      : 'Certains budgets sont proches de leur limite.';
+  } else {
+    level  = 'bad';
+    status = '🔴 Finances tendues';
+    detail = expense > income
+      ? `Tu dépenses plus que tu ne gagnes ce mois. Parle à Kula.`
+      : 'Plusieurs budgets sont dépassés.';
+  }
+
+  card.setAttribute('data-level', level);
+  statEl.textContent = status;
+  detEl.textContent  = detail;
 }
 
 // ── Category chart ──────────────────────────────────────────────────────────────
@@ -1808,8 +1903,20 @@ function renderBudgetList(budgetMap, spending) {
            <div class="budget-progress-label">${formatAmount(spent)} / ${formatAmount(limite)} FCFA (${bPct}%)</div>`
         : '';
       const catActions = cat.id
-        ? `<button class="btn-cat-edit"   data-cat-id="${cat.id}" title="Modifier">✏️</button>
-           <button class="btn-cat-delete" data-cat-id="${cat.id}" data-cat-nom="${escapeHtml(cat.nom)}" title="Supprimer">✕</button>`
+        ? `<button class="btn-cat-edit" data-cat-id="${cat.id}" title="Modifier">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+             </svg>
+           </button>
+           <button class="btn-cat-delete" data-cat-id="${cat.id}" data-cat-nom="${escapeHtml(cat.nom)}" title="Supprimer">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+               <polyline points="3 6 5 6 21 6"/>
+               <path d="M19 6l-1 14H6L5 6"/>
+               <path d="M10 11v6M14 11v6"/>
+               <path d="M9 6V4h6v2"/>
+             </svg>
+           </button>`
         : '';
       return `
         <div class="budget-row">
