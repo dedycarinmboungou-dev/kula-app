@@ -28,8 +28,12 @@ const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
 const VAPID_EMAIL   = process.env.VAPID_EMAIL || 'mailto:hello@kula.app';
 
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
-  webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
-  console.log('  Web Push : VAPID configured');
+  try {
+    webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
+    console.log('  Web Push : VAPID configured');
+  } catch (e) {
+    console.error('  Web Push : VAPID error —', e.message, '— push disabled');
+  }
 } else {
   console.warn('  Web Push : VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY not set — push disabled');
 }
