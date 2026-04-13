@@ -200,6 +200,42 @@
     </div>
   </section>
 
+  <!-- ── Tab: Épargne ────────────────────────────────────────────────────── -->
+  <section class="tab-panel" id="tab-epargne">
+
+    <!-- Summary card -->
+    <div class="epargne-summary" id="epargne-summary" style="display:none">
+      <div>
+        <div class="epargne-summary-label">Total épargné</div>
+        <div class="epargne-summary-amount" id="epargne-total-actuel">0 FCFA</div>
+        <div class="epargne-summary-sub" id="epargne-total-objectif"></div>
+      </div>
+      <div class="epargne-summary-right">
+        <div class="epargne-summary-nb" id="epargne-nb-poches"></div>
+        <div class="epargne-summary-icon">🐷</div>
+      </div>
+    </div>
+
+    <!-- Header + add button -->
+    <div class="epargne-header">
+      <span class="epargne-title">Mes Poches</span>
+      <button class="btn-add-poche" id="btn-add-poche">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nouvelle poche
+      </button>
+    </div>
+
+    <!-- Poches list -->
+    <div id="poches-list">
+      <div class="empty-state">
+        <div class="empty-icon">🐷</div>
+        <div class="empty-text">Aucune poche d'épargne</div>
+        <div class="empty-sub">Crée ta première poche pour commencer !</div>
+      </div>
+    </div>
+
+  </section>
+
   <!-- ── Tab: Transactions ──────────────────────────────────────────────── -->
   <section class="tab-panel" id="tab-transactions">
 
@@ -244,6 +280,16 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
         </svg>
       </div>
+    </button>
+
+    <button class="nav-item" data-tab="epargne">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 8h10a5 5 0 0 1 0 10H5V8z"/>
+        <path d="M5 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+        <line x1="19" y1="12" x2="22" y2="12"/>
+        <circle cx="9" cy="15" r="1" fill="currentColor"/>
+      </svg>
+      <span class="nav-label">Épargne</span>
     </button>
 
     <button class="nav-item" data-tab="transactions">
@@ -376,6 +422,32 @@
     </div>
   </div>
 
+</div>
+
+<!-- Poche modal backdrop -->
+<div class="poche-modal-overlay" id="poche-modal-overlay" style="display:none"></div>
+
+<!-- Poche modal -->
+<div class="poche-modal" id="poche-modal" style="display:none">
+  <div class="poche-modal-header">
+    <div class="poche-modal-title">
+      <span>🐷</span> Nouvelle poche d'épargne
+    </div>
+    <button class="poche-modal-close" id="poche-modal-close">✕</button>
+  </div>
+  <div class="poche-field">
+    <label for="poche-nom">Nom de la poche</label>
+    <input type="text" id="poche-nom" placeholder="ex : Voiture, Voyage, Téléphone…" maxlength="50" autocomplete="off">
+  </div>
+  <div class="poche-field">
+    <label for="poche-objectif">Objectif (FCFA)</label>
+    <input type="number" id="poche-objectif" placeholder="ex : 500 000" min="1" inputmode="numeric">
+  </div>
+  <div class="poche-field">
+    <label for="poche-echeance">Date cible <span style="font-weight:400;color:#9ca3af">(optionnel)</span></label>
+    <input type="date" id="poche-echeance">
+  </div>
+  <button class="btn-create-poche" id="btn-create-poche">Créer la poche 🐷</button>
 </div>
 
 <!-- Toast -->

@@ -711,6 +711,62 @@ app.get('/api/report/pdf', requireAuth, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// POCHES ÉPARGNE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+app.get('/api/poches', requireAuth, (req, res) => {
+  try {
+    res.json(stmts.getPoches.all({ userId: req.userId }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/poches', requireAuth, (req, res) => {
+  try {
+    const { nom, objectif_montant, date_echeance } = req.body;
+    if (!nom?.trim()) return res.status(400).json({ error: 'Le nom est requis' });
+    const objectif = parseFloat(objectif_montant);
+    if (!objectif || objectif <= 0) return res.status(400).json({ error: 'Objectif invalide' });
+    const result = stmts.insertPoche.run({ userId: req.userId, nom: nom.trim(), objectif, echeance: date_echeance || null });
+    res.status(201).json(stmts.getPocheById.get({ id: result.lastInsertRowid, userId: req.userId }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/poches/:id', requireAuth, (req, res) => {
+  try {
+    const { nom, objectif_montant, date_echeance } = req.body;
+    const id = parseInt(req.params.id);
+    if (!nom?.trim()) return res.status(400).json({ error: 'Le nom est requis' });
+    const objectif = parseFloat(objectif_montant);
+    if (!objectif || objectif <= 0) return res.status(400).json({ error: 'Objectif invalide' });
+    const r = stmts.updatePoche.run({ id, userId: req.userId, nom: nom.trim(), objectif, echeance: date_echeance || null });
+    if (r.changes === 0) return res.status(404).json({ error: 'Poche non trouvée' });
+    res.json(stmts.getPocheById.get({ id, userId: req.userId }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/poches/:id', requireAuth, (req, res) => {
+  try {
+    const r = stmts.deletePoche.run({ id: parseInt(req.params.id), userId: req.userId });
+    if (r.changes === 0) return res.status(404).json({ error: 'Poche non trouvée' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/poches/:id/alimenter', requireAuth, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const montant = parseFloat(req.body.montant);
+    if (!montant || montant <= 0) return res.status(400).json({ error: 'Montant invalide' });
+    const before = stmts.getPocheById.get({ id, userId: req.userId });
+    if (!before) return res.status(404).json({ error: 'Poche non trouvée' });
+    stmts.alimenterPoche.run({ id, userId: req.userId, montant });
+    const after = stmts.getPocheById.get({ id, userId: req.userId });
+    const goal_reached = before.montant_actuel < before.objectif_montant && after.montant_actuel >= after.objectif_montant;
+    res.json({ ...after, goal_reached });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // KOLA COACH
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -875,6 +931,7 @@ app.post('/api/chat', requireAuth, async (req, res) => {
     const allTime      = stmts.getAllTimeDashboard.get({ userId: req.userId }) || {};
     const recentTx     = stmts.getRecentTransactions.all({ userId: req.userId, limit: 10 });
     const catStats     = stmts.getCategoryStats.all({ userId: req.userId, month: currentMonth });
+    const poches       = stmts.getPoches.all({ userId: req.userId });
     const fmtN = n => Math.round(n || 0).toLocaleString('fr-FR');
 
     // Top 3 expense categories this month
@@ -891,6 +948,14 @@ app.post('/api/chat', requireAuth, async (req, res) => {
           `  #${t.id} | ${t.date} | ${t.type === 'income' ? '+' : '-'}${fmtN(t.amount)} FCFA | ${t.category} | ${t.description}`
         ).join('\n')
       : '  Aucune transaction récente';
+
+    // Poches d'épargne
+    const pochesLines = poches.length
+      ? poches.map(p => {
+          const pct = p.objectif_montant > 0 ? Math.round(p.montant_actuel / p.objectif_montant * 100) : 0;
+          return `  "${p.nom}" : ${fmtN(p.montant_actuel)} / ${fmtN(p.objectif_montant)} FCFA (${pct}%)`;
+        }).join('\n')
+      : '  Aucune poche créée';
 
     const systemPrompt = `Tu es Kula, un conseiller financier personnel de confiance. Kula signifie "grandir" en kituba — et c'est exactement ce que tu aides les gens à faire : grandir financièrement.
 
@@ -910,6 +975,9 @@ Top dépenses ce mois : ${topExpCats}
 
 Transactions récentes (avec leur ID — utilise ces IDs pour les outils) :
 ${recentTxLines}
+
+Poches d'épargne (utilise le nom exact pour add_to_poche) :
+${pochesLines}
 ────────────────────────────────────────────────
 
 CATÉGORIES DISPONIBLES :
@@ -964,6 +1032,18 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
         }
       },
       {
+        name: 'add_to_poche',
+        description: "Alimente une poche d'épargne de l'utilisateur avec un montant donné.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            nom_poche: { type: 'string', description: "Nom de la poche d'épargne (partiel suffit)" },
+            montant:   { type: 'number', description: 'Montant en FCFA à ajouter à la poche' }
+          },
+          required: ['nom_poche', 'montant']
+        }
+      },
+      {
         name: 'update_transaction',
         description: "Modifie une transaction existante (type, montant, catégorie, description ou date).",
         input_schema: {
@@ -983,6 +1063,8 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
 
     // ── Save user message to DB ───────────────────────────────────────────────
     stmts.insertChatMessage.run({ userId: req.userId, role: 'user', content: message.trim() });
+
+    let goalReachedPoche = null; // set when add_to_poche reaches the goal
 
     // ── Agentic loop (handles tool_use rounds) ────────────────────────────────
     const messages = [
@@ -1045,6 +1127,26 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
                 result = `Transaction #${transaction_id} mise à jour avec succès.`;
               }
             }
+          } else if (toolUse.name === 'add_to_poche') {
+            const { nom_poche, montant: toolMontant } = toolUse.input;
+            if (!nom_poche || !toolMontant || toolMontant <= 0) {
+              result = 'Nom de poche et montant positif requis.';
+            } else {
+              const poche = stmts.getPocheByNom.get({ userId: req.userId, pattern: `%${nom_poche}%` });
+              if (!poche) {
+                result = `Aucune poche nommée "${nom_poche}" trouvée. Demande à l'utilisateur de la créer depuis l'onglet Épargne.`;
+              } else {
+                const wasComplete = poche.montant_actuel >= poche.objectif_montant;
+                stmts.alimenterPoche.run({ id: poche.id, userId: req.userId, montant: parseFloat(toolMontant) });
+                const updated = stmts.getPocheById.get({ id: poche.id, userId: req.userId });
+                const pct = Math.round(updated.montant_actuel / updated.objectif_montant * 100);
+                result = `Poche "${poche.nom}" alimentée de ${fmtN(parseFloat(toolMontant))} FCFA. Solde : ${fmtN(updated.montant_actuel)} / ${fmtN(updated.objectif_montant)} FCFA (${pct}%).`;
+                if (!wasComplete && updated.montant_actuel >= updated.objectif_montant) {
+                  result += ` 🎉 OBJECTIF ATTEINT !`;
+                  goalReachedPoche = { nom: poche.nom };
+                }
+              }
+            }
           } else {
             result = 'Outil inconnu.';
           }
@@ -1076,6 +1178,7 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
 
     // If tools were used, signal the frontend to refresh its data
     if (toolsUsed) parsed.refresh = true;
+    if (goalReachedPoche) parsed.poche_goal_reached = goalReachedPoche;
 
     // ── Auto-insert new transactions into SQLite ───────────────────────────────
     if (parsed.type === 'transactions' && Array.isArray(parsed.transactions)) {

@@ -75,6 +75,19 @@ db.exec(`
   );
 `);
 
+// ── Poches Épargne table ───────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS poches_epargne (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id          INTEGER NOT NULL REFERENCES users(id),
+    nom              TEXT    NOT NULL,
+    objectif_montant REAL    NOT NULL CHECK(objectif_montant > 0),
+    montant_actuel   REAL    NOT NULL DEFAULT 0,
+    date_echeance    TEXT,
+    created_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+`);
+
 // ── Chat history table ────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS chat_history (
@@ -157,6 +170,33 @@ const stmts = {
     UPDATE transactions
     SET type = $type, amount = $amount, category = $category,
         description = $description, date = $date
+    WHERE id = $id AND user_id = $userId
+  `),
+
+  // Poches Épargne
+  insertPoche: db.prepare(`
+    INSERT INTO poches_epargne (user_id, nom, objectif_montant, date_echeance)
+    VALUES ($userId, $nom, $objectif, $echeance)
+  `),
+  getPoches: db.prepare(`
+    SELECT * FROM poches_epargne WHERE user_id = $userId ORDER BY created_at DESC
+  `),
+  getPocheById: db.prepare(`
+    SELECT * FROM poches_epargne WHERE id = $id AND user_id = $userId
+  `),
+  getPocheByNom: db.prepare(`
+    SELECT * FROM poches_epargne WHERE user_id = $userId AND nom LIKE $pattern
+    ORDER BY created_at DESC LIMIT 1
+  `),
+  updatePoche: db.prepare(`
+    UPDATE poches_epargne SET nom = $nom, objectif_montant = $objectif, date_echeance = $echeance
+    WHERE id = $id AND user_id = $userId
+  `),
+  deletePoche: db.prepare(`
+    DELETE FROM poches_epargne WHERE id = $id AND user_id = $userId
+  `),
+  alimenterPoche: db.prepare(`
+    UPDATE poches_epargne SET montant_actuel = montant_actuel + $montant
     WHERE id = $id AND user_id = $userId
   `),
 

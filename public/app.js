@@ -226,6 +226,7 @@ function switchTab(tab) {
 
   if (tab === 'dashboard') loadDashboard();
   if (tab === 'transactions') loadTransactions();
+  if (tab === 'epargne') loadPoches();
   if (tab === 'chat') {
     setTimeout(() => {
       const cm = document.getElementById('chat-messages');
@@ -674,10 +675,26 @@ async function sendChatMessage() {
       const msg = response.message || "Je n'ai pas compris. Pouvez-vous reformuler ?";
       addChatMessage('bot', msg);
       state.chatHistory.push({ role: 'assistant', content: msg });
-      // If Kola used a tool (delete/update), refresh data
+      // If Kola used a tool (delete/update/add_to_poche), refresh data
       if (response.refresh) {
         loadDashboard();
         loadTransactions();
+        loadPoches();
+      }
+      // Notification si objectif de poche atteint
+      if (response.poche_goal_reached) {
+        const nom = response.poche_goal_reached.nom;
+        showToast(`🎉 Objectif "${nom}" atteint !`, 'success');
+        if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification('Kula 🌱 — Félicitations !', {
+              body: `🎉 Félicitations ! Tu as atteint ton objectif "${nom}" !`,
+              icon: '/icon-192.png',
+              badge: '/icon-192.png',
+              tag: `poche-goal-${nom}`
+            });
+          }).catch(() => {});
+        }
       }
     }
   } catch (err) {
@@ -1059,6 +1076,146 @@ async function initNotifications() {
   }, 1500);
 }
 
+// ── Poches Épargne ────────────────────────────────────────────────────────────
+async function loadPoches() {
+  const list = document.getElementById('poches-list');
+  if (!list) return;
+  try {
+    const poches = await api('/api/poches');
+    if (poches) renderPoches(poches);
+  } catch {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Erreur de chargement</div></div>`;
+  }
+}
+
+function renderPoches(poches) {
+  const list    = document.getElementById('poches-list');
+  const summary = document.getElementById('epargne-summary');
+  if (!list) return;
+
+  // Update summary card
+  if (summary) {
+    const totalActuel  = poches.reduce((s, p) => s + p.montant_actuel, 0);
+    const totalObjectif = poches.reduce((s, p) => s + p.objectif_montant, 0);
+    document.getElementById('epargne-total-actuel').textContent    = `${formatAmount(totalActuel)} FCFA`;
+    document.getElementById('epargne-total-objectif').textContent  = `Objectif : ${formatAmount(totalObjectif)} FCFA`;
+    document.getElementById('epargne-nb-poches').textContent       = `${poches.length} poche${poches.length > 1 ? 's' : ''}`;
+    summary.style.display = poches.length ? 'flex' : 'none';
+  }
+
+  if (!poches.length) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🐷</div>
+        <div class="empty-text">Aucune poche d'épargne</div>
+        <div class="empty-sub">Crée ta première poche pour commencer à épargner !</div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  poches.forEach(p => {
+    const pct       = p.objectif_montant > 0 ? Math.min(100, Math.round(p.montant_actuel / p.objectif_montant * 100)) : 0;
+    const completed = p.montant_actuel >= p.objectif_montant;
+    const barColor  = completed ? '#059669' : pct >= 80 ? '#10B981' : pct >= 50 ? '#3B82F6' : '#F59E0B';
+    const reste     = Math.max(0, p.objectif_montant - p.montant_actuel);
+
+    let echeanceHtml = '';
+    if (p.date_echeance) {
+      const d = new Date(p.date_echeance + 'T12:00:00');
+      const daysLeft = Math.ceil((d - Date.now()) / 86400000);
+      const dateLabel = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+      echeanceHtml = `<div class="poche-echeance">📅 ${dateLabel}${daysLeft > 0 ? ` · ${daysLeft}j` : ' · Échéance dépassée'}</div>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = `poche-card${completed ? ' completed' : ''}`;
+    card.innerHTML = `
+      <div class="poche-card-header">
+        <div>
+          <div class="poche-nom">${escapeHtml(p.nom)}</div>
+          ${echeanceHtml}
+        </div>
+        <button class="btn-poche-delete" data-id="${p.id}" title="Supprimer">✕</button>
+      </div>
+      <div class="poche-amounts">
+        <div class="poche-amount-current">${formatAmount(p.montant_actuel)} <span class="currency">FCFA</span></div>
+        <div class="poche-amount-objectif">/ ${formatAmount(p.objectif_montant)} FCFA</div>
+      </div>
+      <div class="poche-progress-bar">
+        <div class="poche-progress-fill" style="width:${pct}%;background:${barColor}"></div>
+      </div>
+      <div class="poche-progress-meta">
+        <span class="poche-pct" style="color:${barColor}">${pct}%</span>
+        ${completed
+          ? `<span class="poche-completed-badge">🎉 Objectif atteint !</span>`
+          : `<span class="poche-reste">Reste ${formatAmount(reste)} FCFA</span>`}
+      </div>`;
+
+    card.querySelector('.btn-poche-delete').addEventListener('click', async () => {
+      if (!confirm(`Supprimer la poche "${p.nom}" ?`)) return;
+      try {
+        await api(`/api/poches/${p.id}`, { method: 'DELETE' });
+        showToast(`Poche "${p.nom}" supprimée`, 'success');
+        loadPoches();
+      } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
+    });
+
+    list.appendChild(card);
+  });
+}
+
+function initPocheHandlers() {
+  const modal   = document.getElementById('poche-modal');
+  const overlay = document.getElementById('poche-modal-overlay');
+  const btnAdd  = document.getElementById('btn-add-poche');
+  const btnClose  = document.getElementById('poche-modal-close');
+  const btnCreate = document.getElementById('btn-create-poche');
+
+  function openModal() {
+    document.getElementById('poche-nom').value      = '';
+    document.getElementById('poche-objectif').value = '';
+    document.getElementById('poche-echeance').value = '';
+    overlay.style.display = 'block';
+    modal.style.display   = 'flex';
+    setTimeout(() => document.getElementById('poche-nom').focus(), 120);
+  }
+  function closeModal() {
+    modal.style.display   = 'none';
+    overlay.style.display = 'none';
+  }
+
+  btnAdd?.addEventListener('click', openModal);
+  btnClose?.addEventListener('click', closeModal);
+  overlay?.addEventListener('click', closeModal);
+
+  btnCreate?.addEventListener('click', async () => {
+    const nom      = document.getElementById('poche-nom').value.trim();
+    const objectif = parseFloat(document.getElementById('poche-objectif').value);
+    const echeance = document.getElementById('poche-echeance').value || null;
+
+    if (!nom)              return showToast('Le nom est requis', 'error');
+    if (!objectif || objectif <= 0) return showToast('Objectif invalide', 'error');
+
+    btnCreate.disabled    = true;
+    btnCreate.textContent = 'Création…';
+    try {
+      await api('/api/poches', {
+        method: 'POST',
+        body: JSON.stringify({ nom, objectif_montant: objectif, date_echeance: echeance })
+      });
+      closeModal();
+      showToast(`Poche "${nom}" créée 🐷`, 'success');
+      loadPoches();
+    } catch (err) {
+      showToast('Erreur : ' + err.message, 'error');
+    } finally {
+      btnCreate.disabled    = false;
+      btnCreate.textContent = 'Créer la poche 🐷';
+    }
+  });
+}
+
 function init() {
   // Service worker — show red dot on profile badge when update available
   if ('serviceWorker' in navigator) {
@@ -1161,6 +1318,9 @@ function init() {
 
   // Profile panel
   initProfileHandlers();
+
+  // Poches Épargne
+  initPocheHandlers();
 
   // Load profile at startup — syncs photo to header badge, chat avatars, and profile cache
   (async () => {

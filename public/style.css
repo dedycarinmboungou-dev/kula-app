@@ -2609,3 +2609,201 @@ button, a, img, .nav-item, .nav-fab,
   font-size: 10px;
   color: var(--gray);
 }
+
+/* ─── Épargne Tab ──────────────────────────────────────────────────────────── */
+#tab-epargne {
+  padding: 16px 16px calc(var(--nav-height) + 16px);
+}
+
+.epargne-summary {
+  background: linear-gradient(135deg, #064E3B 0%, #065F46 60%, #10B981 100%);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.epargne-summary-label  { font-size: 11px; opacity: .75; margin-bottom: 4px; }
+.epargne-summary-amount { font-size: 26px; font-weight: 800; letter-spacing: -.5px; }
+.epargne-summary-sub    { font-size: 11px; opacity: .65; margin-top: 2px; }
+.epargne-summary-right  { text-align: right; }
+.epargne-summary-nb     { font-size: 13px; font-weight: 600; opacity: .85; }
+.epargne-summary-icon   { font-size: 32px; margin-top: 4px; }
+
+.epargne-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.epargne-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--dark);
+}
+
+.btn-add-poche {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s;
+}
+.btn-add-poche:active { background: var(--primary-dark); }
+
+/* Poche card */
+.poche-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  border: 1.5px solid transparent;
+  transition: border-color .3s;
+}
+.poche-card.completed { border-color: var(--primary); }
+
+.poche-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.poche-nom      { font-size: 16px; font-weight: 700; color: var(--dark); }
+.poche-echeance { font-size: 11px; color: var(--gray); margin-top: 3px; }
+
+.btn-poche-delete {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: var(--danger-light);
+  color: var(--danger);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.btn-poche-delete:active { background: #fca5a5; }
+
+.poche-amounts {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.poche-amount-current {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--dark);
+}
+.poche-amount-current .currency {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray);
+}
+.poche-amount-objectif { font-size: 13px; color: var(--gray); }
+
+.poche-progress-bar {
+  height: 8px;
+  background: var(--light-gray);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.poche-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width .5s ease;
+}
+
+.poche-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.poche-pct  { font-size: 12px; font-weight: 700; }
+.poche-reste { font-size: 11px; color: var(--gray); }
+.poche-completed-badge {
+  font-size: 12px; font-weight: 700;
+  color: var(--primary-dark);
+  background: var(--primary-light);
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+
+/* Poche modal */
+.poche-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 400;
+}
+.poche-modal {
+  position: fixed;
+  bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  background: var(--white);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
+  z-index: 401;
+  max-height: 90dvh;
+  overflow-y: auto;
+  animation: slideUp .25s ease;
+}
+.poche-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.poche-modal-title {
+  font-size: 17px; font-weight: 700;
+  color: var(--dark);
+  display: flex; align-items: center; gap: 8px;
+}
+.poche-modal-close {
+  width: 32px; height: 32px;
+  border: none; background: var(--light-gray);
+  border-radius: 50%; cursor: pointer;
+  font-size: 14px; color: var(--gray);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.poche-field { margin-bottom: 14px; }
+.poche-field label {
+  display: block;
+  font-size: 13px; font-weight: 600;
+  color: var(--dark); margin-bottom: 6px;
+}
+.poche-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 15px; color: var(--dark);
+  background: var(--white);
+  transition: border-color .2s;
+}
+.poche-field input:focus { outline: none; border-color: var(--primary); }
+
+.btn-create-poche {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white; border: none;
+  border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700;
+  cursor: pointer; margin-top: 4px;
+  transition: opacity .2s;
+}
+.btn-create-poche:active  { opacity: .85; }
+.btn-create-poche:disabled { opacity: .5; cursor: not-allowed; }
