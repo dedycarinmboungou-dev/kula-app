@@ -75,6 +75,17 @@ db.exec(`
   );
 `);
 
+// ── Chat history table ────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chat_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    role       TEXT    NOT NULL CHECK(role IN ('user', 'assistant')),
+    content    TEXT    NOT NULL,
+    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+`);
+
 // Migration: add photo column to users if missing
 const userCols = db.prepare('PRAGMA table_info(users)').all();
 if (!userCols.some(c => c.name === 'photo')) {
@@ -92,6 +103,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tx_user_date     ON transactions(user_id, date);
   CREATE INDEX IF NOT EXISTS idx_tx_user_type     ON transactions(user_id, type);
   CREATE INDEX IF NOT EXISTS idx_tx_user_category ON transactions(user_id, category);
+  CREATE INDEX IF NOT EXISTS idx_chat_user        ON chat_history(user_id, created_at);
 `);
 
 db.exec('PRAGMA foreign_keys = ON');
@@ -137,6 +149,24 @@ const stmts = {
   `),
   deleteTransaction: db.prepare(`
     DELETE FROM transactions WHERE id = $id AND user_id = $userId
+  `),
+  getTransactionById: db.prepare(`
+    SELECT * FROM transactions WHERE id = $id AND user_id = $userId
+  `),
+  updateTransaction: db.prepare(`
+    UPDATE transactions
+    SET type = $type, amount = $amount, category = $category,
+        description = $description, date = $date
+    WHERE id = $id AND user_id = $userId
+  `),
+
+  // Chat history
+  insertChatMessage: db.prepare(`
+    INSERT INTO chat_history (user_id, role, content) VALUES ($userId, $role, $content)
+  `),
+  getChatHistory: db.prepare(`
+    SELECT role, content FROM chat_history
+    WHERE user_id = $userId ORDER BY created_at DESC LIMIT $limit
   `),
   getDashboard: db.prepare(`
     SELECT

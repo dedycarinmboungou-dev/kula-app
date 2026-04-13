@@ -854,7 +854,7 @@ Ton rôle : conseiller financier personnel. Réponds aux questions, donne des co
 // ═══════════════════════════════════════════════════════════════════════════════
 app.post('/api/chat', requireAuth, async (req, res) => {
   try {
-    const { message, history = [] } = req.body;
+    const { message } = req.body;
     if (!message?.trim()) return res.status(400).json({ error: 'Message requis' });
 
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -863,13 +863,54 @@ app.post('/api/chat', requireAuth, async (req, res) => {
 
     const today = new Date().toISOString().slice(0, 10);
 
+    // ── Load conversation history from DB (last 20 messages, chronological) ──
+    const dbHistory = stmts.getChatHistory.all({ userId: req.userId, limit: 20 });
+    dbHistory.reverse(); // DESC → ASC
+
+    // ── Fetch live financial context ──────────────────────────────────────────
+    const currentMonth = today.slice(0, 7);
+    const user         = stmts.getUserById.get({ id: req.userId });
+    const firstName    = user?.name?.split(' ')[0] || 'toi';
+    const dashStats    = stmts.getDashboard.get({ userId: req.userId, month: currentMonth }) || {};
+    const allTime      = stmts.getAllTimeDashboard.get({ userId: req.userId }) || {};
+    const recentTx     = stmts.getRecentTransactions.all({ userId: req.userId, limit: 10 });
+    const catStats     = stmts.getCategoryStats.all({ userId: req.userId, month: currentMonth });
+    const fmtN = n => Math.round(n || 0).toLocaleString('fr-FR');
+
+    // Top 3 expense categories this month
+    const topExpCats = catStats
+      .filter(c => c.type === 'expense')
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 3)
+      .map(c => `${c.category} : ${fmtN(c.total)} FCFA`)
+      .join(', ') || 'aucune';
+
+    // Recent transactions summary (last 10)
+    const recentTxLines = recentTx.length
+      ? recentTx.map(t =>
+          `  #${t.id} | ${t.date} | ${t.type === 'income' ? '+' : '-'}${fmtN(t.amount)} FCFA | ${t.category} | ${t.description}`
+        ).join('\n')
+      : '  Aucune transaction récente';
+
     const systemPrompt = `Tu es Kula, un conseiller financier personnel de confiance. Kula signifie "grandir" en kituba — et c'est exactement ce que tu aides les gens à faire : grandir financièrement.
 
 Ta personnalité : chaleureux, bienveillant et professionnel. Tu t'exprimes avec clarté et élégance, comme un conseiller qui respecte son client. Tu es ancré dans la réalité africaine francophone — tu connais le contexte, tu comprends les défis du quotidien — mais tu apportes la rigueur d'un vrai professionnel de la finance. Tu utilises quelques emojis choisis pour humaniser tes messages, jamais en excès.
 
 Ton ton : encourageant sans être familier. Tu tutoies naturellement mais avec respect. Pas de "mon frère / chef / boss" — plutôt "je vous invite à…", "je vous encourage à…", "c'est une bonne décision". Tu motives avec des faits et des perspectives concrètes, pas avec de l'enthousiasme creux.
 
-Aujourd'hui nous sommes le ${today}.
+Aujourd'hui nous sommes le ${today}. Tu parles à ${firstName}.
+
+── SITUATION FINANCIÈRE ACTUELLE DE ${firstName.toUpperCase()} ──
+Solde total (tous les temps) : ${fmtN(allTime.balance)} FCFA
+Mois en cours (${currentMonth}) :
+  Revenus    : ${fmtN(dashStats.total_income)} FCFA
+  Dépenses   : ${fmtN(dashStats.total_expense)} FCFA
+  Solde mois : ${fmtN(dashStats.balance)} FCFA
+Top dépenses ce mois : ${topExpCats}
+
+Transactions récentes (avec leur ID — utilise ces IDs pour les outils) :
+${recentTxLines}
+────────────────────────────────────────────────
 
 CATÉGORIES DISPONIBLES :
 - Revenus (income) : Salaire, Business, Famille, Solde initial
@@ -877,13 +918,15 @@ CATÉGORIES DISPONIBLES :
 
 TES RÔLES :
 A) ENREGISTRER DES TRANSACTIONS — quand l'utilisateur décrit des dépenses ou revenus
-B) CONSEILLER FINANCIÈREMENT — budget, épargne, investissement, gestion de l'argent
-C) COACHER ET MOTIVER — analyser les habitudes, valoriser les progrès, fixer des objectifs réalistes
+B) MODIFIER / SUPPRIMER DES TRANSACTIONS — via les outils disponibles quand l'utilisateur le demande
+C) CONSEILLER FINANCIÈREMENT — budget, épargne, investissement, gestion de l'argent
+D) COACHER ET MOTIVER — analyser les habitudes, valoriser les progrès, fixer des objectifs réalistes
 
 RÈGLES TRANSACTIONS :
 1. Détecte TOUTES les transactions dans le message (il peut y en avoir plusieurs).
 2. Chaque transaction doit avoir un montant explicite — sinon, demande poliment une précision.
 3. Adapte la catégorie au contexte local (ex : "manioc/foufou" → Alimentation, "moto-taxi/wewa" → Transport).
+4. Pour modifier ou supprimer une transaction, utilise les outils delete_transaction et update_transaction.
 
 RÈGLES CONSEILS :
 - Conseils pratiques, chiffrés en FCFA, adaptés à la réalité africaine francophone.
@@ -894,31 +937,130 @@ RÈGLES CONSEILS :
 FORMAT TRANSACTIONS (une ou plusieurs) :
 {"type":"transactions","transactions":[{"type":"expense"|"income","amount":<number>,"category":"<catégorie>","description":"<description courte>","date":"${today}"},...],"message":"<confirmation professionnelle et chaleureuse>"}
 
-FORMAT MESSAGE (conseil / analyse / clarification) :
+FORMAT MESSAGE (conseil / analyse / clarification / résultat d'outil) :
 {"type":"message","message":"<réponse en français, claire et structurée, max 3 paragraphes>"}
 
 EXEMPLES DE RÉPONSES ATTENDUES :
 - "Acheté du pain 500 et payé wewa 300" → 2 transactions expense, message de confirmation sobre
 - "Reçu salaire 200 000 et remboursé un ami 15 000" → 1 income + 1 expense
 - "Comment économiser ?" → conseil structuré avec étapes concrètes
-- "Analyse mes dépenses" → coaching précis basé sur les données disponibles
-- "Est-ce que je dépense trop ?" → analyse et recommandation professionnelle
+- "Supprime la transaction 42" → utilise delete_transaction, puis réponds en JSON message
+- "Change le montant de la transaction 7 à 5000" → utilise update_transaction, puis réponds en JSON message
 - "J'ai dépensé de l'argent" → demande poliment le montant et la nature
 
-Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour.`;
+Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf quand tu utilises un outil.`;
 
-    const messages = history.slice(-10)
-      .filter(h => h.role && h.content)
-      .concat([{ role: 'user', content: message }]);
+    // ── Tools ──────────────────────────────────────────────────────────────────
+    const tools = [
+      {
+        name: 'delete_transaction',
+        description: "Supprime définitivement une transaction de l'historique de l'utilisateur.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            transaction_id: { type: 'integer', description: "L'ID de la transaction à supprimer" }
+          },
+          required: ['transaction_id']
+        }
+      },
+      {
+        name: 'update_transaction',
+        description: "Modifie une transaction existante (type, montant, catégorie, description ou date).",
+        input_schema: {
+          type: 'object',
+          properties: {
+            transaction_id: { type: 'integer', description: "L'ID de la transaction à modifier" },
+            type:        { type: 'string', enum: ['income', 'expense'], description: 'Nouveau type' },
+            amount:      { type: 'number', description: 'Nouveau montant positif en FCFA' },
+            category:    { type: 'string', enum: VALID_CATEGORIES, description: 'Nouvelle catégorie' },
+            description: { type: 'string', description: 'Nouvelle description courte' },
+            date:        { type: 'string', description: 'Nouvelle date au format YYYY-MM-DD' }
+          },
+          required: ['transaction_id']
+        }
+      }
+    ];
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages
-    });
+    // ── Save user message to DB ───────────────────────────────────────────────
+    stmts.insertChatMessage.run({ userId: req.userId, role: 'user', content: message.trim() });
 
-    const raw = response.content[0]?.text || '';
+    // ── Agentic loop (handles tool_use rounds) ────────────────────────────────
+    const messages = [
+      ...dbHistory,
+      { role: 'user', content: message.trim() }
+    ];
+
+    let raw = '';
+    let toolsUsed = false;
+
+    while (true) {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools,
+        messages
+      });
+
+      if (response.stop_reason === 'tool_use') {
+        toolsUsed = true;
+        const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
+
+        // Add assistant turn with tool_use blocks
+        messages.push({ role: 'assistant', content: response.content });
+
+        // Execute each tool and collect results
+        const toolResults = [];
+        for (const toolUse of toolUseBlocks) {
+          let result;
+          if (toolUse.name === 'delete_transaction') {
+            const { transaction_id } = toolUse.input;
+            const r = stmts.deleteTransaction.run({ id: transaction_id, userId: req.userId });
+            result = r.changes > 0
+              ? `Transaction #${transaction_id} supprimée avec succès.`
+              : `Transaction #${transaction_id} introuvable ou accès refusé.`;
+          } else if (toolUse.name === 'update_transaction') {
+            const { transaction_id, ...updates } = toolUse.input;
+            const existing = stmts.getTransactionById.get({ id: transaction_id, userId: req.userId });
+            if (!existing) {
+              result = `Transaction #${transaction_id} introuvable ou accès refusé.`;
+            } else {
+              const newType   = updates.type        || existing.type;
+              const newAmt    = updates.amount      ? parseFloat(updates.amount) : existing.amount;
+              const newCat    = updates.category    || existing.category;
+              const newDesc   = updates.description || existing.description;
+              const newDate   = updates.date        || existing.date;
+              if (!['income', 'expense'].includes(newType)) {
+                result = 'Type invalide.';
+              } else if (isNaN(newAmt) || newAmt <= 0) {
+                result = 'Montant invalide.';
+              } else if (!VALID_CATEGORIES.includes(newCat)) {
+                result = `Catégorie invalide : "${newCat}".`;
+              } else {
+                stmts.updateTransaction.run({
+                  id: transaction_id, userId: req.userId,
+                  type: newType, amount: newAmt,
+                  category: newCat, description: newDesc, date: newDate
+                });
+                result = `Transaction #${transaction_id} mise à jour avec succès.`;
+              }
+            }
+          } else {
+            result = 'Outil inconnu.';
+          }
+          toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: result });
+        }
+
+        messages.push({ role: 'user', content: toolResults });
+        continue; // next iteration — get final text response
+      }
+
+      // stop_reason === 'end_turn' (or max_tokens)
+      raw = response.content.find(b => b.type === 'text')?.text || '';
+      break;
+    }
+
+    // ── Parse response ────────────────────────────────────────────────────────
     let parsed;
     try {
       parsed = JSON.parse(raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
@@ -932,7 +1074,10 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour.`;
       parsed.transactions = [parsed.transaction];
     }
 
-    // Auto-insert all detected transactions into SQLite
+    // If tools were used, signal the frontend to refresh its data
+    if (toolsUsed) parsed.refresh = true;
+
+    // ── Auto-insert new transactions into SQLite ───────────────────────────────
     if (parsed.type === 'transactions' && Array.isArray(parsed.transactions)) {
       const saved = [];
       const errors = [];
@@ -950,14 +1095,10 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour.`;
 
           const txDate = tx.date || today;
           const result = stmts.insertTransaction.run({
-            userId:      req.userId,
-            type:        tx.type,
-            amount:      parseFloat(tx.amount),
-            category:    tx.category,
-            description: tx.description.trim(),
-            date:        txDate
+            userId: req.userId, type: tx.type,
+            amount: parseFloat(tx.amount), category: tx.category,
+            description: tx.description.trim(), date: txDate
           });
-
           saved.push({ id: result.lastInsertRowid, ...tx, amount: parseFloat(tx.amount), date: txDate });
         } catch (e) {
           console.error('Chat tx insert error:', e.message, tx);
@@ -970,6 +1111,12 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour.`;
         const errMsg = errors.map(e => `"${e.tx.description || '?'}" (${e.error})`).join(', ');
         parsed.message = (parsed.message || '') + ` ⚠️ Non enregistré : ${errMsg}`;
       }
+    }
+
+    // ── Save assistant response to DB ─────────────────────────────────────────
+    const assistantContent = parsed.message || raw;
+    if (assistantContent) {
+      stmts.insertChatMessage.run({ userId: req.userId, role: 'assistant', content: String(assistantContent) });
     }
 
     res.json(parsed);

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kula-cache-v1';
+const CACHE_NAME = 'kula-cache-force-__BUILD_TIME__';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

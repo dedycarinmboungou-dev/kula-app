@@ -667,12 +667,18 @@ async function sendChatMessage() {
       const botMsg = addChatMessage('bot', confirmMsg);
       response.transactions.forEach(tx => renderSavedTransaction(tx, botMsg));
       state.chatHistory.push({ role: 'assistant', content: confirmMsg });
-      // Refresh dashboard silently
-      if (state.currentTab === 'dashboard') loadDashboard();
+      // Refresh data silently
+      loadDashboard();
+      if (state.currentTab === 'transactions') loadTransactions();
     } else {
       const msg = response.message || "Je n'ai pas compris. Pouvez-vous reformuler ?";
       addChatMessage('bot', msg);
       state.chatHistory.push({ role: 'assistant', content: msg });
+      // If Kola used a tool (delete/update), refresh data
+      if (response.refresh) {
+        loadDashboard();
+        loadTransactions();
+      }
     }
   } catch (err) {
     removeTypingIndicator();
@@ -748,14 +754,16 @@ function scheduleNotifications() {
       const body = slot.key === 'morning'
         ? `💡 Citation du jour : ${getDailyQuote()}`
         : slot.msg;
-      const notif = new Notification('Kula 🌱', {
-        body,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        tag: `kula-notif-${slot.key}`,
-        renotify: false
-      });
-      notif.onclick = () => { window.focus(); switchTab('chat'); notif.close(); };
+      if (typeof Notification !== 'undefined') {
+        const notif = new Notification('Kula 🌱', {
+          body,
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          tag: `kula-notif-${slot.key}`,
+          renotify: false
+        });
+        notif.onclick = () => { window.focus(); switchTab('chat'); notif.close(); };
+      }
       localStorage.setItem(storageKey, Date.now().toString());
     }, target - now);
   });
@@ -978,14 +986,16 @@ function showReminderBanner(daysSince) {
 function sendBrowserNotification(daysSince) {
   if (!notifGranted()) return;
   const { text } = getReminderMessage(daysSince);
-  const notif = new Notification('Kula 🌱 — Rappel budget', {
-    body: text,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    tag: 'kula-reminder',
-    renotify: true
-  });
-  notif.onclick = () => { window.focus(); notif.close(); switchTab('chat'); };
+  if (typeof Notification !== 'undefined') {
+    const notif = new Notification('Kula 🌱 — Rappel budget', {
+      body: text,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: 'kula-reminder',
+      renotify: true
+    });
+    notif.onclick = () => { window.focus(); notif.close(); switchTab('chat'); };
+  }
 }
 
 async function initNotifications() {
@@ -994,7 +1004,20 @@ async function initNotifications() {
   if (Notification.permission === 'default') {
     setTimeout(async () => {
       const permission = await Notification.requestPermission();
-      if (permission === 'granted') scheduleNotifications();
+      if (permission === 'granted') {
+        scheduleNotifications();
+        // Notification de bienvenue via le Service Worker
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification('Kula 🌱', {
+              body: "👋 Bienvenue sur Kula ! Je suis Kola, ton coach financier. Je t'enverrai des conseils et rappels pour faire grandir ton argent 🌱",
+              icon: '/icon-192.png',
+              badge: '/icon-192.png',
+              tag: 'kula-welcome'
+            });
+          }).catch(() => {});
+        }
+      }
     }, 5000); // ask 5s after load, less intrusive
   }
 
@@ -1276,16 +1299,20 @@ function checkBudgetNotifications(categories, budgets) {
 
     if (pct >= 100 && budgetAlertsSent[key] !== 100) {
       budgetAlertsSent[key] = 100;
-      new Notification(`🚨 Budget ${c.category} dépassé !`, {
-        body: `Tu as dépensé ${formatAmount(c.total)} FCFA sur ${formatAmount(limite)} FCFA prévu.`,
-        icon: '/icon-192.png', tag: `budget-over-${key}`, renotify: true
-      });
+      if (typeof Notification !== 'undefined') {
+        new Notification(`🚨 Budget ${c.category} dépassé !`, {
+          body: `Tu as dépensé ${formatAmount(c.total)} FCFA sur ${formatAmount(limite)} FCFA prévu.`,
+          icon: '/icon-192.png', tag: `budget-over-${key}`, renotify: true
+        });
+      }
     } else if (pct >= 80 && pct < 100 && !budgetAlertsSent[key]) {
       budgetAlertsSent[key] = 80;
-      new Notification(`⚠️ Budget ${c.category} à ${Math.round(pct)}%`, {
-        body: `Tu as dépensé ${formatAmount(c.total)} FCFA sur ${formatAmount(limite)} FCFA prévu.`,
-        icon: '/icon-192.png', tag: `budget-warn-${key}`, renotify: true
-      });
+      if (typeof Notification !== 'undefined') {
+        new Notification(`⚠️ Budget ${c.category} à ${Math.round(pct)}%`, {
+          body: `Tu as dépensé ${formatAmount(c.total)} FCFA sur ${formatAmount(limite)} FCFA prévu.`,
+          icon: '/icon-192.png', tag: `budget-warn-${key}`, renotify: true
+        });
+      }
     }
   });
 }
