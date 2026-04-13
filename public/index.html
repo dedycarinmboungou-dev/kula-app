@@ -48,6 +48,44 @@
     </div>
   </header>
 
+  <!-- ── Trial banner — shown during free trial ───────────────── -->
+  <div class="trial-banner" id="trial-banner" style="display:none">
+    <span class="trial-banner-text" id="trial-banner-text">🌱 Essai gratuit — <strong>3 jours restants</strong></span>
+    <button class="trial-upgrade-btn" id="trial-upgrade-btn">Passer Premium</button>
+  </div>
+
+  <!-- ── Paywall overlay — shown when trial expired ──────────── -->
+  <div class="paywall-overlay" id="paywall-overlay" style="display:none" aria-modal="true">
+    <div class="paywall-card">
+      <div class="paywall-logo">🌱</div>
+      <h2 class="paywall-title">Kula Premium</h2>
+      <p class="paywall-subtitle">Votre essai de 3 jours est terminé</p>
+
+      <ul class="paywall-features">
+        <li><span class="pf-check">✓</span> Coach Kula IA illimité</li>
+        <li><span class="pf-check">✓</span> Transactions &amp; historique complet</li>
+        <li><span class="pf-check">✓</span> Poches d'épargne &amp; budgets</li>
+        <li><span class="pf-check">✓</span> Rapports PDF &amp; analyses</li>
+        <li><span class="pf-check">✓</span> Notifications intelligentes</li>
+      </ul>
+
+      <div class="paywall-price">
+        <span class="paywall-amount">3 000</span>
+        <span class="paywall-currency">FCFA<span class="paywall-period">/mois</span></span>
+      </div>
+
+      <button class="paywall-cta" id="paywall-cta">
+        <span id="paywall-cta-text">S'abonner maintenant</span>
+        <svg id="paywall-cta-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none">
+          <circle cx="12" cy="12" r="10" stroke-opacity=".25"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <p class="paywall-secure">🔒 Paiement sécurisé · Annulable à tout moment</p>
+    </div>
+  </div>
+
   <!-- Offline data banner — shown when serving cached API data -->
   <div class="offline-data-bar" id="offline-data-bar" style="display:none">
     <span class="offline-data-text">📵 Mode hors ligne</span>

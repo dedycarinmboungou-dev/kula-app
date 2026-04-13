@@ -124,11 +124,15 @@ db.exec(`
   );
 `);
 
-// Migration: add photo column to users if missing
+// Migration: add photo + freemium columns to users if missing
 const userCols = db.prepare('PRAGMA table_info(users)').all();
-if (!userCols.some(c => c.name === 'photo')) {
-  db.exec('ALTER TABLE users ADD COLUMN photo TEXT');
-}
+const userColNames = userCols.map(c => c.name);
+if (!userColNames.includes('photo'))                db.exec("ALTER TABLE users ADD COLUMN photo TEXT");
+if (!userColNames.includes('plan'))                 db.exec("ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free'");
+if (!userColNames.includes('trial_start'))          db.exec("ALTER TABLE users ADD COLUMN trial_start TEXT");
+if (!userColNames.includes('trial_end'))            db.exec("ALTER TABLE users ADD COLUMN trial_end TEXT");
+if (!userColNames.includes('subscription_end'))     db.exec("ALTER TABLE users ADD COLUMN subscription_end TEXT");
+if (!userColNames.includes('moneroo_customer_id'))  db.exec("ALTER TABLE users ADD COLUMN moneroo_customer_id TEXT");
 
 // Migration: add user_id column if missing
 const cols = db.prepare('PRAGMA table_info(transactions)').all();
@@ -160,8 +164,20 @@ const stmts = {
   insertUser:     db.prepare(`INSERT INTO users (name, email, password_hash) VALUES ($name, $email, $hash)`),
   getUserByEmail: db.prepare(`SELECT * FROM users WHERE email = $email`),
   getUserById:    db.prepare(`SELECT id, name, email, photo, created_at FROM users WHERE id = $id`),
-  updateUserName: db.prepare(`UPDATE users SET name = $name WHERE id = $id`),
+  updateUserName:  db.prepare(`UPDATE users SET name = $name WHERE id = $id`),
   updateUserPhoto: db.prepare(`UPDATE users SET photo = $photo WHERE id = $id`),
+  setUserTrial: db.prepare(`
+    UPDATE users SET trial_start = $trialStart, trial_end = $trialEnd WHERE id = $id
+  `),
+  getUserPlan: db.prepare(`
+    SELECT plan, trial_start, trial_end, subscription_end, email FROM users WHERE id = $id
+  `),
+  activatePremium: db.prepare(`
+    UPDATE users SET plan = 'premium', subscription_end = $subEnd WHERE id = $id
+  `),
+  setMonerooCustomer: db.prepare(`
+    UPDATE users SET moneroo_customer_id = $customerId WHERE id = $id
+  `),
 
   // Budgets
   getBudgets: db.prepare(`SELECT category, limite FROM budgets WHERE user_id = $userId AND mois = $mois`),

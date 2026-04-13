@@ -1565,6 +1565,67 @@ function initAlimenterHandlers() {
   });
 }
 
+// ── Freemium / Plan ────────────────────────────────────────────────────────────
+
+async function checkPlan() {
+  try {
+    const data = await api('/api/user/plan');
+    if (!data) return;
+
+    const trialBanner  = document.getElementById('trial-banner');
+    const trialText    = document.getElementById('trial-banner-text');
+    const paywallEl    = document.getElementById('paywall-overlay');
+
+    if (data.plan === 'premium') {
+      // Full access — nothing to show
+      if (trialBanner) trialBanner.style.display = 'none';
+      if (paywallEl)   paywallEl.style.display   = 'none';
+      return;
+    }
+
+    if (data.plan === 'trial') {
+      const d = data.days_left ?? 0;
+      const label = d <= 0 ? 'dernier jour' : `${d} jour${d > 1 ? 's' : ''} restant${d > 1 ? 's' : ''}`;
+      if (trialText)   trialText.innerHTML = `🌱 Essai gratuit — <strong>${label}</strong>`;
+      if (trialBanner) trialBanner.style.display = 'flex';
+      if (paywallEl)   paywallEl.style.display   = 'none';
+      return;
+    }
+
+    // Expired — show paywall
+    if (trialBanner) trialBanner.style.display = 'none';
+    if (paywallEl)   paywallEl.style.display   = 'flex';
+  } catch { /* silent — don't block app if plan check fails */ }
+}
+
+async function initiatePayment() {
+  const btn     = document.getElementById('paywall-cta');
+  const btnText = document.getElementById('paywall-cta-text');
+  const spinner = document.getElementById('paywall-cta-spin');
+  if (!btn) return;
+
+  btn.disabled       = true;
+  btnText.textContent = 'Connexion au paiement…';
+  if (spinner) spinner.style.display = 'inline';
+
+  try {
+    const data = await api('/api/payment/initiate', { method: 'POST', body: '{}' });
+    if (data?.checkout_url) {
+      window.location.href = data.checkout_url;
+    } else {
+      showToast(data?.error || 'Erreur lors de l\'initiation du paiement.', 'error');
+      btn.disabled        = false;
+      btnText.textContent = 'S\'abonner maintenant';
+      if (spinner) spinner.style.display = 'none';
+    }
+  } catch {
+    showToast('Erreur réseau. Réessaie.', 'error');
+    btn.disabled        = false;
+    btnText.textContent = 'S\'abonner maintenant';
+    if (spinner) spinner.style.display = 'none';
+  }
+}
+
 function init() {
   // Service worker — auto-reload when a new version activates
   if ('serviceWorker' in navigator) {
@@ -1638,6 +1699,24 @@ function init() {
 
   // Notifications & reminders
   initNotifications();
+
+  // Check plan status (freemium gate)
+  checkPlan();
+
+  // Wire up paywall CTA and trial upgrade button
+  document.getElementById('paywall-cta')?.addEventListener('click', initiatePayment);
+  document.getElementById('trial-upgrade-btn')?.addEventListener('click', initiatePayment);
+
+  // Handle ?payment=success redirect from Moneroo
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('payment') === 'success') {
+    history.replaceState({}, '', '/');
+    showToast('Paiement reçu ! Activation en cours…', 'success');
+    setTimeout(() => checkPlan(), 3000); // webhook may take a moment
+  } else if (urlParams.get('payment') === 'cancel') {
+    history.replaceState({}, '', '/');
+    showToast('Paiement annulé.', 'error');
+  }
 
   // Handle manifest shortcut ?tab=chat
   const urlTab = new URLSearchParams(window.location.search).get('tab');

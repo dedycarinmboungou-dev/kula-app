@@ -16,7 +16,9 @@ const BUILD_ID = Date.now();
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'kula_fallback_secret';
+const JWT_SECRET       = process.env.JWT_SECRET       || 'kula_fallback_secret';
+const MONEROO_API_KEY  = process.env.MONEROO_API_KEY  || '';
+const ADMIN_EMAIL      = (process.env.ADMIN_EMAIL     || 'mindup05@gmail.com').toLowerCase();
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -265,6 +267,41 @@ function requireAuth(req, res, next) {
   }
 }
 
+// ── Date helpers ─────────────────────────────────────────────────────────────
+function dateAddDays(days, from = new Date()) {
+  const d = new Date(from);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+function today() { return new Date().toISOString().slice(0, 10); }
+
+// ── Access check middleware (freemium gate) ───────────────────────────────────
+// Admin (ADMIN_EMAIL) → always granted.
+// Others → granted if trial_end >= today OR (plan='premium' AND subscription_end >= today)
+function checkAccess(req, res, next) {
+  const row = stmts.getUserPlan.get({ id: req.userId });
+  if (!row) return res.status(403).json({ error: 'Accès refusé', code: 'NO_PLAN' });
+
+  // Admin bypass
+  if (row.email.toLowerCase() === ADMIN_EMAIL) return next();
+
+  const now = today();
+
+  // Active premium subscription
+  if (row.plan === 'premium' && row.subscription_end && row.subscription_end >= now) return next();
+
+  // Trial still valid
+  if (row.trial_end && row.trial_end >= now) return next();
+
+  // Expired
+  return res.status(402).json({
+    error: 'Abonnement requis',
+    code:  'TRIAL_EXPIRED',
+    plan:  row.plan,
+    trial_end: row.trial_end
+  });
+}
+
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', app: 'Kula', version: '1.0.0' });
@@ -297,7 +334,17 @@ app.post('/api/auth/register', async (req, res) => {
       hash
     });
 
-    const user = { id: result.lastInsertRowid, name: name.trim(), email: email.toLowerCase().trim() };
+    const userId = result.lastInsertRowid;
+    const emailNorm = email.toLowerCase().trim();
+
+    // Set trial window (3 days) — or permanent premium for admin
+    if (emailNorm === ADMIN_EMAIL) {
+      stmts.activatePremium.run({ subEnd: '2099-12-31', id: userId });
+    } else {
+      stmts.setUserTrial.run({ trialStart: today(), trialEnd: dateAddDays(3), id: userId });
+    }
+
+    const user = { id: userId, name: name.trim(), email: emailNorm };
     const token = jwt.sign({ userId: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
     // Insert default categories for new user
@@ -346,6 +393,112 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
   const user = stmts.getUserById.get({ id: req.userId });
   if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
   res.json(user);
+});
+
+// ── Plan / freemium routes ────────────────────────────────────────────────────
+
+// GET /api/user/plan — return current plan status
+app.get('/api/user/plan', requireAuth, (req, res) => {
+  const row = stmts.getUserPlan.get({ id: req.userId });
+  if (!row) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+  const isAdmin   = row.email.toLowerCase() === ADMIN_EMAIL;
+  const now       = today();
+  const isPremium = isAdmin || (row.plan === 'premium' && row.subscription_end >= now);
+  const inTrial   = !isPremium && row.trial_end && row.trial_end >= now;
+  const expired   = !isPremium && !inTrial;
+
+  let daysLeft = null;
+  if (inTrial && row.trial_end) {
+    const ms = new Date(row.trial_end + 'T23:59:59Z') - new Date();
+    daysLeft = Math.max(0, Math.ceil(ms / 86400000));
+  }
+
+  res.json({
+    plan:             isPremium ? 'premium' : (inTrial ? 'trial' : 'expired'),
+    trial_end:        row.trial_end,
+    subscription_end: row.subscription_end,
+    days_left:        daysLeft,
+    is_admin:         isAdmin
+  });
+});
+
+// POST /api/payment/initiate — create Moneroo payment, return checkout URL
+app.post('/api/payment/initiate', requireAuth, async (req, res) => {
+  if (!MONEROO_API_KEY) return res.status(503).json({ error: 'Paiement non configuré' });
+
+  const row = stmts.getUserPlan.get({ id: req.userId });
+  if (!row) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+  try {
+    const returnUrl  = `${req.protocol}://${req.get('host')}/?payment=success`;
+    const cancelUrl  = `${req.protocol}://${req.get('host')}/?payment=cancel`;
+    const webhookUrl = `${req.protocol}://${req.get('host')}/api/payment/webhook`;
+
+    const body = {
+      amount:      3000,
+      currency:    'XOF',
+      description: 'Kula Premium — abonnement mensuel',
+      return_url:  returnUrl,
+      cancel_url:  cancelUrl,
+      webhook_url: webhookUrl,
+      customer: {
+        email:      row.email,
+        first_name: row.email.split('@')[0]
+      },
+      metadata: { user_id: req.userId }
+    };
+
+    const response = await fetch('https://api.moneroo.io/v1/payments/initialize', {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${MONEROO_API_KEY}`,
+        'Content-Type':  'application/json',
+        'Accept':        'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('[Moneroo] initiate error:', data);
+      return res.status(502).json({ error: data.message || 'Erreur Moneroo' });
+    }
+
+    // data.data.checkout_url — Moneroo v1 response shape
+    const checkoutUrl = data?.data?.checkout_url || data?.checkout_url;
+    if (!checkoutUrl) return res.status(502).json({ error: 'URL de paiement introuvable' });
+
+    res.json({ checkout_url: checkoutUrl, payment_id: data?.data?.id || data?.id });
+  } catch (err) {
+    console.error('[Moneroo] fetch error:', err.message);
+    res.status(500).json({ error: 'Erreur réseau paiement' });
+  }
+});
+
+// POST /api/payment/webhook — Moneroo confirms payment
+app.post('/api/payment/webhook', express.json(), async (req, res) => {
+  try {
+    const payload = req.body;
+    console.log('[Moneroo] webhook:', JSON.stringify(payload));
+
+    // Accept both { status:'success' } and { data: { status:'successful' } } shapes
+    const status   = payload?.data?.status || payload?.status || '';
+    const userId   = payload?.data?.metadata?.user_id || payload?.metadata?.user_id;
+    const isSuccess = ['success', 'successful', 'completed', 'paid'].includes(status.toLowerCase());
+
+    if (isSuccess && userId) {
+      const subEnd = dateAddDays(30);
+      stmts.activatePremium.run({ subEnd, id: parseInt(userId) });
+      console.log(`[Moneroo] user ${userId} activated premium until ${subEnd}`);
+    }
+
+    res.json({ received: true });
+  } catch (err) {
+    console.error('[Moneroo] webhook error:', err.message);
+    res.status(500).json({ error: 'Webhook error' });
+  }
 });
 
 // ── Profile routes ─────────────────────────────────────────────────────────────
@@ -420,7 +573,7 @@ app.put('/api/budgets', requireAuth, (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-app.get('/api/dashboard', requireAuth, (req, res) => {
+app.get('/api/dashboard', requireAuth, checkAccess, (req, res) => {
   try {
     const month   = req.query.month || new Date().toISOString().slice(0, 7);
     const userId  = req.userId;
@@ -452,7 +605,7 @@ app.get('/api/dashboard', requireAuth, (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRANSACTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
-app.get('/api/transactions', requireAuth, (req, res) => {
+app.get('/api/transactions', requireAuth, checkAccess, (req, res) => {
   try {
     const { month, limit = 50, offset = 0 } = req.query;
     const userId = req.userId;
@@ -466,7 +619,7 @@ app.get('/api/transactions', requireAuth, (req, res) => {
   }
 });
 
-app.post('/api/transactions', requireAuth, (req, res) => {
+app.post('/api/transactions', requireAuth, checkAccess, (req, res) => {
   try {
     const { type, amount, category, description, date } = req.body;
 
@@ -985,7 +1138,7 @@ Ton rôle : conseiller financier personnel. Réponds aux questions, donne des co
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHAT (AI)
 // ═══════════════════════════════════════════════════════════════════════════════
-app.post('/api/chat', requireAuth, async (req, res) => {
+app.post('/api/chat', requireAuth, checkAccess, async (req, res) => {
   try {
     const { message } = req.body;
     if (!message?.trim()) return res.status(400).json({ error: 'Message requis' });
@@ -1409,7 +1562,7 @@ app.delete('/api/categories/:id', requireAuth, (req, res) => {
 // ── Whisper transcription ─────────────────────────────────────────────────────
 // POST /api/transcribe — multipart/form-data, field "audio" (webm or mp4)
 // Returns { text: "..." }
-app.post('/api/transcribe', requireAuth, audioUpload.single('audio'), async (req, res) => {
+app.post('/api/transcribe', requireAuth, checkAccess, audioUpload.single('audio'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Fichier audio manquant' });
 
   if (!process.env.OPENAI_API_KEY) {
