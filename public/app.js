@@ -984,217 +984,230 @@ function scheduleNotifications() {
   });
 }
 
-// ── Voice recognition — professional recorder UI ──────────────────────────────
+// ── Voice recording — MediaRecorder → OpenAI Whisper ─────────────────────────
 const voice = (() => {
-  try {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return null;
+  // MediaRecorder is available in all modern browsers including Android WebView
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return null;
 
-    let isListening    = false;
-    let audioCtx       = null;
-    let analyser       = null;
-    let mediaStream    = null;
-    let animFrame      = null;
-    let timerInterval  = null;
-    let timerSec       = 0;
-    let recognitionRef = null;
-    let cancelled      = false;
+  let isListening   = false;
+  let audioCtx      = null;
+  let analyser      = null;
+  let mediaStream   = null;
+  let animFrame     = null;
+  let timerInterval = null;
+  let timerSec      = 0;
+  let mediaRecorder = null;
+  let audioChunks   = [];
+  let cancelled     = false;
+  let maxTimer      = null; // auto-stop after 60s
 
-    // ── Panel helpers ─────────────────────────────────────────────────────
-    const $  = id => document.getElementById(id);
+  // ── Panel helpers ───────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
 
-    function showPanel() {
-      $('chat-input-area').style.display  = 'none';
-      $('voice-rec-panel').classList.add('active');
-      $('voice-rec-panel').setAttribute('aria-hidden', 'false');
-      $('voice-processing').classList.remove('active');
-    }
-
-    function showProcessing() {
-      $('voice-rec-panel').classList.remove('active');
-      $('voice-processing').classList.add('active');
-      $('voice-processing').setAttribute('aria-hidden', 'false');
-    }
-
-    function hidePanel() {
-      $('chat-input-area').style.display  = '';
-      $('voice-rec-panel').classList.remove('active');
-      $('voice-rec-panel').setAttribute('aria-hidden', 'true');
-      $('voice-processing').classList.remove('active');
-      $('voice-processing').setAttribute('aria-hidden', 'true');
-      $('voice-bars').classList.remove('has-data');
-    }
-
-    // ── Timer ─────────────────────────────────────────────────────────────
-    function startTimer() {
-      timerSec = 0;
-      _tickTimer();
-      timerInterval = setInterval(_tickTimer, 1000);
-    }
-
-    function _tickTimer() {
-      const m = Math.floor(timerSec / 60);
-      const s = timerSec % 60;
-      const el = $('voice-timer');
-      if (el) el.textContent = `${m}:${s.toString().padStart(2, '0')}`;
-      timerSec++;
-    }
-
-    function stopTimer() {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-
-    // ── Bar visualiser ────────────────────────────────────────────────────
-    const BARS = 11;
-
-    function startBars() {
-      if (!analyser) return;
-      const barsEl  = $('voice-bars');
-      const barEls  = barsEl ? [...barsEl.querySelectorAll('.vb')] : [];
-      const freqData = new Uint8Array(analyser.frequencyBinCount);
-      const maxH = 28; // px
-      const minH = 3;
-
-      function loop() {
-        animFrame = requestAnimationFrame(loop);
-        analyser.getByteFrequencyData(freqData);
-
-        // Map freq bins to bar count — use low-to-mid range (most speech energy)
-        const binCount = freqData.length;
-        const step = Math.floor(binCount * 0.4 / BARS); // use first 40% of spectrum
-
-        let hasSignal = false;
-        barEls.forEach((bar, i) => {
-          const binIdx = Math.floor(i * step + step * 0.5);
-          const val    = freqData[Math.min(binIdx, binCount - 1)];
-          if (val > 10) hasSignal = true;
-          const h = minH + Math.round((val / 255) * (maxH - minH));
-          bar.style.height = h + 'px';
-        });
-
-        if (hasSignal) barsEl.classList.add('has-data');
-      }
-      loop();
-    }
-
-    function stopBars() {
-      if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
-      // Reset bar heights
-      const barEls = document.querySelectorAll('.vb');
-      barEls.forEach(b => { b.style.height = ''; });
-    }
-
-    function stopAudio() {
-      stopBars();
-      if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-      if (audioCtx)    { audioCtx.close().catch(() => {}); audioCtx = null; analyser = null; }
-    }
-
-    function cleanup(showInput = true) {
-      stopAudio();
-      stopTimer();
-      if (showInput) hidePanel();
-      isListening = false;
-      recognitionRef = null;
-    }
-
-    // ── Cancel ────────────────────────────────────────────────────────────
-    function cancel() {
-      cancelled = true;
-      if (recognitionRef) { try { recognitionRef.abort(); } catch {} }
-      cleanup(true);
-    }
-
-    // ── Main toggle ───────────────────────────────────────────────────────
-    async function toggle() {
-      if (isListening) return;
-      cancelled = false;
-
-      const recognition = new SpeechRecognition();
-      recognition.lang            = 'fr-FR';
-      recognition.interimResults  = false;
-      recognition.continuous      = false;
-      recognition.maxAlternatives = 1;
-      recognitionRef = recognition;
-
-      // Start audio visualiser
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const AC    = window.AudioContext || window.webkitAudioContext;
-        audioCtx    = new AC();
-        analyser    = audioCtx.createAnalyser();
-        analyser.fftSize        = 512;
-        analyser.smoothingTimeConstant = 0.7;
-        audioCtx.createMediaStreamSource(mediaStream).connect(analyser);
-        showPanel();
-        startTimer();
-        startBars();
-      } catch {
-        showPanel();
-        startTimer();
-      }
-
-      isListening = true;
-      recognition.start();
-
-      // ── Result ────────────────────────────────────────────────────────
-      recognition.onresult = (e) => {
-        if (cancelled) return;
-        const transcript = e.results[0]?.[0]?.transcript?.trim();
-        stopAudio();
-        stopTimer();
-        showProcessing();
-        isListening = false;
-
-        // Brief processing display, then fill input
-        setTimeout(() => {
-          hidePanel();
-          const input = $('chat-input');
-          if (transcript && input) {
-            input.value = input.value.trim()
-              ? input.value.trim() + ' ' + transcript
-              : transcript;
-            autoResize(input);
-          }
-          if (input) input.focus();
-        }, 500);
-
-        try { recognition.stop(); } catch {}
-      };
-
-      // ── End (no speech detected) ───────────────────────────────────────
-      recognition.onend = () => {
-        if (!isListening) return; // handled by onresult
-        cleanup(true);
-      };
-
-      // ── Errors ────────────────────────────────────────────────────────
-      recognition.onerror = (e) => {
-        const silent = cancelled || e.error === 'aborted' || e.error === 'no-speech';
-        cleanup(true);
-        if (silent) return;
-        if (e.error === 'not-allowed') {
-          showToast('Accès au micro refusé. Autorisez-le dans votre navigateur.', 'error');
-        } else {
-          showToast(`Erreur micro : ${e.error}`, 'error');
-        }
-      };
-    }
-
-    // Wire up stop/cancel buttons once DOM is ready
-    document.addEventListener('DOMContentLoaded', () => {
-      const stopBtn   = document.getElementById('voice-stop-btn');
-      const cancelBtn = document.getElementById('voice-cancel-btn');
-      if (stopBtn)   stopBtn.addEventListener('click',   () => { if (recognitionRef) try { recognitionRef.stop(); } catch {} });
-      if (cancelBtn) cancelBtn.addEventListener('click', () => cancel());
-    });
-
-    return { toggle, cancel, isListening: () => isListening };
-  } catch (e) {
-    console.warn('Voice recognition init error:', e);
-    return null;
+  function showPanel() {
+    $('chat-input-area').style.display = 'none';
+    $('voice-rec-panel').classList.add('active');
+    $('voice-rec-panel').setAttribute('aria-hidden', 'false');
+    $('voice-processing').classList.remove('active');
   }
+
+  function showProcessing() {
+    $('voice-rec-panel').classList.remove('active');
+    $('voice-processing').classList.add('active');
+    $('voice-processing').setAttribute('aria-hidden', 'false');
+  }
+
+  function hidePanel() {
+    $('chat-input-area').style.display = '';
+    $('voice-rec-panel').classList.remove('active');
+    $('voice-rec-panel').setAttribute('aria-hidden', 'true');
+    $('voice-processing').classList.remove('active');
+    $('voice-processing').setAttribute('aria-hidden', 'true');
+    $('voice-bars').classList.remove('has-data');
+  }
+
+  // ── Timer ───────────────────────────────────────────────────────────────
+  function startTimer() {
+    timerSec = 0;
+    _tick();
+    timerInterval = setInterval(_tick, 1000);
+  }
+  function _tick() {
+    const el = $('voice-timer');
+    if (el) el.textContent = `${Math.floor(timerSec / 60)}:${String(timerSec % 60).padStart(2, '0')}`;
+    timerSec++;
+  }
+  function stopTimer() { clearInterval(timerInterval); timerInterval = null; }
+
+  // ── Bar visualiser ──────────────────────────────────────────────────────
+  const BARS = 11;
+
+  function startBars() {
+    if (!analyser) return;
+    const barsEl  = $('voice-bars');
+    const barEls  = barsEl ? [...barsEl.querySelectorAll('.vb')] : [];
+    const data    = new Uint8Array(analyser.frequencyBinCount);
+    const maxH = 28, minH = 3;
+    const step = Math.floor(analyser.frequencyBinCount * 0.4 / BARS);
+
+    function loop() {
+      animFrame = requestAnimationFrame(loop);
+      analyser.getByteFrequencyData(data);
+      let sig = false;
+      barEls.forEach((bar, i) => {
+        const val = data[Math.min(i * step + Math.floor(step * 0.5), data.length - 1)];
+        if (val > 10) sig = true;
+        bar.style.height = (minH + Math.round((val / 255) * (maxH - minH))) + 'px';
+      });
+      if (sig) barsEl.classList.add('has-data');
+    }
+    loop();
+  }
+
+  function stopBars() {
+    if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+    document.querySelectorAll('.vb').forEach(b => { b.style.height = ''; });
+  }
+
+  function stopAudio() {
+    stopBars();
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    if (audioCtx)    { audioCtx.close().catch(() => {}); audioCtx = null; analyser = null; }
+  }
+
+  function cleanup() {
+    stopAudio();
+    stopTimer();
+    clearTimeout(maxTimer); maxTimer = null;
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try { mediaRecorder.stop(); } catch {}
+    }
+    mediaRecorder = null;
+    audioChunks   = [];
+    isListening   = false;
+    hidePanel();
+  }
+
+  // ── Cancel ──────────────────────────────────────────────────────────────
+  function cancel() {
+    cancelled = true;
+    cleanup();
+  }
+
+  // ── Stop recording → send to Whisper ───────────────────────────────────
+  function stopRecording() {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+    mediaRecorder.stop(); // triggers ondataavailable + onstop
+  }
+
+  async function transcribe(blob) {
+    showProcessing();
+    stopAudio();
+    stopTimer();
+    clearTimeout(maxTimer); maxTimer = null;
+    isListening = false;
+
+    try {
+      // Determine extension from MIME type (webm or mp4)
+      const ext      = blob.type.includes('mp4') ? 'audio.mp4' : 'audio.webm';
+      const formData = new FormData();
+      formData.append('audio', blob, ext);
+
+      const token = localStorage.getItem('kula_token');
+      const res   = await fetch('/api/transcribe', {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body:    formData
+      });
+      const data = await res.json();
+
+      hidePanel();
+      const input = $('chat-input');
+      if (data.text?.trim() && input) {
+        input.value = input.value.trim()
+          ? input.value.trim() + ' ' + data.text.trim()
+          : data.text.trim();
+        autoResize(input);
+        input.focus();
+      } else if (!data.text?.trim()) {
+        hidePanel();
+        showToast('Aucune parole détectée. Réessaie.', 'error');
+      }
+      if (data.error) {
+        hidePanel();
+        showToast('Transcription échouée : ' + data.error, 'error');
+      }
+    } catch (err) {
+      hidePanel();
+      showToast('Erreur réseau lors de la transcription.', 'error');
+    }
+
+    mediaRecorder = null;
+    audioChunks   = [];
+  }
+
+  // ── Main toggle ─────────────────────────────────────────────────────────
+  async function toggle() {
+    if (isListening) return;
+    cancelled = false;
+    audioChunks = [];
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      showToast('Accès au micro refusé. Autorisez-le dans votre navigateur.', 'error');
+      return;
+    }
+
+    mediaStream = stream;
+
+    // Set up Web Audio analyser for the visualiser
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.7;
+      audioCtx.createMediaStreamSource(stream).connect(analyser);
+    } catch { /* visualiser optional — recording still works */ }
+
+    // Pick the best supported MIME type
+    const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+      .find(m => MediaRecorder.isTypeSupported(m)) || '';
+
+    mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data?.size > 0) audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      if (cancelled) { audioChunks = []; return; }
+      if (!audioChunks.length) { hidePanel(); return; }
+      const blob = new Blob(audioChunks, { type: mimeType || 'audio/webm' });
+      transcribe(blob);
+    };
+
+    mediaRecorder.start(250); // collect chunks every 250ms
+    isListening = true;
+    showPanel();
+    startTimer();
+    startBars();
+
+    // Auto-stop after 60 seconds
+    maxTimer = setTimeout(() => stopRecording(), 60000);
+  }
+
+  // Wire up stop/cancel buttons once DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('voice-stop-btn')
+      ?.addEventListener('click', () => stopRecording());
+    document.getElementById('voice-cancel-btn')
+      ?.addEventListener('click', () => cancel());
+  });
+
+  return { toggle, cancel, isListening: () => isListening };
 })();
 
 // ── Auto-resize textarea ────────────────────────────────────────────────────────
