@@ -88,6 +88,18 @@ db.exec(`
   );
 `);
 
+// ── Push subscriptions table ─────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    endpoint   TEXT    NOT NULL UNIQUE,
+    p256dh     TEXT    NOT NULL,
+    auth       TEXT    NOT NULL,
+    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+`);
+
 // ── Chat history table ────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS chat_history (
@@ -198,6 +210,19 @@ const stmts = {
   alimenterPoche: db.prepare(`
     UPDATE poches_epargne SET montant_actuel = montant_actuel + $montant
     WHERE id = $id AND user_id = $userId
+  `),
+
+  // Push subscriptions
+  upsertPushSubscription: db.prepare(`
+    INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+    VALUES ($userId, $endpoint, $p256dh, $auth)
+    ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth, user_id = excluded.user_id
+  `),
+  deletePushSubscription: db.prepare(`
+    DELETE FROM push_subscriptions WHERE endpoint = $endpoint
+  `),
+  getAllPushSubscriptions: db.prepare(`
+    SELECT * FROM push_subscriptions
   `),
 
   // Chat history

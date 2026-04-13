@@ -5,6 +5,7 @@ const path     = require('path');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const Anthropic = require('@anthropic-ai/sdk');
+const webpush  = require('web-push');
 const { stmts, VALID_CATEGORIES } = require('./database');
 
 const app  = express();
@@ -12,6 +13,18 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'kula_fallback_secret';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// ── Web Push (VAPID) ──────────────────────────────────────────────────────────
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
+const VAPID_EMAIL   = process.env.VAPID_EMAIL || 'mailto:hello@kula.app';
+
+if (VAPID_PUBLIC && VAPID_PRIVATE) {
+  webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
+  console.log('  Web Push : VAPID configured');
+} else {
+  console.warn('  Web Push : VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY not set — push disabled');
+}
 
 // ── Brevo — email de bienvenue ────────────────────────────────────────────────
 async function sendWelcomeEmail(toEmail, toName) {
@@ -1229,6 +1242,82 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
     res.status(500).json({ type: 'message', message: msg });
   }
 });
+
+// ── Web Push routes ───────────────────────────────────────────────────────────
+
+// Return the VAPID public key so the frontend can subscribe
+app.get('/api/push/vapid-key', (req, res) => {
+  if (!VAPID_PUBLIC) return res.status(503).json({ error: 'Push non configuré' });
+  res.json({ publicKey: VAPID_PUBLIC });
+});
+
+// Save a push subscription for the authenticated user
+app.post('/api/push/subscribe', requireAuth, (req, res) => {
+  const { endpoint, keys } = req.body;
+  if (!endpoint || !keys?.p256dh || !keys?.auth)
+    return res.status(400).json({ error: 'Subscription invalide' });
+
+  stmts.upsertPushSubscription.run({
+    userId:   req.userId,
+    endpoint,
+    p256dh:   keys.p256dh,
+    auth:     keys.auth
+  });
+  res.json({ ok: true });
+});
+
+// Remove a push subscription (called on unsubscribe / logout)
+app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
+  const { endpoint } = req.body;
+  if (endpoint) stmts.deletePushSubscription.run({ endpoint });
+  res.json({ ok: true });
+});
+
+// ── Daily push notification at 20:00 (server local time) ─────────────────────
+async function sendDailyPush() {
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+  const subs = stmts.getAllPushSubscriptions.all();
+  if (!subs.length) return;
+
+  const payload = JSON.stringify({
+    title: 'Kula 🌱',
+    body:  '💸 Tu as pensé à noter tes dépenses du jour ? Ouvre Kula et reste à jour !',
+    icon:  '/icon-192.png',
+    badge: '/icon-192.png',
+    tag:   'kula-daily-reminder'
+  });
+
+  const failed = [];
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload
+      );
+    } catch (err) {
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        // Subscription expired — remove it
+        stmts.deletePushSubscription.run({ endpoint: sub.endpoint });
+      }
+      failed.push(sub.endpoint);
+    }
+  }
+  console.log(`[Push] Daily sent to ${subs.length - failed.length}/${subs.length} subscribers`);
+}
+
+function scheduleDailyPush() {
+  const now   = new Date();
+  const next  = new Date(now);
+  next.setHours(20, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1); // already past 20h today
+  const delay = next - now;
+  setTimeout(() => {
+    sendDailyPush();
+    setInterval(sendDailyPush, 24 * 60 * 60 * 1000); // repeat every 24h
+  }, delay);
+  console.log(`  Daily push scheduled in ${Math.round(delay / 60000)} min`);
+}
+scheduleDailyPush();
 
 // ── Widget page (lightweight, for PWA shortcut / home screen pin) ────────────
 app.get('/widget', requireAuth, (req, res) => {

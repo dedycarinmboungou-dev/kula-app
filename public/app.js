@@ -1015,6 +1015,44 @@ function sendBrowserNotification(daysSince) {
   }
 }
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function subscribeToPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const res = await fetch('/api/push/vapid-key');
+    if (!res.ok) return;
+    const { publicKey } = await res.json();
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      // Already subscribed — send to server in case DB lost it
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+        body: JSON.stringify(existing.toJSON())
+      });
+      return;
+    }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+      body: JSON.stringify(sub.toJSON())
+    });
+  } catch (e) {
+    console.warn('[Push] subscribe failed:', e.message);
+  }
+}
+
 async function initNotifications() {
   if (typeof Notification === 'undefined') return; // iOS Safari — no API
   // Request permission once (don't re-ask if denied)
@@ -1023,6 +1061,7 @@ async function initNotifications() {
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
         scheduleNotifications();
+        subscribeToPush();
         // Notification de bienvenue via le Service Worker
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.ready.then(reg => {
@@ -1036,6 +1075,9 @@ async function initNotifications() {
         }
       }
     }, 5000); // ask 5s after load, less intrusive
+  } else if (Notification.permission === 'granted') {
+    // Already granted — ensure push subscription is registered (e.g. after reinstall)
+    subscribeToPush();
   }
 
   // Check last transaction date after dashboard loads
@@ -1150,6 +1192,9 @@ function renderPoches(poches) {
         ${completed
           ? `<span class="poche-completed-badge">🎉 Objectif atteint !</span>`
           : `<span class="poche-reste">Reste ${formatAmount(reste)} FCFA</span>`}
+      </div>
+      <div class="poche-actions">
+        <button class="btn-alimenter" data-id="${p.id}" data-nom="${escapeHtml(p.nom)}">+ Ajouter</button>
       </div>`;
 
     card.querySelector('.btn-poche-delete').addEventListener('click', async () => {
@@ -1159,6 +1204,10 @@ function renderPoches(poches) {
         showToast(`Poche "${p.nom}" supprimée`, 'success');
         loadPoches();
       } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
+    });
+
+    card.querySelector('.btn-alimenter').addEventListener('click', () => {
+      openAlimenterModal(p.id, p.nom);
     });
 
     list.appendChild(card);
@@ -1212,6 +1261,54 @@ function initPocheHandlers() {
     } finally {
       btnCreate.disabled    = false;
       btnCreate.textContent = 'Créer la poche 🐷';
+    }
+  });
+}
+
+function initAlimenterHandlers() {
+  const overlay  = document.getElementById('alimenter-modal-overlay');
+  const modal    = document.getElementById('alimenter-modal');
+  const btnClose = document.getElementById('alimenter-modal-close');
+  const btnConfirm = document.getElementById('btn-alimenter-confirm');
+  let currentPocheId = null;
+
+  window.openAlimenterModal = function(id, nom) {
+    currentPocheId = id;
+    document.getElementById('alimenter-modal-nom').textContent = nom;
+    document.getElementById('alimenter-montant').value = '';
+    overlay.style.display = 'flex';
+    setTimeout(() => document.getElementById('alimenter-montant').focus(), 120);
+  };
+
+  function closeModal() {
+    overlay.style.display = 'none';
+    currentPocheId = null;
+  }
+
+  btnClose?.addEventListener('click', closeModal);
+  overlay?.addEventListener('click', closeModal);
+  modal?.addEventListener('click', e => e.stopPropagation());
+
+  btnConfirm?.addEventListener('click', async () => {
+    const montant = parseFloat(document.getElementById('alimenter-montant').value);
+    if (!montant || montant <= 0) return showToast('Montant invalide', 'error');
+    if (!currentPocheId) return;
+
+    btnConfirm.disabled = true;
+    btnConfirm.textContent = 'Ajout…';
+    try {
+      await api(`/api/poches/${currentPocheId}/alimenter`, {
+        method: 'POST',
+        body: JSON.stringify({ montant })
+      });
+      closeModal();
+      showToast('Montant ajouté 💰', 'success');
+      loadPoches();
+    } catch (err) {
+      showToast('Erreur : ' + err.message, 'error');
+    } finally {
+      btnConfirm.disabled = false;
+      btnConfirm.textContent = 'Ajouter 💰';
     }
   });
 }
@@ -1338,6 +1435,7 @@ function init() {
 
   // Poches Épargne
   initPocheHandlers();
+  initAlimenterHandlers();
 
   // Load profile at startup — syncs photo to header badge, chat avatars, and profile cache
   (async () => {
