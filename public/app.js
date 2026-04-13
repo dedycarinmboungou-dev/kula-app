@@ -1176,18 +1176,18 @@ function initPocheHandlers() {
     document.getElementById('poche-nom').value      = '';
     document.getElementById('poche-objectif').value = '';
     document.getElementById('poche-echeance').value = '';
-    overlay.style.display = 'block';
-    modal.style.display   = 'flex';
+    overlay.style.display = 'flex';
     setTimeout(() => document.getElementById('poche-nom').focus(), 120);
   }
   function closeModal() {
-    modal.style.display   = 'none';
     overlay.style.display = 'none';
   }
 
   btnAdd?.addEventListener('click', openModal);
   btnClose?.addEventListener('click', closeModal);
+  // Clic sur le backdrop ferme — clic à l'intérieur de la modale ne ferme pas
   overlay?.addEventListener('click', closeModal);
+  modal?.addEventListener('click', e => e.stopPropagation());
 
   btnCreate?.addEventListener('click', async () => {
     const nom      = document.getElementById('poche-nom').value.trim();

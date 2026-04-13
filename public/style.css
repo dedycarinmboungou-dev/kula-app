@@ -2744,65 +2744,80 @@ button, a, img, .nav-item, .nav-fab,
 /* Poche modal */
 .poche-modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.45);
-  z-index: 400;
+  background: rgba(0,0,0,0.55);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 .poche-modal {
-  position: fixed;
-  bottom: 0; left: 50%; transform: translateX(-50%);
-  width: 100%; max-width: 480px;
-  background: var(--white);
-  border-radius: var(--radius) var(--radius) 0 0;
-  padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
-  z-index: 401;
-  max-height: 90dvh;
-  overflow-y: auto;
-  animation: slideUp .25s ease;
+  background: #fff;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 24px 24px 0 0;
+  padding: 24px 20px 36px;
+  animation: slideUp 0.3s ease;
 }
 .poche-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 .poche-modal-title {
-  font-size: 17px; font-weight: 700;
-  color: var(--dark);
-  display: flex; align-items: center; gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .poche-modal-close {
+  background: #f3f4f6;
+  border: none;
+  border-radius: 50%;
   width: 32px; height: 32px;
-  border: none; background: var(--light-gray);
-  border-radius: 50%; cursor: pointer;
-  font-size: 14px; color: var(--gray);
-  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  color: #6b7280;
 }
-
-.poche-field { margin-bottom: 14px; }
+.poche-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.poche-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .poche-field label {
-  display: block;
-  font-size: 13px; font-weight: 600;
-  color: var(--dark); margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
 }
 .poche-field input {
-  width: 100%;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
   padding: 12px 14px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 15px; color: var(--dark);
-  background: var(--white);
-  transition: border-color .2s;
-}
-.poche-field input:focus { outline: none; border-color: var(--primary); }
-
-.btn-create-poche {
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
   width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: white; border: none;
-  border-radius: var(--radius-sm);
-  font-size: 15px; font-weight: 700;
-  cursor: pointer; margin-top: 4px;
+  box-sizing: border-box;
+}
+.poche-field input:focus { border-color: #16a34a; }
+.btn-create-poche {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 15px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  width: 100%;
   transition: opacity .2s;
 }
 .btn-create-poche:active  { opacity: .85; }
