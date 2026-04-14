@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kula Admin</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f1f5f1;
+      color: #1a2e1a;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-logo { font-size: 22px; }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header p  { font-size: 12px; opacity: 0.85; }
+    #admin-email-badge {
+      background: rgba(255,255,255,0.2);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* ── Auth gate ── */
+    #auth-gate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      gap: 16px;
+    }
+    #auth-gate h2 { font-size: 20px; color: #16a34a; }
+    .auth-form { display: flex; flex-direction: column; gap: 12px; width: 320px; }
+    .auth-form input {
+      padding: 12px 16px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+    }
+    .auth-form input:focus { border-color: #16a34a; }
+    .btn-green {
+      background: #16a34a;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-green:hover { background: #15803d; }
+    .btn-green:disabled { opacity: 0.5; cursor: not-allowed; }
+    #auth-error { color: #ef4444; font-size: 13px; text-align: center; }
+
+    /* ── Main ── */
+    #main { display: none; padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+    /* ── Stats ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      border-top: 4px solid #e5e7eb;
+    }
+    .stat-card.green  { border-top-color: #16a34a; }
+    .stat-card.amber  { border-top-color: #f59e0b; }
+    .stat-card.blue   { border-top-color: #3b82f6; }
+    .stat-card.gray   { border-top-color: #9ca3af; }
+    .stat-num  { font-size: 36px; font-weight: 800; color: #1a2e1a; line-height: 1; }
+    .stat-label { font-size: 12px; color: #6b7280; margin-top: 4px; font-weight: 500; }
+
+    /* ── Section title ── */
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #15803d;
+      margin-bottom: 14px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #dcfce7;
+    }
+
+    /* ── Table ── */
+    .table-wrap {
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      overflow-x: auto;
+      margin-bottom: 28px;
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 680px; }
+    thead th {
+      background: #f0fdf4;
+      padding: 12px 14px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 700;
+      color: #15803d;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    tbody tr { border-top: 1px solid #f3f4f6; transition: background 0.1s; }
+    tbody tr:hover { background: #f9fafb; }
+    tbody td { padding: 12px 14px; font-size: 13px; vertical-align: middle; }
+    .td-name  { font-weight: 600; }
+    .td-email { color: #6b7280; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-premium { background: #dcfce7; color: #15803d; }
+    .badge-trial   { background: #fef3c7; color: #d97706; }
+    .badge-free    { background: #f3f4f6; color: #6b7280; }
+
+    .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btn-sm {
+      padding: 5px 10px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+    .btn-sm:hover { opacity: 0.8; }
+    .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-prem   { background: #16a34a; color: white; }
+    .btn-revoke { background: #ef4444; color: white; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #1a2e1a;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      transition: transform 0.3s;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.success { background: #16a34a; }
+    #toast.error   { background: #ef4444; }
+
+    /* ── Days input inline ── */
+    .days-input {
+      width: 52px;
+      padding: 4px 6px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 12px;
+      text-align: center;
+    }
+    .days-input:focus { outline: none; border-color: #16a34a; }
+
+    #refresh-btn {
+      background: white;
+      border: 1.5px solid #16a34a;
+      color: #16a34a;
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 16px;
+    }
+    #refresh-btn:hover { background: #f0fdf4; }
+
+    .loading { text-align: center; padding: 40px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <span class="header-logo">🌱</span>
+    <div>
+      <h1>Kula Admin</h1>
+      <p>Tableau de bord administrateur</p>
+    </div>
+  </div>
+  <span id="admin-email-badge">—</span>
+</header>
+
+<!-- Auth gate -->
+<div id="auth-gate">
+  <h2>🔐 Connexion Admin</h2>
+  <form class="auth-form" id="login-form">
+    <input type="email"    id="login-email"    placeholder="Email"         required/>
+    <input type="password" id="login-password" placeholder="Mot de passe"  required/>
+    <button type="submit" class="btn-green" id="login-btn">Se connecter</button>
+    <div id="auth-error"></div>
+  </form>
+</div>
+
+<!-- Main dashboard -->
+<div id="main">
+  <div class="stats-grid">
+    <div class="stat-card blue">
+      <div class="stat-num" id="stat-total">—</div>
+      <div class="stat-label">Total utilisateurs</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-num" id="stat-premium">—</div>
+      <div class="stat-label">Premium actifs</div>
+    </div>
+    <div class="stat-card amber">
+      <div class="stat-num" id="stat-trial">—</div>
+      <div class="stat-label">En essai</div>
+    </div>
+    <div class="stat-card gray">
+      <div class="stat-num" id="stat-free">—</div>
+      <div class="stat-label">Plan gratuit</div>
+    </div>
+  </div>
+
+  <div class="section-title">Utilisateurs</div>
+  <button id="refresh-btn" onclick="loadAll()">↻ Actualiser</button>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Email</th>
+          <th>Plan</th>
+          <th>Inscription</th>
+          <th>Fin abonnement</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="users-tbody">
+        <tr><td colspan="6" class="loading">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let TOKEN = localStorage.getItem('kula_token') || '';
+
+  // ── Toast ──
+  let toastTimer;
+  function toast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className   = `show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+  }
+
+  // ── API helper ──
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}` },
+      ...opts
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  // ── Login ──
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true;
+    btn.textContent = 'Connexion…';
+    document.getElementById('auth-error').textContent = '';
+
+    try {
+      const email    = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const data = await fetch('/api/auth/login', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email, password })
+      }).then(r => r.json());
+
+      if (!data.token) throw new Error(data.error || 'Échec connexion');
+
+      TOKEN = data.token;
+      localStorage.setItem('kula_token', TOKEN);
+      await initAdmin();
+    } catch (err) {
+      document.getElementById('auth-error').textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = 'Se connecter';
+    }
+  });
+
+  // ── Init ──
+  async function initAdmin() {
+    try {
+      // Verify we are admin
+      const plan = await api('/api/user/plan');
+      if (!plan.is_admin) {
+        document.getElementById('auth-error').textContent = 'Accès réservé à l\'administrateur.';
+        return;
+      }
+      // Get email for badge
+      const profile = await api('/api/profile');
+      document.getElementById('admin-email-badge').textContent = profile.email || '';
+
+      document.getElementById('auth-gate').style.display = 'none';
+      document.getElementById('main').style.display = 'block';
+      loadAll();
+    } catch {
+      document.getElementById('auth-error').textContent = 'Erreur de vérification.';
+    }
+  }
+
+  // ── Load stats + users ──
+  async function loadAll() {
+    try {
+      const [stats, users] = await Promise.all([
+        api('/api/admin/stats'),
+        api('/api/admin/users')
+      ]);
+      renderStats(stats);
+      renderUsers(users);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  function renderStats(s) {
+    document.getElementById('stat-total').textContent   = s.total   ?? '—';
+    document.getElementById('stat-premium').textContent = s.premium ?? '—';
+    document.getElementById('stat-trial').textContent   = s.trial   ?? '—';
+    document.getElementById('stat-free').textContent    = s.free_expired ?? '—';
+  }
+
+  function renderUsers(users) {
+    const tbody = document.getElementById('users-tbody');
+    if (!users.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="loading">Aucun utilisateur.</td></tr>';
+      return;
+    }
+
+    const fmtDate = iso => iso
+      ? new Date(iso).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' })
+      : '—';
+
+    tbody.innerHTML = users.map(u => {
+      const plan = u.effective_plan;
+      const badgeCls = plan === 'premium' ? 'badge-premium' : plan === 'trial' ? 'badge-trial' : 'badge-free';
+      const planLabel = plan === 'premium' ? 'Premium' : plan === 'trial' ? 'Essai' : 'Gratuit';
+
+      return `
+        <tr>
+          <td class="td-name">${esc(u.name || '—')}</td>
+          <td class="td-email">${esc(u.email)}</td>
+          <td><span class="badge ${badgeCls}">${planLabel}</span></td>
+          <td>${fmtDate(u.created_at)}</td>
+          <td>${fmtDate(u.subscription_end)}</td>
+          <td>
+            <div class="action-btns">
+              <input class="days-input" id="days-${u.id}" type="number" value="30" min="1" max="365" title="Nombre de jours"/>
+              <button class="btn-sm btn-prem"   onclick="setPremium('${esc(u.email)}', ${u.id})">⭐ Premium</button>
+              <button class="btn-sm btn-revoke" onclick="revoke('${esc(u.email)}', ${u.id})">✕ Révoquer</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function esc(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ── Actions ──
+  async function setPremium(email, userId) {
+    const daysEl = document.getElementById(`days-${userId}`);
+    const days   = parseInt(daysEl?.value) || 30;
+    try {
+      const data = await api('/api/admin/set-premium', {
+        method: 'POST',
+        body:   JSON.stringify({ email, days })
+      });
+      toast(`✅ ${email} → Premium jusqu'au ${new Date(data.subscription_end).toLocaleDateString('fr-FR')}`, 'success');
+      loadAll();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function revoke(email) {
+    if (!confirm(`Révoquer le premium de ${email} ?`)) return;
+    try {
+      await api('/api/admin/revoke-premium', {
+        method: 'POST',
+        body:   JSON.stringify({ email })
+      });
+      toast(`🗑️ Premium révoqué pour ${email}`, 'success');
+      loadAll();
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // ── Auto-login if token already stored ──
+  if (TOKEN) initAdmin().catch(() => {});
+</script>
+</body>
+</html>

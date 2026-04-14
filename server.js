@@ -1699,6 +1699,62 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   if (!res.headersSent) res.status(status).json({ error: message });
 });
 
+// ── Admin routes ──────────────────────────────────────────────────────────────
+
+function requireAdmin(req, res, next) {
+  const row = stmts.getUserById.get({ id: req.userId });
+  if (!row || row.email.toLowerCase() !== ADMIN_EMAIL) {
+    return res.status(403).json({ error: 'Accès refusé' });
+  }
+  next();
+}
+
+// Serve admin page
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// GET /api/admin/stats
+app.get('/api/admin/stats', requireAuth, requireAdmin, (req, res) => {
+  const stats = stmts.getAdminStats.get();
+  res.json(stats);
+});
+
+// GET /api/admin/users
+app.get('/api/admin/users', requireAuth, requireAdmin, (req, res) => {
+  const now   = today();
+  const users = stmts.getAllUsers.all().map(u => {
+    const isPremium = u.plan === 'premium' && u.subscription_end >= now;
+    const inTrial   = u.plan === 'free' && u.trial_end && u.trial_end >= now;
+    return {
+      ...u,
+      effective_plan: isPremium ? 'premium' : (inTrial ? 'trial' : 'free')
+    };
+  });
+  res.json(users);
+});
+
+// POST /api/admin/set-premium { email, days }
+app.post('/api/admin/set-premium', requireAuth, requireAdmin, (req, res) => {
+  const { email, days } = req.body;
+  if (!email || !days || isNaN(days) || days < 1) {
+    return res.status(400).json({ error: 'email et days (≥1) requis' });
+  }
+  const subEnd = dateAddDays(parseInt(days));
+  const result = stmts.activatePremiumByEmail.run({ subEnd, email: email.toLowerCase() });
+  if (!result.changes) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+  res.json({ ok: true, subscription_end: subEnd });
+});
+
+// POST /api/admin/revoke-premium { email }
+app.post('/api/admin/revoke-premium', requireAuth, requireAdmin, (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email requis' });
+  const result = stmts.revokePremiumByEmail.run({ email: email.toLowerCase() });
+  if (!result.changes) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+  res.json({ ok: true });
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`🌱 Kula démarré sur http://localhost:${PORT}`);

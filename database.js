@@ -182,6 +182,26 @@ const stmts = {
     UPDATE users SET moneroo_customer_id = $customerId WHERE id = $id
   `),
 
+  // Admin
+  getAllUsers: db.prepare(`
+    SELECT id, name, email, plan, trial_start, trial_end, subscription_end, created_at
+    FROM users ORDER BY created_at DESC
+  `),
+  getAdminStats: db.prepare(`
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN plan = 'premium' THEN 1 ELSE 0 END) AS premium,
+      SUM(CASE WHEN plan = 'free' AND trial_end >= date('now') THEN 1 ELSE 0 END) AS trial,
+      SUM(CASE WHEN plan = 'free' AND (trial_end IS NULL OR trial_end < date('now')) THEN 1 ELSE 0 END) AS free_expired
+    FROM users
+  `),
+  activatePremiumByEmail: db.prepare(`
+    UPDATE users SET plan = 'premium', subscription_end = $subEnd WHERE email = $email
+  `),
+  revokePremiumByEmail: db.prepare(`
+    UPDATE users SET plan = 'free', subscription_end = NULL WHERE email = $email
+  `),
+
   // Budgets
   getBudgets: db.prepare(`SELECT category, limite FROM budgets WHERE user_id = $userId AND mois = $mois`),
   upsertBudget: db.prepare(`
