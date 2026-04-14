@@ -6,7 +6,6 @@ const fs       = require('fs');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const Anthropic = require('@anthropic-ai/sdk');
-const OpenAI   = require('openai');
 const multer   = require('multer');
 const webpush  = require('web-push');
 const { stmts, VALID_CATEGORIES, DEFAULT_CATEGORIES } = require('./database');
@@ -28,20 +27,6 @@ if (FEDAPAY_SECRET_KEY) {
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ── OpenAI (Whisper transcription) ───────────────────────────────────────────
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// multer: store audio uploads in /tmp (or OS temp), max 25 MB (Whisper limit)
-const audioUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, require('os').tmpdir()),
-    filename:    (req, file, cb) => {
-      const ext = file.originalname.endsWith('.mp4') ? '.mp4' : '.webm';
-      cb(null, `kula-audio-${Date.now()}${ext}`);
-    }
-  }),
-  limits: { fileSize: 25 * 1024 * 1024 }
-});
 
 // ── Category helpers ──────────────────────────────────────────────────────────
 // Returns Set of valid category names for a user (static defaults + user's custom ones)
@@ -1561,35 +1546,6 @@ app.delete('/api/categories/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Whisper transcription ─────────────────────────────────────────────────────
-// POST /api/transcribe — multipart/form-data, field "audio" (webm or mp4)
-// Returns { text: "..." }
-app.post('/api/transcribe', requireAuth, checkAccess, audioUpload.single('audio'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Fichier audio manquant' });
-
-  if (!process.env.OPENAI_API_KEY) {
-    // Clean up temp file even on early return
-    fs.unlink(req.file.path, () => {});
-    return res.status(503).json({ error: 'OPENAI_API_KEY non configurée' });
-  }
-
-  try {
-    const transcription = await openai.audio.transcriptions.create({
-      file:     require('fs').createReadStream(req.file.path),
-      model:    'whisper-1',
-      language: 'fr',
-      response_format: 'json'
-    });
-
-    res.json({ text: transcription.text || '' });
-  } catch (err) {
-    console.error('[Whisper] Error:', err.message);
-    res.status(500).json({ error: 'Erreur transcription : ' + err.message });
-  } finally {
-    // Always delete the temp file
-    fs.unlink(req.file.path, () => {});
-  }
-});
 
 // ── Web Push routes ───────────────────────────────────────────────────────────
 
