@@ -460,6 +460,8 @@ app.post('/api/payment/initiate', requireAuth, async (req, res) => {
     });
 
     const data = await response.json();
+    console.log('MONEROO STATUS:', response.status);
+    console.log('MONEROO RESPONSE:', JSON.stringify(data));
 
     if (!response.ok) {
       console.error('[Moneroo] initiate error:', data);
