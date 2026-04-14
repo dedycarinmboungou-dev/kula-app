@@ -239,27 +239,29 @@
 
       <!-- ── Normal input row ────────────────────────────── -->
       <div class="chat-input-area" id="chat-input-area">
-        <button class="btn-mic" id="btn-mic" title="Dicter un message">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line stroke-linecap="round" x1="12" y1="19" x2="12" y2="23"/>
-            <line stroke-linecap="round" x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
-        </button>
-        <div class="chat-input-wrap">
+        <div class="chat-input-pill">
           <textarea
             id="chat-input"
             placeholder="Décris ta transaction…"
             rows="1"
             maxlength="500"
           ></textarea>
+          <div class="chat-input-actions">
+            <button class="btn-mic" id="btn-mic" title="Dicter un message">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line stroke-linecap="round" x1="12" y1="19" x2="12" y2="23"/>
+                <line stroke-linecap="round" x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </button>
+            <button class="btn-send" id="btn-send" title="Envoyer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7"/>
+              </svg>
+            </button>
+          </div>
         </div>
-        <button class="btn-send" id="btn-send" title="Envoyer">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7"/>
-          </svg>
-        </button>
       </div>
 
       <!-- ── Voice recording panel (shown during recording) ── -->
