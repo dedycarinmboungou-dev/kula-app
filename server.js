@@ -444,7 +444,8 @@ app.post('/api/payment/initiate', requireAuth, async (req, res) => {
       webhook_url: webhookUrl,
       customer: {
         email:      row.email,
-        first_name: row.email.split('@')[0]
+        first_name: row.email.split('@')[0],
+        last_name:  'Kula'
       },
       metadata: { user_id: req.userId }
     };
