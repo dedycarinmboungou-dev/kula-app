@@ -2332,3 +2332,200 @@ window.saveBudget       = saveBudget;
 window.switchTab        = switchTab;
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ── Add Transaction FAB & Bottom-Sheet ───────────────────────────────────────
+const addTxModal = (() => {
+  let currentType     = 'expense';
+  let selectedCat     = '';
+  let justificatifB64 = '';
+  let allCats         = [];
+
+  const overlay  = () => document.getElementById('add-tx-overlay');
+  const sheet    = () => document.getElementById('add-tx-sheet');
+  const catsEl   = () => document.getElementById('add-tx-cats');
+  const autreEl  = () => document.getElementById('add-tx-autre');
+  const amountEl = () => document.getElementById('add-tx-amount');
+  const descEl   = () => document.getElementById('add-tx-desc');
+  const dateEl   = () => document.getElementById('add-tx-date');
+  const photoIn  = () => document.getElementById('add-tx-photo-input');
+  const photoNm  = () => document.getElementById('add-tx-photo-name');
+  const preview  = () => document.getElementById('add-tx-preview');
+  const submitEl = () => document.getElementById('add-tx-submit');
+  const submitTx = () => document.getElementById('add-tx-submit-text');
+  const spinEl   = () => document.getElementById('add-tx-spin');
+
+  function open() {
+    // Default date = today
+    dateEl().value = new Date().toISOString().slice(0, 10);
+    overlay().classList.add('open');
+    overlay().setAttribute('aria-hidden', 'false');
+    amountEl().focus();
+    loadCats();
+  }
+
+  function close() {
+    overlay().classList.remove('open');
+    overlay().setAttribute('aria-hidden', 'true');
+    reset();
+  }
+
+  function reset() {
+    currentType = 'expense';
+    selectedCat = '';
+    justificatifB64 = '';
+    amountEl().value = '';
+    descEl().value   = '';
+    autreEl().value  = '';
+    autreEl().style.display = 'none';
+    if (photoIn()) photoIn().value = '';
+    if (photoNm()) photoNm().textContent = '';
+    if (preview()) { preview().src = ''; preview().style.display = 'none'; }
+    setType('expense');
+  }
+
+  function setType(type) {
+    currentType = type;
+    selectedCat = '';
+    document.getElementById('atab-expense').classList.toggle('active', type === 'expense');
+    document.getElementById('atab-income').classList.toggle('active', type === 'income');
+    submitEl()?.classList.toggle('expense', type === 'expense');
+    renderCats();
+  }
+
+  async function loadCats() {
+    try {
+      const data = await api('/api/categories');
+      allCats = data || [];
+    } catch { allCats = []; }
+    renderCats();
+  }
+
+  function renderCats() {
+    const el = catsEl();
+    if (!el) return;
+
+    // Filter by type
+    const filtered = allCats.filter(c =>
+      c.type === currentType || c.type === 'both'
+    );
+
+    el.innerHTML = filtered.map(c => `
+      <button class="cat-chip${selectedCat === c.nom ? (currentType === 'expense' ? ' selected-expense' : ' selected') : ''}"
+              data-cat="${c.nom}" data-icone="${c.icone || ''}">
+        <span>${c.icone || ''}</span>${c.nom}
+      </button>
+    `).join('');
+
+    el.querySelectorAll('.cat-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedCat = btn.dataset.cat;
+        renderCats();
+        const isAutre = selectedCat === 'Autre';
+        autreEl().style.display = isAutre ? 'block' : 'none';
+        if (!isAutre) autreEl().value = '';
+      });
+    });
+  }
+
+  async function handlePhoto(file) {
+    if (!file) return;
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        justificatifB64 = e.target.result;
+        if (preview()) { preview().src = justificatifB64; preview().style.display = 'block'; }
+        if (photoNm()) photoNm().textContent = file.name;
+        resolve();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function submit() {
+    const amount = parseFloat(amountEl().value);
+    if (!amount || amount <= 0) { showToast('Montant invalide', 'error'); return; }
+    if (!selectedCat)           { showToast('Sélectionnez une catégorie', 'error'); return; }
+
+    let category = selectedCat;
+    if (selectedCat === 'Autre') {
+      const txt = autreEl().value.trim();
+      if (!txt) { showToast('Précisez la catégorie', 'error'); return; }
+      category = txt;
+    }
+
+    const description = descEl().value.trim() || category;
+    const date        = dateEl().value || new Date().toISOString().slice(0, 10);
+
+    // Disable submit
+    submitEl().disabled = true;
+    submitTx().textContent = 'Enregistrement…';
+    spinEl().style.display = 'inline';
+
+    try {
+      await api('/api/transactions', {
+        method: 'POST',
+        body: JSON.stringify({
+          type:          currentType,
+          amount,
+          category:      selectedCat === 'Autre' ? 'Autre' : selectedCat,
+          description,
+          date,
+          justificatif:  justificatifB64 || null
+        })
+      });
+
+      showToast(currentType === 'expense' ? '💸 Dépense ajoutée !' : '💰 Revenu ajouté !', 'success');
+      close();
+
+      // Refresh dashboard data
+      loadDashboard();
+      if (document.getElementById('tab-transactions')?.classList.contains('active')) {
+        loadTransactions();
+      }
+    } catch (err) {
+      showToast(err.message || 'Erreur lors de l\'enregistrement', 'error');
+    } finally {
+      submitEl().disabled = false;
+      submitTx().textContent = 'Enregistrer';
+      spinEl().style.display = 'none';
+    }
+  }
+
+  // Wire up once DOM ready
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('fab-add-tx')?.addEventListener('click', open);
+
+    // Close on overlay click (outside sheet)
+    overlay()?.addEventListener('click', e => {
+      if (e.target === overlay()) close();
+    });
+
+    // Type tab clicks
+    document.getElementById('atab-expense')?.addEventListener('click', () => setType('expense'));
+    document.getElementById('atab-income')?.addEventListener('click',  () => setType('income'));
+
+    // Photo input
+    photoIn()?.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (file) handlePhoto(file);
+    });
+
+    // Submit
+    document.getElementById('add-tx-submit')?.addEventListener('click', submit);
+
+    // Hide FAB on non-dashboard tabs
+    document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        const fab = document.getElementById('fab-add-tx');
+        if (fab) fab.classList.toggle('hidden', tab !== 'dashboard');
+      });
+    });
+    // Also hide FAB when chat opens
+    document.getElementById('nav-chat')?.addEventListener('click', () => {
+      document.getElementById('fab-add-tx')?.classList.add('hidden');
+    });
+  });
+
+  return { open, close };
+})();

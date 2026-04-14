@@ -27,6 +27,11 @@ if (FEDAPAY_SECRET_KEY) {
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// ── Multer — justificatif uploads (memory → base64, no disk dependency) ──────
+const receiptUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 } // 5 MB max
+});
 
 // ── Category helpers ──────────────────────────────────────────────────────────
 // Returns Set of valid category names for a user (static defaults + user's custom ones)
@@ -606,9 +611,18 @@ app.get('/api/transactions', requireAuth, checkAccess, (req, res) => {
   }
 });
 
+// POST /api/transactions/upload — receive image, return base64 data URL
+app.post('/api/transactions/upload', requireAuth, checkAccess, receiptUpload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Fichier manquant' });
+  const mime    = req.file.mimetype || 'image/jpeg';
+  const b64     = req.file.buffer.toString('base64');
+  const dataUrl = `data:${mime};base64,${b64}`;
+  res.json({ url: dataUrl });
+});
+
 app.post('/api/transactions', requireAuth, checkAccess, (req, res) => {
   try {
-    const { type, amount, category, description, date } = req.body;
+    const { type, amount, category, description, date, justificatif } = req.body;
 
     if (!type || !['income', 'expense'].includes(type))
       return res.status(400).json({ error: 'Type invalide' });
@@ -621,12 +635,13 @@ app.post('/api/transactions', requireAuth, checkAccess, (req, res) => {
 
     const txDate  = date || new Date().toISOString().slice(0, 10);
     const result  = stmts.insertTransaction.run({
-      userId: req.userId,
+      userId:       req.userId,
       type,
-      amount:      parseFloat(amount),
+      amount:       parseFloat(amount),
       category,
-      description: description.trim(),
-      date:        txDate
+      description:  description.trim(),
+      date:         txDate,
+      justificatif: justificatif || null
     });
 
     res.status(201).json({ id: result.lastInsertRowid, type, amount: parseFloat(amount), category, description: description.trim(), date: txDate });

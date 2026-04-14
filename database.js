@@ -134,11 +134,10 @@ if (!userColNames.includes('trial_end'))            db.exec("ALTER TABLE users A
 if (!userColNames.includes('subscription_end'))     db.exec("ALTER TABLE users ADD COLUMN subscription_end TEXT");
 if (!userColNames.includes('moneroo_customer_id'))  db.exec("ALTER TABLE users ADD COLUMN moneroo_customer_id TEXT");
 
-// Migration: add user_id column if missing
+// Migration: add columns to transactions if missing
 const cols = db.prepare('PRAGMA table_info(transactions)').all();
-if (!cols.some(c => c.name === 'user_id')) {
-  db.exec('ALTER TABLE transactions ADD COLUMN user_id INTEGER REFERENCES users(id)');
-}
+if (!cols.some(c => c.name === 'user_id'))      db.exec('ALTER TABLE transactions ADD COLUMN user_id INTEGER REFERENCES users(id)');
+if (!cols.some(c => c.name === 'justificatif')) db.exec('ALTER TABLE transactions ADD COLUMN justificatif TEXT');
 
 // Indexes (after migration)
 db.exec(`
@@ -212,8 +211,8 @@ const stmts = {
 
   // Transactions (scoped to user_id)
   insertTransaction: db.prepare(`
-    INSERT INTO transactions (user_id, type, amount, category, description, date)
-    VALUES ($userId, $type, $amount, $category, $description, $date)
+    INSERT INTO transactions (user_id, type, amount, category, description, date, justificatif)
+    VALUES ($userId, $type, $amount, $category, $description, $date, $justificatif)
   `),
   getTransactions: db.prepare(`
     SELECT * FROM transactions WHERE user_id = $userId

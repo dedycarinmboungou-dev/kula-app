@@ -398,6 +398,71 @@
     </button>
   </nav>
 
+  <!-- ── FAB Add Transaction ──────────────────────────────────────────── -->
+  <button class="fab-add-tx" id="fab-add-tx" title="Ajouter une transaction" aria-label="Ajouter une transaction">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  </button>
+
+</div>
+
+<!-- ── Add Transaction Bottom-Sheet ─────────────────────────────────────── -->
+<div class="add-tx-overlay" id="add-tx-overlay" aria-hidden="true">
+  <div class="add-tx-sheet" id="add-tx-sheet" role="dialog" aria-modal="true" aria-label="Nouvelle transaction">
+
+    <div class="add-tx-handle"></div>
+
+    <!-- Type tabs -->
+    <div class="add-tx-tabs">
+      <button class="add-tx-tab add-tx-tab--expense active" id="atab-expense" data-type="expense">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M17 7l-10 10M7 7h10v10"/></svg>
+        Dépense
+      </button>
+      <button class="add-tx-tab add-tx-tab--income" id="atab-income" data-type="income">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M7 7h10v10"/></svg>
+        Revenu
+      </button>
+    </div>
+
+    <!-- Amount -->
+    <div class="add-tx-amount-wrap">
+      <input class="add-tx-amount" id="add-tx-amount" type="number" inputmode="decimal" min="1" placeholder="0" autocomplete="off"/>
+      <span class="add-tx-currency">FCFA</span>
+    </div>
+
+    <!-- Categories -->
+    <div class="add-tx-label">Catégorie</div>
+    <div class="add-tx-cats" id="add-tx-cats"></div>
+    <input class="add-tx-autre" id="add-tx-autre" type="text" placeholder="Précisez la catégorie…" style="display:none" maxlength="60"/>
+
+    <!-- Description -->
+    <div class="add-tx-label">Description <span class="add-tx-opt">(optionnel)</span></div>
+    <input class="add-tx-input" id="add-tx-desc" type="text" placeholder="Ex: Course au marché…" maxlength="200"/>
+
+    <!-- Date -->
+    <div class="add-tx-label">Date</div>
+    <input class="add-tx-input" id="add-tx-date" type="date"/>
+
+    <!-- Photo -->
+    <div class="add-tx-label">Justificatif <span class="add-tx-opt">(optionnel)</span></div>
+    <div class="add-tx-photo-row">
+      <label class="add-tx-photo-btn" for="add-tx-photo-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path stroke-linecap="round" d="M21 15l-5-5L5 21"/></svg>
+        Joindre une photo
+      </label>
+      <input type="file" id="add-tx-photo-input" accept="image/*" style="display:none"/>
+      <span class="add-tx-photo-name" id="add-tx-photo-name"></span>
+    </div>
+    <img class="add-tx-preview" id="add-tx-preview" style="display:none" alt="Justificatif"/>
+
+    <!-- Submit -->
+    <button class="add-tx-submit" id="add-tx-submit">
+      <span id="add-tx-submit-text">Enregistrer</span>
+      <svg class="add-tx-spin" id="add-tx-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="display:none"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+    </button>
+
+  </div>
 </div>
 
 <!-- PDF Export modal -->
