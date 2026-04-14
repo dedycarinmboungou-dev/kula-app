@@ -1687,6 +1687,9 @@ app.get('/widget', requireAuth, (req, res) => {
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
+  if (req.path === '/admin') {
+    return res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
