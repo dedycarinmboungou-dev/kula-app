@@ -244,6 +244,14 @@ app.get('/sw.js', (req, res) => {
   }
 });
 
+// index.html — never cache: ensures the latest version is always fetched
+app.get(['/index.html', '/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0 }));
 
 // ── Auth middleware ───────────────────────────────────────────────────────────

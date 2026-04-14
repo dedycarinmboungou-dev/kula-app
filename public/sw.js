@@ -121,7 +121,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for static assets
+  // Network-first for HTML navigation — always get fresh markup on deploy
+  if (request.mode === 'navigate' ||
+      url.pathname === '/' ||
+      url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(request).then(response => {
+        if (response.ok) {
+          caches.open(CACHE_NAME).then(c => c.put(request, response.clone()));
+        }
+        return response;
+      }).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // Cache-first for other static assets (CSS, JS, icons)
   event.respondWith(
     caches.match(request).then((cached) =>
       cached || fetch(request).then((response) => {
