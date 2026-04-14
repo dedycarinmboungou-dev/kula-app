@@ -17,8 +17,14 @@ const BUILD_ID = Date.now();
 const app  = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET       = process.env.JWT_SECRET       || 'kula_fallback_secret';
-const MONEROO_API_KEY  = process.env.MONEROO_API_KEY  || '';
+const FEDAPAY_SECRET_KEY = process.env.FEDAPAY_SECRET_KEY || '';
 const ADMIN_EMAIL      = (process.env.ADMIN_EMAIL     || 'mindup05@gmail.com').toLowerCase();
+
+const { FedaPay, Transaction: FedaTransaction } = require('fedapay');
+if (FEDAPAY_SECRET_KEY) {
+  FedaPay.setApiKey(FEDAPAY_SECRET_KEY);
+  FedaPay.setEnvironment(process.env.FEDAPAY_ENV || 'live');
+}
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -423,83 +429,65 @@ app.get('/api/user/plan', requireAuth, (req, res) => {
   });
 });
 
-// POST /api/payment/initiate — create Moneroo payment, return checkout URL
+// POST /api/payment/initiate — create FedaPay transaction, return checkout URL
 app.post('/api/payment/initiate', requireAuth, async (req, res) => {
-  if (!MONEROO_API_KEY) return res.status(503).json({ error: 'Paiement non configuré' });
+  if (!FEDAPAY_SECRET_KEY) return res.status(503).json({ error: 'Paiement non configuré' });
 
   const row = stmts.getUserPlan.get({ id: req.userId });
   if (!row) return res.status(404).json({ error: 'Utilisateur non trouvé' });
 
   try {
-    const returnUrl  = `${req.protocol}://${req.get('host')}/?payment=success`;
-    const cancelUrl  = `${req.protocol}://${req.get('host')}/?payment=cancel`;
-    const webhookUrl = `${req.protocol}://${req.get('host')}/api/payment/webhook`;
+    const returnUrl = `${req.protocol}://${req.get('host')}/?payment=success`;
 
-    const body = {
-      amount:      3000,
-      currency:    'XOF',
-      description: 'Kula Premium — abonnement mensuel',
-      return_url:  returnUrl,
-      cancel_url:  cancelUrl,
-      webhook_url: webhookUrl,
+    const transaction = await FedaTransaction.create({
+      description:  'Kula Premium — abonnement mensuel',
+      amount:       3000,
+      currency:     { iso: 'XOF' },
+      callback_url: returnUrl,
       customer: {
-        email:      row.email,
-        first_name: row.email.split('@')[0],
-        last_name:  'Kula'
-      },
-      metadata: { user_id: req.userId }
-    };
-
-    const response = await fetch('https://api.moneroo.io/v1/payments/initialize', {
-      method:  'POST',
-      headers: {
-        'Authorization': `Bearer ${MONEROO_API_KEY}`,
-        'Content-Type':  'application/json',
-        'Accept':        'application/json'
-      },
-      body: JSON.stringify(body)
+        email:     row.email,
+        firstname: row.email.split('@')[0],
+        lastname:  'User'
+      }
     });
 
-    const data = await response.json();
-    console.log('MONEROO STATUS:', response.status);
-    console.log('MONEROO RESPONSE:', JSON.stringify(data));
+    const token = await transaction.generateToken();
+    console.log('[FedaPay] transaction created id=%s url=%s', transaction.id, token.url);
 
-    if (!response.ok) {
-      console.error('[Moneroo] initiate error:', data);
-      return res.status(502).json({ error: data.message || 'Erreur Moneroo' });
-    }
-
-    // data.data.checkout_url — Moneroo v1 response shape
-    const checkoutUrl = data?.data?.checkout_url || data?.checkout_url;
-    if (!checkoutUrl) return res.status(502).json({ error: 'URL de paiement introuvable' });
-
-    res.json({ checkout_url: checkoutUrl, payment_id: data?.data?.id || data?.id });
+    res.json({ checkout_url: token.url });
   } catch (err) {
-    console.error('[Moneroo] fetch error:', err.message);
-    res.status(500).json({ error: 'Erreur réseau paiement' });
+    console.error('[FedaPay] initiate error:', err.message);
+    res.status(500).json({ error: err.message || 'Erreur paiement' });
   }
 });
 
-// POST /api/payment/webhook — Moneroo confirms payment
+// POST /api/payment/webhook — FedaPay confirms payment
 app.post('/api/payment/webhook', express.json(), async (req, res) => {
   try {
     const payload = req.body;
-    console.log('[Moneroo] webhook:', JSON.stringify(payload));
+    console.log('[FedaPay] webhook:', JSON.stringify(payload));
 
-    // Accept both { status:'success' } and { data: { status:'successful' } } shapes
-    const status   = payload?.data?.status || payload?.status || '';
-    const userId   = payload?.data?.metadata?.user_id || payload?.metadata?.user_id;
-    const isSuccess = ['success', 'successful', 'completed', 'paid'].includes(status.toLowerCase());
+    // FedaPay event: { name: 'transaction.approved', data: { object: { status, customer: { email } } } }
+    const txData  = payload?.data?.object || payload?.entity || payload;
+    const status  = (txData?.status || '').toLowerCase();
+    const email   = txData?.customer?.email || '';
 
-    if (isSuccess && userId) {
-      const subEnd = dateAddDays(30);
-      stmts.activatePremium.run({ subEnd, id: parseInt(userId) });
-      console.log(`[Moneroo] user ${userId} activated premium until ${subEnd}`);
+    const isApproved = ['approved', 'success', 'successful', 'completed'].includes(status);
+
+    if (isApproved && email) {
+      const user = stmts.getUserByEmail.get({ email });
+      if (user) {
+        const subEnd = dateAddDays(30);
+        stmts.activatePremium.run({ subEnd, id: user.id });
+        console.log('[FedaPay] user %d activated premium until %s', user.id, subEnd);
+      } else {
+        console.warn('[FedaPay] webhook: no user found for email', email);
+      }
     }
 
     res.json({ received: true });
   } catch (err) {
-    console.error('[Moneroo] webhook error:', err.message);
+    console.error('[FedaPay] webhook error:', err.message);
     res.status(500).json({ error: 'Webhook error' });
   }
 });
