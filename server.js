@@ -412,7 +412,11 @@ app.get('/api/user/plan', requireAuth, (req, res) => {
   const now       = today();
   const isPremium = isAdmin || (row.plan === 'premium' && row.subscription_end >= now);
   const inTrial   = !isPremium && row.trial_end && row.trial_end >= now;
-  const expired   = !isPremium && !inTrial;
+
+  // Auto-downgrade: premium expired → reset plan to 'free' in DB
+  if (!isAdmin && row.plan === 'premium' && row.subscription_end < now) {
+    stmts.resetPlanToFree.run({ id: req.userId });
+  }
 
   let daysLeft = null;
   if (inTrial && row.trial_end) {
@@ -420,12 +424,19 @@ app.get('/api/user/plan', requireAuth, (req, res) => {
     daysLeft = Math.max(0, Math.ceil(ms / 86400000));
   }
 
+  let premiumDaysLeft = null;
+  if (isPremium && !isAdmin && row.subscription_end) {
+    const ms = new Date(row.subscription_end + 'T23:59:59Z') - new Date();
+    premiumDaysLeft = Math.max(0, Math.ceil(ms / 86400000));
+  }
+
   res.json({
-    plan:             isPremium ? 'premium' : (inTrial ? 'trial' : 'expired'),
-    trial_end:        row.trial_end,
-    subscription_end: row.subscription_end,
-    days_left:        daysLeft,
-    is_admin:         isAdmin
+    plan:              isPremium ? 'premium' : (inTrial ? 'trial' : 'expired'),
+    trial_end:         row.trial_end,
+    subscription_end:  row.subscription_end,
+    days_left:         daysLeft,
+    premium_days_left: premiumDaysLeft,
+    is_admin:          isAdmin
   });
 });
 

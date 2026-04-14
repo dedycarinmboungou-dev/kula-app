@@ -2197,6 +2197,47 @@ function openProfile() {
       document.getElementById('profile-avatar-initial').style.display = '';
     }
   }).catch(() => { /* panel already open — silent fail on data refresh */ });
+
+  // Also refresh plan info
+  api('/api/user/plan').then(renderProfilePlan).catch(() => {});
+}
+
+function renderProfilePlan(data) {
+  const nameEl  = document.getElementById('profile-plan-name');
+  const descEl  = document.getElementById('profile-plan-desc');
+  const badgeEl = document.getElementById('profile-plan-badge');
+  const cardEl  = document.getElementById('profile-plan-card');
+  if (!nameEl || !descEl || !badgeEl) return;
+
+  const fmt = iso => iso
+    ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '';
+
+  if (data.plan === 'premium') {
+    nameEl.textContent  = data.is_admin ? 'Plan Admin ⭐' : 'Plan Premium ⭐';
+    const nextDate      = data.subscription_end ? fmt(data.subscription_end) : null;
+    const daysLeft      = data.premium_days_left;
+    descEl.textContent  = nextDate
+      ? `Prochain paiement le ${nextDate}${daysLeft != null ? ` · ${daysLeft} j restants` : ''}`
+      : 'Accès illimité';
+    badgeEl.textContent = 'Premium';
+    badgeEl.className   = 'profile-plan-badge badge-premium';
+    if (cardEl) cardEl.className = 'profile-plan-card card-premium';
+  } else if (data.plan === 'trial') {
+    const d             = data.days_left ?? 0;
+    const label         = d <= 1 ? 'dernier jour' : `${d} jours restants`;
+    nameEl.textContent  = 'Essai gratuit';
+    descEl.textContent  = `${label} · Expire le ${fmt(data.trial_end)} · Essai de 3 jours offert`;
+    badgeEl.textContent = 'Essai';
+    badgeEl.className   = 'profile-plan-badge badge-trial';
+    if (cardEl) cardEl.className = 'profile-plan-card card-trial';
+  } else {
+    nameEl.textContent  = 'Plan Gratuit';
+    descEl.textContent  = 'Essai de 3 jours terminé · Passez Premium pour accéder à toutes les fonctionnalités';
+    badgeEl.textContent = 'Inactif';
+    badgeEl.className   = 'profile-plan-badge badge-expired';
+    if (cardEl) cardEl.className = 'profile-plan-card card-expired';
+  }
 }
 
 function closeProfile() {

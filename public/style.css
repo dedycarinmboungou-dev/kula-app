@@ -2479,6 +2479,19 @@ button, a, img, .nav-item, .nav-fab,
   font-weight: 700;
 }
 
+/* Plan badge variants */
+.badge-premium  { background: linear-gradient(135deg, #16a34a, #15803d); }
+.badge-trial    { background: #f59e0b; }
+.badge-expired  { background: #9ca3af; }
+
+/* Plan card variants */
+.profile-plan-card.card-premium { border-left: 4px solid #16a34a; background: #f0fdf4; }
+.profile-plan-card.card-trial   { border-left: 4px solid #f59e0b; background: #fffbeb; }
+.profile-plan-card.card-expired { border-left: 4px solid #9ca3af; background: #f9fafb; }
+.profile-plan-card.card-premium .profile-plan-name { color: #15803d; }
+.profile-plan-card.card-trial   .profile-plan-name { color: #d97706; }
+.profile-plan-card.card-expired .profile-plan-name { color: #6b7280; }
+
 /* ─── Update bar inside profile panel ───────────────────────────────────────── */
 .profile-update-bar {
   display: flex;

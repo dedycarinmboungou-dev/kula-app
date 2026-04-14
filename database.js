@@ -175,6 +175,9 @@ const stmts = {
   activatePremium: db.prepare(`
     UPDATE users SET plan = 'premium', subscription_end = $subEnd WHERE id = $id
   `),
+  resetPlanToFree: db.prepare(`
+    UPDATE users SET plan = 'free' WHERE id = $id
+  `),
   setMonerooCustomer: db.prepare(`
     UPDATE users SET moneroo_customer_id = $customerId WHERE id = $id
   `),
