@@ -1618,8 +1618,8 @@ async function initiatePayment() {
       btnText.textContent = 'S\'abonner maintenant';
       if (spinner) spinner.style.display = 'none';
     }
-  } catch {
-    showToast('Erreur réseau. Réessaie.', 'error');
+  } catch (err) {
+    showToast(err.message || 'Erreur réseau. Réessaie.', 'error');
     btn.disabled        = false;
     btnText.textContent = 'S\'abonner maintenant';
     if (spinner) spinner.style.display = 'none';
