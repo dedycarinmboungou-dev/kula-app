@@ -998,7 +998,8 @@ app.post('/api/poches/:id/alimenter', requireAuth, (req, res) => {
       amount:      montant,
       category:    'Autre',
       description: `💰 Épargne : ${before.nom}`,
-      date:        new Date().toISOString().slice(0, 10)
+      date:        new Date().toISOString().slice(0, 10),
+      justificatif: null
     });
 
     const goal_reached = before.montant_actuel < before.objectif_montant && after.montant_actuel >= after.objectif_montant;
@@ -1419,7 +1420,8 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
                   userId: req.userId, type: 'expense', amount: m,
                   category: 'Autre',
                   description: `💰 Épargne : ${poche.nom}`,
-                  date: new Date().toISOString().slice(0, 10)
+                  date: new Date().toISOString().slice(0, 10),
+                  justificatif: null
                 });
                 const updated = stmts.getPocheById.get({ id: poche.id, userId: req.userId });
                 const pct = Math.round(updated.montant_actuel / updated.objectif_montant * 100);
@@ -1483,7 +1485,8 @@ Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf qua
           const result = stmts.insertTransaction.run({
             userId: req.userId, type: tx.type,
             amount: parseFloat(tx.amount), category: tx.category,
-            description: tx.description.trim(), date: txDate
+            description: tx.description.trim(), date: txDate,
+            justificatif: null
           });
           saved.push({ id: result.lastInsertRowid, ...tx, amount: parseFloat(tx.amount), date: txDate });
         } catch (e) {
