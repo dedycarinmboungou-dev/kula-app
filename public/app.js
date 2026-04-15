@@ -46,7 +46,8 @@ const state = {
   pendingTransaction: null,
   charts: { category: null, trend: null },
   budgets:  {},        // {category: limite} for current month
-  userCats: []         // [{id, nom, icone, couleur, type}] loaded from API
+  userCats: [],        // [{id, nom, icone, couleur, type}] loaded from API
+  recentTransactions: [] // populated by loadDashboard(), read by initNotifications()
 };
 
 // ── Category metadata ─────────────────────────────────────────────────────────
@@ -349,7 +350,8 @@ async function loadDashboard() {
     renderTrendChart(data.trend || []);
 
     // Recent transactions
-    renderTransactionList('recent-tx-list', data.recentTransactions || []);
+    state.recentTransactions = data.recentTransactions || [];
+    renderTransactionList('recent-tx-list', state.recentTransactions);
 
     // Score Kula
     try { renderScoreKula(data.monthlyIncome || 0, data.monthlyExpense || 0, data.categories || [], state.budgets); } catch { /* silent */ }
@@ -1257,15 +1259,11 @@ async function initNotifications() {
     subscribeToPush();
   }
 
-  // Check last transaction date after dashboard loads
-  // We'll hook into loadDashboard's result via a small delay
-  setTimeout(async () => {
+  // Check last transaction date — reuse data already fetched by loadDashboard()
+  // Wait 2s to ensure loadDashboard() has had time to populate state.recentTransactions
+  setTimeout(() => {
     try {
-      const data = await api(`/api/dashboard?month=${state.currentMonth}`);
-      if (!data) return;
-
-      // Find the most recent transaction date
-      const recent = data.recentTransactions;
+      const recent = state.recentTransactions; // set by loadDashboard()
       if (!recent || !recent.length) {
         // No transactions at all — show gentle nudge after 1 day of account age
         const user = getUser();
@@ -1277,12 +1275,12 @@ async function initNotifications() {
         return;
       }
 
-      const lastDate   = new Date(recent[0].date + 'T12:00:00');
-      const daysSince  = Math.floor((Date.now() - lastDate) / 86400000);
+      const lastDate  = new Date(recent[0].date + 'T12:00:00');
+      const daysSince = Math.floor((Date.now() - lastDate) / 86400000);
 
       if (daysSince < 1) return; // active today — no reminder
 
-      // Don't show if user dismissed recently (same day)
+      // Don't show if user dismissed the banner today
       const dismissed = localStorage.getItem('kula_reminder_dismissed');
       if (dismissed) {
         const dismissedToday = new Date(parseInt(dismissed)).toDateString() === new Date().toDateString();
@@ -1292,7 +1290,7 @@ async function initNotifications() {
       showReminderBanner(daysSince);
       sendBrowserNotification(daysSince);
     } catch { /* silent */ }
-  }, 1500);
+  }, 2000);
 }
 
 // ── Poches Épargne ────────────────────────────────────────────────────────────

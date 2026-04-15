@@ -47,7 +47,25 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Handle notification click — open/focus the app and go to chat tab
+// Handle incoming Web Push — show the notification
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  let payload = {};
+  try { payload = event.data.json(); } catch { payload = { body: event.data.text() }; }
+
+  const title = payload.title || 'Kula 🌱';
+  const body  = payload.body  || '';
+  const icon  = payload.icon  || '/icon-192.png';
+  const badge = payload.badge || '/icon-192.png';
+  const tag   = payload.tag   || 'kula-push';
+  const data  = payload.data  || { tab: 'dashboard' };
+
+  event.waitUntil(
+    self.registration.showNotification(title, { body, icon, badge, tag, data, renotify: false })
+  );
+});
+
+// Handle notification click — open/focus the app and go to the right tab
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const tab = event.notification.data?.tab || 'chat';

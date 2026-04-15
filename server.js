@@ -1608,15 +1608,15 @@ app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
 const PUSH_SLOTS = [
   {
     utcHour: 8,
-    payload: { title: 'Kula 🌱', body: '🌅 Bonne journée ! Pense à noter tes dépenses et revenus du matin.', tag: 'kula-morning', icon: '/icon-192.png', badge: '/icon-192.png' }
+    payload: { title: 'Kula 🌱', body: '🌅 Bonne journée ! Pense à noter tes dépenses et revenus du matin.', tag: 'kula-morning', icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'dashboard' } }
   },
   {
     utcHour: 13,
-    payload: { title: 'Kula 🌱', body: '☀️ Pause déjeuner ! Quelques dépenses à enregistrer dans Kula ?', tag: 'kula-midday', icon: '/icon-192.png', badge: '/icon-192.png' }
+    payload: { title: 'Kula 🌱', body: '☀️ Pause déjeuner ! Quelques dépenses à enregistrer dans Kula ?', tag: 'kula-midday', icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'dashboard' } }
   },
   {
     utcHour: 20,
-    payload: { title: 'Kula 🌱', body: '🌙 Bonsoir ! Prends 2 minutes pour faire le bilan financier de ta journée.', tag: 'kula-evening', icon: '/icon-192.png', badge: '/icon-192.png' }
+    payload: { title: 'Kula 🌱', body: '🌙 Bonsoir ! Prends 2 minutes pour faire le bilan financier de ta journée.', tag: 'kula-evening', icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'chat' } }
   }
 ];
 
