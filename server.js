@@ -257,6 +257,7 @@ const KOLA_QUOTES = [
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json({ limit: '4mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Serve sw.js dynamically so __BUILD_TIME__ is replaced on every deploy,
 // which forces the browser to install a fresh Service Worker and bust old caches.
@@ -526,12 +527,17 @@ app.post('/api/payment/initiate', requireAuth, async (req, res) => {
 });
 
 // POST /api/payment/webhook — PayTech IPN confirms payment
-app.post('/api/payment/webhook', express.json(), async (req, res) => {
+// PayTech sends application/x-www-form-urlencoded (not JSON)
+app.post('/api/payment/webhook', async (req, res) => {
   try {
     console.log('[PAYTECH IPN] *** WEBHOOK APPELÉ ***');
     console.log('[PAYTECH IPN] Body reçu:', JSON.stringify(req.body));
     console.log('[PAYTECH IPN] Headers:', JSON.stringify(req.headers));
-    const { ref_command, custom_field } = req.body;
+
+    const { ref_command, type_event, custom_field } = req.body;
+    console.log('[PAYTECH IPN] ref_command:', ref_command);
+    console.log('[PAYTECH IPN] type_event:', type_event);
+    console.log('[PAYTECH IPN] custom_field:', custom_field);
     console.log('[PAYTECH IPN] received ref=%s', ref_command);
 
     if (!ref_command) return res.status(400).json({ error: 'ref_command manquant' });
@@ -543,13 +549,13 @@ app.post('/api/payment/webhook', express.json(), async (req, res) => {
     }
 
     // Verify ipn_secret from custom_field
-    let incoming_secret = null;
+    let customData = {};
     try {
-      const cf = typeof custom_field === 'string' ? JSON.parse(custom_field) : custom_field;
-      incoming_secret = cf?.ipn_secret;
-    } catch {
-      return res.status(400).json({ error: 'custom_field invalide' });
+      customData = JSON.parse(custom_field || '{}');
+    } catch (e) {
+      console.log('[PAYTECH IPN] custom_field parse error:', e.message);
     }
+    const incoming_secret = customData?.ipn_secret;
 
     if (!incoming_secret || incoming_secret !== payment.ipn_secret) {
       console.warn('[PAYTECH IPN] ipn_secret mismatch for ref=%s', ref_command);
