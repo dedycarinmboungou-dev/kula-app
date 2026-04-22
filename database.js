@@ -301,6 +301,9 @@ const stmts = {
   getPushSubscriptionsByUser: db.prepare(`
     SELECT * FROM push_subscriptions WHERE user_id = $userId
   `),
+  deleteAllPushSubscriptions: db.prepare(`
+    DELETE FROM push_subscriptions
+  `),
 
   // Chat history
   insertChatMessage: db.prepare(`

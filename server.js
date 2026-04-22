@@ -1830,6 +1830,13 @@ app.post('/api/admin/revoke-premium', requireAuth, requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// Reset all push subscriptions (needed after VAPID key rotation)
+app.delete('/api/admin/push-subscriptions/reset', requireAuth, requireAdmin, (req, res) => {
+  const result = stmts.deleteAllPushSubscriptions.run();
+  console.log('[Admin] push-subscriptions reset — deleted %d rows', result.changes);
+  res.json({ deleted: result.changes });
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
