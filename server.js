@@ -8,11 +8,31 @@ const jwt      = require('jsonwebtoken');
 const Anthropic = require('@anthropic-ai/sdk');
 const multer   = require('multer');
 const webpush  = require('web-push');
+
+// ── VAPID key sanitizer (Render/Railway can inject padding, quotes, whitespace)
+function cleanVapidKey(key) {
+  if (!key) return '';
+  return key
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/=+$/, '')
+    .replace(/\s/g, '');
+}
+const VAPID_PUBLIC_CLEAN  = cleanVapidKey(process.env.VAPID_PUBLIC_KEY);
+const VAPID_PRIVATE_CLEAN = cleanVapidKey(process.env.VAPID_PRIVATE_KEY);
+
+console.log('[VAPID CLEAN]', {
+  publicRaw:     process.env.VAPID_PUBLIC_KEY?.length,
+  publicClean:   VAPID_PUBLIC_CLEAN.length,
+  privateRaw:    process.env.VAPID_PRIVATE_KEY?.length,
+  privateClean:  VAPID_PRIVATE_CLEAN.length,
+  publicPreview: VAPID_PUBLIC_CLEAN.substring(0, 10) + '...' + VAPID_PUBLIC_CLEAN.substring(VAPID_PUBLIC_CLEAN.length - 5)
+});
 console.log('[PUSH CONFIG]', {
-  hasVapidPublic:    !!process.env.VAPID_PUBLIC_KEY,
-  hasVapidPrivate:   !!process.env.VAPID_PRIVATE_KEY,
+  hasVapidPublic:    !!VAPID_PUBLIC_CLEAN,
+  hasVapidPrivate:   !!VAPID_PRIVATE_CLEAN,
   vapidEmail:        process.env.VAPID_EMAIL,
-  vapidPublicLength: process.env.VAPID_PUBLIC_KEY?.length,
+  vapidPublicLength: VAPID_PUBLIC_CLEAN.length,
   hasCronSecret:     !!process.env.CRON_SECRET
 });
 const { stmts, VALID_CATEGORIES, DEFAULT_CATEGORIES } = require('./database');
@@ -50,14 +70,14 @@ function getUserCatNames(userId) {
 }
 
 // ── Web Push (VAPID) ──────────────────────────────────────────────────────────
-const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY;
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
-const VAPID_EMAIL   = process.env.VAPID_EMAIL || 'mailto:hello@kula.app';
+const VAPID_PUBLIC  = VAPID_PUBLIC_CLEAN;
+const VAPID_PRIVATE = VAPID_PRIVATE_CLEAN;
+const VAPID_EMAIL   = process.env.VAPID_EMAIL || 'mailto:mindup05@gmail.com';
 
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
   try {
     webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
-    console.log('  Web Push : VAPID configured');
+    console.log('  Web Push : VAPID configured (%d chars)', VAPID_PUBLIC.length);
   } catch (e) {
     console.error('  Web Push : VAPID error —', e.message, '— push disabled');
   }
@@ -1586,8 +1606,7 @@ app.delete('/api/categories/:id', requireAuth, (req, res) => {
 // Return the VAPID public key so the frontend can subscribe
 app.get('/api/push/vapid-key', (req, res) => {
   if (!VAPID_PUBLIC) return res.status(503).json({ error: 'Push non configuré' });
-  // Trim whitespace/quotes that Render/Railway may inject into env vars
-  res.json({ publicKey: VAPID_PUBLIC.trim().replace(/^["']|["']$/g, '') });
+  res.json({ publicKey: VAPID_PUBLIC });
 });
 
 // Save a push subscription for the authenticated user
