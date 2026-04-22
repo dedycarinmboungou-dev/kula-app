@@ -1218,12 +1218,22 @@ async function subscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try {
     const res = await fetch('/api/push/vapid-key');
-    if (!res.ok) return;
+    if (!res.ok) { console.warn('[Push] vapid-key endpoint returned', res.status); return; }
     const { publicKey } = await res.json();
+
+    console.log('[PUSH DEBUG] VAPID key received:', publicKey);
+    console.log('[PUSH DEBUG] VAPID key length:', publicKey?.length);
+
+    if (!publicKey || typeof publicKey !== 'string' || publicKey.length < 20) {
+      console.warn('[Push] VAPID key missing or invalid, skip subscribe');
+      return;
+    }
+
     const reg = await navigator.serviceWorker.ready;
     const existing = await reg.pushManager.getSubscription();
     if (existing) {
       // Already subscribed — send to server in case DB lost it
+      console.log('[Push] Already subscribed, re-syncing with server');
       await fetch('/api/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
@@ -1231,15 +1241,20 @@ async function subscribeToPush() {
       });
       return;
     }
+
+    const applicationServerKey = urlBase64ToUint8Array(publicKey);
+    console.log('[PUSH DEBUG] Converted Uint8Array length:', applicationServerKey?.length);
+
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey)
+      applicationServerKey
     });
     await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
       body: JSON.stringify(sub.toJSON())
     });
+    console.log('[Push] Subscribed successfully');
   } catch (e) {
     console.warn('[Push] subscribe failed:', e.message);
   }

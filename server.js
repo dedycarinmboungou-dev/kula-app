@@ -1586,7 +1586,8 @@ app.delete('/api/categories/:id', requireAuth, (req, res) => {
 // Return the VAPID public key so the frontend can subscribe
 app.get('/api/push/vapid-key', (req, res) => {
   if (!VAPID_PUBLIC) return res.status(503).json({ error: 'Push non configuré' });
-  res.json({ publicKey: VAPID_PUBLIC });
+  // Trim whitespace/quotes that Render/Railway may inject into env vars
+  res.json({ publicKey: VAPID_PUBLIC.trim().replace(/^["']|["']$/g, '') });
 });
 
 // Save a push subscription for the authenticated user
