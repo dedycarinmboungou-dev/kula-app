@@ -507,7 +507,10 @@ app.post('/api/payment/initiate', requireAuth, async (req, res) => {
       body: JSON.stringify(body)
     });
 
-    const data = await response.json();
+    const paytechResponse = await response.json();
+    console.log('[PAYTECH INITIATE] Status HTTP:', response.status);
+    console.log('[PAYTECH INITIATE] Réponse PayTech:', JSON.stringify(paytechResponse));
+    const data = paytechResponse;
     console.log('[PAYTECH] initiate ref=%s success=%s', ref_command, data.success);
 
     if (data.success === 1 && data.redirect_url) {
