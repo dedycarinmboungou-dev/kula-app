@@ -3,6 +3,7 @@ const express  = require('express');
 const cors     = require('cors');
 const path     = require('path');
 const fs       = require('fs');
+const crypto   = require('crypto');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -42,16 +43,15 @@ const BUILD_ID = Date.now();
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET       = process.env.JWT_SECRET       || 'kula_fallback_secret';
-const FEDAPAY_SECRET_KEY = process.env.FEDAPAY_SECRET_KEY || '';
-const ADMIN_EMAIL      = (process.env.ADMIN_EMAIL     || 'mindup05@gmail.com').toLowerCase();
-const CRON_SECRET      = process.env.CRON_SECRET       || '';
+const JWT_SECRET  = process.env.JWT_SECRET  || 'kula_fallback_secret';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'mindup05@gmail.com').toLowerCase();
+const CRON_SECRET = process.env.CRON_SECRET  || '';
 
-const { FedaPay, Transaction: FedaTransaction } = require('fedapay');
-if (FEDAPAY_SECRET_KEY) {
-  FedaPay.setApiKey(FEDAPAY_SECRET_KEY);
-  FedaPay.setEnvironment(process.env.FEDAPAY_ENV || 'live');
-}
+console.log('[PAYTECH CONFIG]', {
+  env:          process.env.PAYTECH_ENV || 'test',
+  hasApiKey:    !!process.env.PAYTECH_API_KEY,
+  hasApiSecret: !!process.env.PAYTECH_API_SECRET
+});
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -466,65 +466,104 @@ app.get('/api/user/plan', requireAuth, (req, res) => {
   });
 });
 
-// POST /api/payment/initiate — create FedaPay transaction, return checkout URL
+// POST /api/payment/initiate — create PayTech transaction, return redirect URL
 app.post('/api/payment/initiate', requireAuth, async (req, res) => {
-  if (!FEDAPAY_SECRET_KEY) return res.status(503).json({ error: 'Paiement non configuré' });
-
-  const row = stmts.getUserPlan.get({ id: req.userId });
-  if (!row) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+  if (!process.env.PAYTECH_API_KEY || !process.env.PAYTECH_API_SECRET) {
+    return res.status(503).json({ error: 'Paiement non configuré' });
+  }
 
   try {
-    const returnUrl = `${req.protocol}://${req.get('host')}/?payment=success`;
+    const ref_command = `KULA_${req.userId}_${Date.now()}`;
+    const ipn_secret  = crypto.randomBytes(16).toString('hex');
 
-    const transaction = await FedaTransaction.create({
-      description:  'Kula Premium — abonnement mensuel',
-      amount:       3000,
-      currency:     { iso: 'XOF' },
-      callback_url: returnUrl,
-      customer: {
-        email:     row.email,
-        firstname: row.email.split('@')[0],
-        lastname:  'User'
-      }
+    stmts.insertPayment.run({
+      ref_command,
+      user_id:    req.userId,
+      amount:     3000,
+      status:     'pending',
+      ipn_secret
     });
 
-    const token = await transaction.generateToken();
-    console.log('[FedaPay] transaction created id=%s url=%s', transaction.id, token.url);
+    const body = {
+      item_name:    'Abonnement Kula Premium',
+      item_price:   3000,
+      currency:     'XOF',
+      ref_command,
+      command_name: 'Abonnement mensuel Kula - 3000 FCFA',
+      env:          process.env.PAYTECH_ENV || 'test',
+      ipn_url:      'https://kula-app-f10h.onrender.com/api/payment/webhook',
+      success_url:  'https://kula-app-f10h.onrender.com/?payment=success',
+      cancel_url:   'https://kula-app-f10h.onrender.com/?payment=cancel',
+      custom_field: JSON.stringify({ ipn_secret, user_id: req.userId })
+    };
 
-    res.json({ checkout_url: token.url });
+    const response = await fetch('https://paytech.sn/api/payment/request-payment', {
+      method:  'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'API_KEY':       process.env.PAYTECH_API_KEY,
+        'API_SECRET':    process.env.PAYTECH_API_SECRET
+      },
+      body: JSON.stringify(body)
+    });
+
+    const data = await response.json();
+    console.log('[PAYTECH] initiate ref=%s success=%s', ref_command, data.success);
+
+    if (data.success === 1 && data.redirect_url) {
+      res.json({ checkout_url: data.redirect_url });
+    } else {
+      console.error('[PAYTECH] initiate failed:', JSON.stringify(data));
+      res.status(500).json({ error: data.error || 'Erreur lors de l\'initialisation du paiement' });
+    }
   } catch (err) {
-    console.error('[FedaPay] initiate error:', err.message);
+    console.error('[PAYTECH] initiate error:', err.message);
     res.status(500).json({ error: err.message || 'Erreur paiement' });
   }
 });
 
-// POST /api/payment/webhook — FedaPay confirms payment
+// POST /api/payment/webhook — PayTech IPN confirms payment
 app.post('/api/payment/webhook', express.json(), async (req, res) => {
   try {
-    const payload = req.body;
-    console.log('[FedaPay] webhook:', JSON.stringify(payload));
+    const { ref_command, custom_field } = req.body;
+    console.log('[PAYTECH IPN] received ref=%s', ref_command);
 
-    // FedaPay event: { name: 'transaction.approved', data: { object: { status, customer: { email } } } }
-    const txData  = payload?.data?.object || payload?.entity || payload;
-    const status  = (txData?.status || '').toLowerCase();
-    const email   = txData?.customer?.email || '';
+    if (!ref_command) return res.status(400).json({ error: 'ref_command manquant' });
 
-    const isApproved = ['approved', 'success', 'successful', 'completed'].includes(status);
-
-    if (isApproved && email) {
-      const user = stmts.getUserByEmail.get({ email });
-      if (user) {
-        const subEnd = dateAddDays(30);
-        stmts.activatePremium.run({ subEnd, id: user.id });
-        console.log('[FedaPay] user %d activated premium until %s', user.id, subEnd);
-      } else {
-        console.warn('[FedaPay] webhook: no user found for email', email);
-      }
+    const payment = stmts.getPaymentByRef.get({ ref_command });
+    if (!payment) {
+      console.warn('[PAYTECH IPN] unknown ref_command:', ref_command);
+      return res.status(404).json({ error: 'Transaction inconnue' });
     }
 
-    res.json({ received: true });
+    // Verify ipn_secret from custom_field
+    let incoming_secret = null;
+    try {
+      const cf = typeof custom_field === 'string' ? JSON.parse(custom_field) : custom_field;
+      incoming_secret = cf?.ipn_secret;
+    } catch {
+      return res.status(400).json({ error: 'custom_field invalide' });
+    }
+
+    if (!incoming_secret || incoming_secret !== payment.ipn_secret) {
+      console.warn('[PAYTECH IPN] ipn_secret mismatch for ref=%s', ref_command);
+      return res.status(403).json({ error: 'Signature IPN invalide' });
+    }
+
+    // Idempotence — skip if already completed
+    if (payment.status === 'completed') {
+      console.log('[PAYTECH IPN] already completed ref=%s', ref_command);
+      return res.json({ success: true });
+    }
+
+    const subEnd = dateAddDays(30);
+    stmts.activatePremium.run({ subEnd, id: payment.user_id });
+    stmts.updatePaymentStatus.run({ status: 'completed', ref_command });
+    console.log('[PAYTECH IPN] Premium activé pour user %d jusqu\'au %s', payment.user_id, subEnd);
+
+    res.json({ success: true });
   } catch (err) {
-    console.error('[FedaPay] webhook error:', err.message);
+    console.error('[PAYTECH IPN] error:', err.message);
     res.status(500).json({ error: 'Webhook error' });
   }
 });

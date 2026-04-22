@@ -113,6 +113,19 @@ db.exec(`
   );
 `);
 
+// ── PayTech payments table ───────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS paytech_payments (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ref_command TEXT    NOT NULL UNIQUE,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    amount      REAL    NOT NULL,
+    status      TEXT    NOT NULL DEFAULT 'pending',
+    ipn_secret  TEXT    NOT NULL,
+    created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+`);
+
 // ── Chat history table ────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS chat_history (
@@ -303,6 +316,18 @@ const stmts = {
   `),
   deleteAllPushSubscriptions: db.prepare(`
     DELETE FROM push_subscriptions
+  `),
+
+  // PayTech payments
+  insertPayment: db.prepare(`
+    INSERT INTO paytech_payments (ref_command, user_id, amount, status, ipn_secret)
+    VALUES ($ref_command, $user_id, $amount, $status, $ipn_secret)
+  `),
+  getPaymentByRef: db.prepare(`
+    SELECT * FROM paytech_payments WHERE ref_command = $ref_command
+  `),
+  updatePaymentStatus: db.prepare(`
+    UPDATE paytech_payments SET status = $status WHERE ref_command = $ref_command
   `),
 
   // Chat history

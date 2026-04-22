@@ -1658,7 +1658,7 @@ function init() {
   document.getElementById('paywall-cta')?.addEventListener('click', initiatePayment);
   document.getElementById('trial-upgrade-btn')?.addEventListener('click', initiatePayment);
 
-  // Handle ?payment=success redirect from Moneroo
+  // Handle ?payment=success redirect from PayTech
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('payment') === 'success') {
     history.replaceState({}, '', '/');
