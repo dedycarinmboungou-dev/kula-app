@@ -528,6 +528,9 @@ app.post('/api/payment/initiate', requireAuth, async (req, res) => {
 // POST /api/payment/webhook — PayTech IPN confirms payment
 app.post('/api/payment/webhook', express.json(), async (req, res) => {
   try {
+    console.log('[PAYTECH IPN] *** WEBHOOK APPELÉ ***');
+    console.log('[PAYTECH IPN] Body reçu:', JSON.stringify(req.body));
+    console.log('[PAYTECH IPN] Headers:', JSON.stringify(req.headers));
     const { ref_command, custom_field } = req.body;
     console.log('[PAYTECH IPN] received ref=%s', ref_command);
 
