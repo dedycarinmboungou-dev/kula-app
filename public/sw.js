@@ -49,6 +49,7 @@ self.addEventListener('activate', (event) => {
 
 // Handle incoming Web Push — show the notification
 self.addEventListener('push', (event) => {
+  console.log('[SW PUSH] Received', event.data?.text());
   if (!event.data) return;
   let payload = {};
   try { payload = event.data.json(); } catch { payload = { body: event.data.text() }; }

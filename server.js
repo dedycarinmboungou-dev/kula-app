@@ -8,6 +8,13 @@ const jwt      = require('jsonwebtoken');
 const Anthropic = require('@anthropic-ai/sdk');
 const multer   = require('multer');
 const webpush  = require('web-push');
+console.log('[PUSH CONFIG]', {
+  hasVapidPublic:    !!process.env.VAPID_PUBLIC_KEY,
+  hasVapidPrivate:   !!process.env.VAPID_PRIVATE_KEY,
+  vapidEmail:        process.env.VAPID_EMAIL,
+  vapidPublicLength: process.env.VAPID_PUBLIC_KEY?.length,
+  hasCronSecret:     !!process.env.CRON_SECRET
+});
 const { stmts, VALID_CATEGORIES, DEFAULT_CATEGORIES } = require('./database');
 
 // Unique build ID — changes on every server restart / deploy
@@ -18,6 +25,7 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET       = process.env.JWT_SECRET       || 'kula_fallback_secret';
 const FEDAPAY_SECRET_KEY = process.env.FEDAPAY_SECRET_KEY || '';
 const ADMIN_EMAIL      = (process.env.ADMIN_EMAIL     || 'mindup05@gmail.com').toLowerCase();
+const CRON_SECRET      = process.env.CRON_SECRET       || '';
 
 const { FedaPay, Transaction: FedaTransaction } = require('fedapay');
 if (FEDAPAY_SECRET_KEY) {
@@ -1603,59 +1611,106 @@ app.post('/api/push/unsubscribe', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Scheduled push notifications — 3 slots per day (UTC) ─────────────────────
-// UTC times: 08h ≈ 8-9h local for West/Central Africa, 20h ≈ 20-21h local
-const PUSH_SLOTS = [
-  {
-    utcHour: 8,
-    payload: { title: 'Kula 🌱', body: '🌅 Bonne journée ! Pense à noter tes dépenses et revenus du matin.', tag: 'kula-morning', icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'dashboard' } }
-  },
-  {
-    utcHour: 13,
-    payload: { title: 'Kula 🌱', body: '☀️ Pause déjeuner ! Quelques dépenses à enregistrer dans Kula ?', tag: 'kula-midday', icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'dashboard' } }
-  },
-  {
-    utcHour: 20,
-    payload: { title: 'Kula 🌱', body: '🌙 Bonsoir ! Prends 2 minutes pour faire le bilan financier de ta journée.', tag: 'kula-evening', icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'chat' } }
-  }
-];
+// ── Push notification payloads ────────────────────────────────────────────────
+// Triggered externally by cron-job.org → POST /api/cron/send-push
+const PUSH_PAYLOADS = {
+  morning: { title: 'Kula 🌱', body: '🌅 Bonne journée ! Pense à noter tes dépenses et revenus du matin.', tag: 'kula-morning', icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'dashboard' } },
+  midday:  { title: 'Kula 🌱', body: '☀️ Pause déjeuner ! Quelques dépenses à enregistrer dans Kula ?',    tag: 'kula-midday',  icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'dashboard' } },
+  evening: { title: 'Kula 🌱', body: '🌙 Bonsoir ! Prends 2 minutes pour faire le bilan financier de ta journée.', tag: 'kula-evening', icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'chat' } }
+};
 
 async function sendPushToAll(payload) {
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return { sent: 0, failed: 0, invalidRemoved: 0 };
   const subs = stmts.getAllPushSubscriptions.all();
-  if (!subs.length) return;
+  if (!subs.length) return { sent: 0, failed: 0, invalidRemoved: 0 };
+
   const payloadStr = JSON.stringify(payload);
-  let ok = 0;
+  let sent = 0, failed = 0, invalidRemoved = 0;
+
   for (const sub of subs) {
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
         payloadStr
       );
-      ok++;
+      sent++;
     } catch (err) {
+      failed++;
+      if (err.statusCode === 410 || err.statusCode === 404) {
+        stmts.deletePushSubscription.run({ endpoint: sub.endpoint });
+        invalidRemoved++;
+      } else if (err.statusCode === 429) {
+        // Rate-limited — pause 1 s before continuing to next subscriber
+        console.warn(`[Push] 429 rate-limited for ${sub.endpoint.slice(0, 60)}… — waiting 1 s`);
+        await new Promise(r => setTimeout(r, 1000));
+      } else {
+        console.warn(`[Push] error ${err.statusCode || err.code || '?'} for ${sub.endpoint.slice(0, 60)}…`);
+      }
+    }
+  }
+
+  console.log(`[Push] "${payload.tag}" — sent:${sent} failed:${failed} removed:${invalidRemoved} total:${subs.length} @ ${new Date().toISOString()}`);
+  return { sent, failed, invalidRemoved };
+}
+
+// ── Cron endpoint — called by external scheduler (cron-job.org) ──────────────
+app.post('/api/cron/send-push', async (req, res) => {
+  // Auth: require CRON_SECRET header
+  if (!CRON_SECRET) return res.status(503).json({ error: 'CRON_SECRET not configured' });
+  if (req.headers['x-cron-secret'] !== CRON_SECRET) {
+    return res.status(401).json({ error: 'Invalid cron secret' });
+  }
+
+  const { slot } = req.body || {};
+  const payload = PUSH_PAYLOADS[slot];
+  if (!payload) {
+    return res.status(400).json({ error: `Unknown slot "${slot}". Valid: morning, midday, evening` });
+  }
+
+  try {
+    const result = await sendPushToAll(payload);
+    console.log(`[Cron] send-push slot=${slot} result=`, result);
+    res.json({ success: true, slot, ...result });
+  } catch (err) {
+    console.error(`[Cron] send-push error:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Debug: test push for current user (temporary — remove after validation) ──
+app.post('/api/debug/test-push', requireAuth, async (req, res) => {
+  const userId = req.userId;
+  const subs = stmts.getPushSubscriptionsByUser.all({ userId });
+  console.log(`[DEBUG PUSH] User ${userId} has ${subs.length} subscriptions`);
+
+  if (!subs.length) {
+    return res.json({ subscriptionsFound: 0, sent: 0, failed: 0, errors: ['No subscriptions for this user'] });
+  }
+
+  const payload = JSON.stringify({ title: 'Test Kula 🧪', body: 'Pipeline push OK !', tag: 'kula-test', icon: '/icon-192.png', badge: '/icon-192.png', data: { tab: 'dashboard' } });
+  let sent = 0, failed = 0;
+  const errors = [];
+
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload
+      );
+      sent++;
+    } catch (err) {
+      failed++;
+      const msg = `${err.statusCode || err.code || '?'}: ${err.message?.slice(0, 120)}`;
+      errors.push(msg);
       if (err.statusCode === 410 || err.statusCode === 404) {
         stmts.deletePushSubscription.run({ endpoint: sub.endpoint });
       }
     }
   }
-  console.log(`[Push] "${payload.tag}" sent to ${ok}/${subs.length} subscribers`);
-}
 
-function schedulePushSlot(slot) {
-  const now  = new Date();
-  const next = new Date(now);
-  next.setUTCHours(slot.utcHour, 0, 0, 0);
-  if (next <= now) next.setUTCDate(next.getUTCDate() + 1); // already past today
-  const delay = next - now;
-  setTimeout(() => {
-    sendPushToAll(slot.payload);
-    setInterval(() => sendPushToAll(slot.payload), 24 * 60 * 60 * 1000);
-  }, delay);
-  console.log(`  Push slot ${slot.utcHour}h UTC scheduled in ${Math.round(delay / 60000)} min`);
-}
-
-PUSH_SLOTS.forEach(schedulePushSlot);
+  console.log(`[DEBUG PUSH] User ${userId} — sent:${sent} failed:${failed}`);
+  res.json({ subscriptionsFound: subs.length, sent, failed, errors });
+});
 
 // ── Widget page (lightweight, for PWA shortcut / home screen pin) ────────────
 app.get('/widget', requireAuth, (req, res) => {

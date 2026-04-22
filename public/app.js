@@ -269,7 +269,20 @@ function initMonthSelectors() {
 // ── API helpers ───────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` };
-  const res = await fetch(path, { headers, ...opts });
+
+  // Abort after 30 s — prevents infinite freeze on Railway cold start
+  const ctrl    = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 30_000);
+
+  let res;
+  try {
+    res = await fetch(path, { headers, signal: ctrl.signal, ...opts });
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Serveur non disponible — réessaie dans quelques secondes');
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (res.status === 401) {
     logout();
