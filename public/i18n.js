@@ -87,6 +87,40 @@ const I18N = {
     days_left:        'j restants',
     subscribe_now:    "S'abonner maintenant",
 
+    // Dashboard section labels
+    categories:       'Dépenses par catégorie',
+    trend_6mo:        'Tendance 6 mois',
+    recent_label:     'Récentes',
+    see_all:          'Voir tout →',
+    manage_budgets:   'Gérer mes budgets',
+    export_pdf:       'Exporter le rapport PDF',
+    about:            'À propos',
+    install_btn:      'Installer',
+    no_expense_month: 'Aucune dépense ce mois',
+    use_chat_hint:    'Utilisez le chat pour ajouter vos dépenses et revenus',
+
+    // Score Kula
+    score_great_status:        '💚 Excellente gestion',
+    score_great_detail_savings:'Tu épargnes ~{X}% de tes revenus ce mois. Continue !',
+    score_great_detail_default:'Tes finances sont sous contrôle.',
+    score_good_status:         '✅ Bonne gestion',
+    score_good_detail_savings: 'Tu mets de côté {X}% de tes revenus. Bien joué !',
+    score_good_detail_default: 'Tes dépenses restent raisonnables.',
+    score_warn_status:         '⚠️ Attention requise',
+    score_warn_detail_over:    'Dépenses supérieures aux revenus ce mois.',
+    score_warn_detail_budget:  'Certains budgets sont proches de leur limite.',
+    score_bad_status:          '🔴 Finances tendues',
+    score_bad_detail_over:     'Tu dépenses plus que tu ne gagnes. Parle à Kula.',
+    score_bad_detail_budget:   'Plusieurs budgets sont dépassés.',
+
+    // Plan details
+    next_payment:     'Prochain paiement le',
+    unlimited_access: 'Accès illimité',
+    expires_on:       'Expire le',
+    plan_free_desc:   'Passez Premium pour accéder à toutes les fonctionnalités',
+    day_left:         'jour restant',
+    trial_last_day:   'Dernier jour',
+
     // Currency onboarding
     currency_onboarding_title: 'Quelle devise utilisez-vous ?',
     currency_onboarding_sub:   'Vous pourrez la changer à tout moment dans les réglages.',
@@ -219,6 +253,40 @@ const I18N = {
     plan_trial_badge: 'Trial',
     days_left:        'days left',
     subscribe_now:    'Subscribe now',
+
+    // Dashboard section labels
+    categories:       'Expenses by category',
+    trend_6mo:        '6-month trend',
+    recent_label:     'Recent',
+    see_all:          'See all →',
+    manage_budgets:   'Manage my budgets',
+    export_pdf:       'Export PDF report',
+    about:            'About',
+    install_btn:      'Install',
+    no_expense_month: 'No expenses this month',
+    use_chat_hint:    'Use the chat to add your expenses and income',
+
+    // Score Kula
+    score_great_status:        '💚 Excellent management',
+    score_great_detail_savings:'You\'re saving ~{X}% of your income this month. Keep it up!',
+    score_great_detail_default:'Your finances are under control.',
+    score_good_status:         '✅ Good management',
+    score_good_detail_savings: 'You\'re setting aside {X}% of your income. Well done!',
+    score_good_detail_default: 'Your expenses remain reasonable.',
+    score_warn_status:         '⚠️ Attention needed',
+    score_warn_detail_over:    'Expenses exceed income this month.',
+    score_warn_detail_budget:  'Some budgets are near their limit.',
+    score_bad_status:          '🔴 Tight finances',
+    score_bad_detail_over:     'You\'re spending more than you earn. Talk to Kula.',
+    score_bad_detail_budget:   'Several budgets are exceeded.',
+
+    // Plan details
+    next_payment:     'Next payment on',
+    unlimited_access: 'Unlimited access',
+    expires_on:       'Expires on',
+    plan_free_desc:   'Go Premium to access all features',
+    day_left:         'day left',
+    trial_last_day:   'Last day',
 
     // Currency onboarding
     currency_onboarding_title: 'Which currency do you use?',

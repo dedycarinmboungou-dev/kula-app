@@ -1172,15 +1172,32 @@ app.get('/api/coach/analysis', requireAuth, async (req, res) => {
     const user   = stmts.getUserById.get({ id: req.userId });
     const ctx    = buildFinancialContext(req.userId);
     const hour   = new Date().getHours();
-    const moment = hour < 12 ? 'matin' : hour < 17 ? 'après-midi' : 'soir';
     const dayIdx = new Date().getDate() - 1;
     const quote  = KOLA_QUOTES[dayIdx % KOLA_QUOTES.length];
     const fmt    = n => Math.round(n).toLocaleString('fr-FR');
 
-    const langPreamble = user.language === 'en' ? 'IMPORTANT: Always respond in English. ' : '';
-    const systemPrompt = `${langPreamble}Tu es Kula, le coach financier personnel de l'application Kula. Tu es comme un grand frère africain bienveillant, direct, motivant et chaleureux. Tu utilises des emojis. Tu parles en français, style familier mais respectueux. Ton objectif : que ${user.name.split(' ')[0]} réussisse financièrement. Réponds UNIQUEMENT avec du JSON valide : {"message":"<ton message>"}.`;
+    const isEN1 = user.language === 'en';
+    const firstName1 = user.name.split(' ')[0];
+    const systemPrompt = isEN1
+      ? `You are Kula, the personal financial coach of the Kula app. You are warm, direct, motivating and uplifting. You use emojis. You ALWAYS respond in English. Your goal: help ${firstName1} succeed financially. Reply ONLY with valid JSON: {"message":"<your message>"}.`
+      : `Tu es Kula, le coach financier personnel de l'application Kula. Tu es comme un grand frère africain bienveillant, direct, motivant et chaleureux. Tu utilises des emojis. Tu parles en français, style familier mais respectueux. Ton objectif : que ${firstName1} réussisse financièrement. Réponds UNIQUEMENT avec du JSON valide : {"message":"<ton message>"}.`;
 
-    const userPrompt = `Il est ${hour}h (${moment}). Génère un message de coaching personnalisé pour ${user.name.split(' ')[0]}.
+    const moment = hour < 12 ? (isEN1 ? 'morning' : 'matin') : hour < 17 ? (isEN1 ? 'afternoon' : 'après-midi') : (isEN1 ? 'evening' : 'soir');
+    const userPrompt = isEN1
+      ? `It is ${hour}h (${moment}). Generate a personalized coaching message for ${firstName1}.
+
+Financial data:
+- Today: ${ctx.todayCount} transaction(s), expenses ${fmt(ctx.todayExpense)} FCFA, income ${fmt(ctx.todayIncome)} FCFA
+- Last 3 days: expenses ${fmt(ctx.day3.expense)} FCFA, income ${fmt(ctx.day3.income)} FCFA
+- This week: income ${fmt(ctx.week.income)} FCFA, expenses ${fmt(ctx.week.expense)} FCFA, balance ${fmt(ctx.week.balance)} FCFA (${ctx.week.txCount} transactions)
+- This month: income ${fmt(ctx.month.income)} FCFA, expenses ${fmt(ctx.month.expense)} FCFA
+- Top expenses (7d): ${ctx.topCategories.length ? ctx.topCategories.join(', ') : 'none yet'}
+
+Instructions by time of day:
+- Morning: motivate to start the day well, give a simple goal
+- Afternoon: check how the day is going, practical tip
+- Evening: daily recap, praise or encourage, prepare for tomorrow`
+      : `Il est ${hour}h (${moment}). Génère un message de coaching personnalisé pour ${firstName1}.
 
 Données financières :
 - Aujourd'hui : ${ctx.todayCount} transaction(s), dépenses ${fmt(ctx.todayExpense)} FCFA, revenus ${fmt(ctx.todayIncome)} FCFA
@@ -1227,8 +1244,17 @@ app.post('/api/coach/chat', requireAuth, async (req, res) => {
     const fmt  = n => Math.round(n).toLocaleString('fr-FR');
     const name = user.name.split(' ')[0];
 
-    const langPreamble2 = user.language === 'en' ? 'IMPORTANT: Always respond in English. ' : '';
-    const systemPrompt = `${langPreamble2}Tu es Kula, le coach financier personnel de ${name} dans l'application Kula. Tu es comme un grand frère africain — bienveillant, direct, motivant, avec de l'humour. Tu utilises des emojis. Tu parles en français familier mais respectueux.
+    const isEN2 = user.language === 'en';
+    const systemPrompt = isEN2
+      ? `You are Kula, ${name}'s personal financial coach in the Kula app. You are warm, direct, motivating and humorous. You use emojis. You always respond in English.
+
+${name}'s current financial data:
+- This week: income ${fmt(ctx.week.income)} FCFA, expenses ${fmt(ctx.week.expense)} FCFA, balance ${fmt(ctx.week.balance)} FCFA
+- This month: income ${fmt(ctx.month.income)} FCFA, expenses ${fmt(ctx.month.expense)} FCFA
+- Top expenses (7d): ${ctx.topCategories.length ? ctx.topCategories.join(', ') : 'none yet'}
+
+Your role: personal financial advisor. Answer questions, give practical advice based on real data, encourage good habits. Be concise (max 3 paragraphs). Reply in plain text (no JSON). ALWAYS in English.`
+      : `Tu es Kula, le coach financier personnel de ${name} dans l'application Kula. Tu es comme un grand frère africain — bienveillant, direct, motivant, avec de l'humour. Tu utilises des emojis. Tu parles en français familier mais respectueux.
 
 Données financières actuelles de ${name} :
 - Cette semaine : revenus ${fmt(ctx.week.income)} FCFA, dépenses ${fmt(ctx.week.expense)} FCFA, solde ${fmt(ctx.week.balance)} FCFA
@@ -1401,7 +1427,8 @@ EXEMPLES DE RÉPONSES ATTENDUES :
 - "Supprime la transaction 42" → utilise delete_transaction
 - "J'ai dépensé de l'argent" → demande poliment le montant et la nature
 
-Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf quand tu utilises un outil.`;
+Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf quand tu utilises un outil.
+${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.language === 'en' ? 'ALL your messages must be written in English. Do not use French.' : 'Réponds en français.'}` : ''}`;
 
     // ── Tools ──────────────────────────────────────────────────────────────────
     const tools = [

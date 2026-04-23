@@ -22,7 +22,7 @@
         <div class="logo-icon">🌱</div>
         <div class="logo-text">
           <h1>Kula</h1>
-          <span>Fais grandir ton argent</span>
+          <span data-i18n="slogan">Fais grandir ton argent</span>
         </div>
       </div>
       <div class="header-right">
@@ -107,7 +107,7 @@
         <span data-i18n="install_sub">Accès rapide, notifications & mises à jour</span>
       </div>
     </div>
-    <button class="install-prompt-btn" id="btn-install">Installer</button>
+    <button class="install-prompt-btn" id="btn-install" data-i18n="install_btn">Installer</button>
     <button class="install-prompt-close" id="btn-install-close" aria-label="Fermer">✕</button>
   </div>
 
@@ -159,7 +159,7 @@
     <!-- Category breakdown -->
     <div class="section">
       <div class="section-header">
-        <span class="section-title">Dépenses par catégorie</span>
+        <span class="section-title" data-i18n="categories">Dépenses par catégorie</span>
       </div>
       <div id="category-chart-wrap">
         <div class="chart-container">
@@ -173,14 +173,14 @@
     <div class="section" style="padding-top:0">
       <button class="btn-budgets" id="btn-budgets" onclick="openBudgets()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-        Gérer mes budgets
+        <span data-i18n="manage_budgets">Gérer mes budgets</span>
       </button>
     </div>
 
     <!-- Monthly trend -->
     <div class="section">
       <div class="section-header">
-        <span class="section-title">Tendance 6 mois</span>
+        <span class="section-title" data-i18n="trend_6mo">Tendance 6 mois</span>
       </div>
       <div class="trend-container">
         <canvas id="trend-chart"></canvas>
@@ -191,15 +191,15 @@
     <div class="section" style="padding-top:0">
       <button class="btn-export-pdf" id="btn-export-pdf-dash" onclick="openExportModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        Exporter le rapport PDF
+        <span data-i18n="export_pdf">Exporter le rapport PDF</span>
       </button>
     </div>
 
     <!-- Recent transactions -->
     <div class="section">
       <div class="section-header">
-        <span class="section-title">Récentes</span>
-        <button class="see-all" onclick="switchTab('transactions')">Voir tout →</button>
+        <span class="section-title" data-i18n="recent_label">Récentes</span>
+        <button class="see-all" onclick="switchTab('transactions')" data-i18n="see_all">Voir tout →</button>
       </div>
       <div class="tx-list" id="recent-tx-list">
         <div class="empty-state">
@@ -590,7 +590,7 @@
 
   <!-- Subscription -->
   <div class="profile-section">
-    <div class="profile-section-title">Mon abonnement</div>
+    <div class="profile-section-title" data-i18n="subscription">Mon abonnement</div>
     <div class="profile-plan-card" id="profile-plan-card">
       <div class="profile-plan-info">
         <div class="profile-plan-name" id="profile-plan-name">…</div>
@@ -602,7 +602,7 @@
 
   <!-- Currency selector -->
   <div class="profile-section">
-    <div class="profile-section-title">Devise</div>
+    <div class="profile-section-title" data-i18n="currency">Devise</div>
     <div class="profile-currency-options" id="currency-options">
       <button class="currency-btn active" data-currency="XOF" data-label="XOF (FCFA)">✓ XOF (FCFA)</button>
       <button class="currency-btn" data-currency="USD" data-label="USD ($)">USD ($)</button>
@@ -612,7 +612,7 @@
 
   <!-- Language selector -->
   <div class="profile-section">
-    <div class="profile-section-title">Langue</div>
+    <div class="profile-section-title" data-i18n="language">Langue</div>
     <div class="profile-lang-options" id="lang-options">
       <button class="lang-btn active" data-lang="fr" data-label="Français">✓ Français</button>
       <button class="lang-btn" data-lang="en" data-label="English">English</button>
@@ -621,7 +621,7 @@
 
   <!-- Feedback -->
   <div class="profile-section">
-    <div class="profile-section-title">Donner mon avis</div>
+    <div class="profile-section-title" data-i18n="feedback">Donner mon avis</div>
     <div class="profile-feedback">
       <div class="feedback-stars" id="feedback-stars">
         <span class="feedback-star" data-star="1">☆</span>
@@ -637,7 +637,7 @@
 
   <!-- About -->
   <div class="profile-section">
-    <div class="profile-section-title">À propos</div>
+    <div class="profile-section-title" data-i18n="about">À propos</div>
     <div class="profile-about">
       <div class="about-header">
         <span class="about-logo">🌱</span>

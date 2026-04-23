@@ -186,15 +186,19 @@ function formatAmount(amount) {
   }).format(Math.round(Math.abs(amount)));
 }
 
+function getLocale() {
+  return (localStorage.getItem('kula_lang') || 'fr') === 'en' ? 'en-US' : 'fr-FR';
+}
+
 function formatDate(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString(getLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function formatMonthLabel(monthStr) {
   const [y, m] = monthStr.split('-');
   const d = new Date(parseInt(y), parseInt(m) - 1, 1);
-  return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  return d.toLocaleDateString(getLocale(), { month: 'long', year: 'numeric' });
 }
 
 // ── PDF Export ────────────────────────────────────────────────────────────────
@@ -472,28 +476,28 @@ function renderScoreKula(income, expense, categories, budgets) {
 
   if (score >= 80) {
     level  = 'great';
-    status = '💚 Excellente gestion';
+    status = t('score_great_status');
     detail = saved !== null
-      ? `Tu épargnes ~${saved}% de tes revenus ce mois. Continue !`
-      : 'Tes finances sont sous contrôle.';
+      ? t('score_great_detail_savings').replace('{X}', saved)
+      : t('score_great_detail_default');
   } else if (score >= 60) {
     level  = 'good';
-    status = '✅ Bonne gestion';
+    status = t('score_good_status');
     detail = saved !== null && saved > 0
-      ? `Tu mets de côté ${saved}% de tes revenus. Bien joué !`
-      : 'Tes dépenses restent raisonnables.';
+      ? t('score_good_detail_savings').replace('{X}', saved)
+      : t('score_good_detail_default');
   } else if (score >= 35) {
     level  = 'warn';
-    status = '⚠️ Attention requise';
+    status = t('score_warn_status');
     detail = expense > income
-      ? `Dépenses (${formatAmount(expense)}) > revenus (${formatAmount(income)}) ce mois.`
-      : 'Certains budgets sont proches de leur limite.';
+      ? t('score_warn_detail_over')
+      : t('score_warn_detail_budget');
   } else {
     level  = 'bad';
-    status = '🔴 Finances tendues';
+    status = t('score_bad_status');
     detail = expense > income
-      ? `Tu dépenses plus que tu ne gagnes ce mois. Parle à Kula.`
-      : 'Plusieurs budgets sont dépassés.';
+      ? t('score_bad_detail_over')
+      : t('score_bad_detail_budget');
   }
 
   card.setAttribute('data-level', level);
@@ -509,7 +513,7 @@ function renderCategoryChart(categories, totalExpense, budgets = {}) {
 
   if (!expenseCats.length) {
     ctx.style.display = 'none';
-    listEl.innerHTML = '<div class="chart-empty">Aucune dépense ce mois</div>';
+    listEl.innerHTML = `<div class="chart-empty">${t('no_expense_month')}</div>`;
     if (state.charts.category) { state.charts.category.destroy(); state.charts.category = null; }
     return;
   }
@@ -575,9 +579,9 @@ function renderTrendChart(trend) {
   const ctx = document.getElementById('trend-chart');
   if (!trend || !trend.length) return;
 
-  const labels = trend.map(t => {
-    const [y, m] = t.month.split('-');
-    return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString('fr-FR', { month: 'short' });
+  const labels = trend.map(tr => {
+    const [y, m] = tr.month.split('-');
+    return new Date(parseInt(y), parseInt(m) - 1).toLocaleDateString(getLocale(), { month: 'short' });
   });
 
   if (state.charts.trend) state.charts.trend.destroy();
@@ -587,14 +591,14 @@ function renderTrendChart(trend) {
       labels,
       datasets: [
         {
-          label: 'Revenus',
-          data: trend.map(t => t.income),
+          label: t('monthly_income'),
+          data: trend.map(tr => tr.income),
           backgroundColor: 'rgba(16,185,129,0.7)',
           borderRadius: 6
         },
         {
-          label: 'Dépenses',
-          data: trend.map(t => t.expense),
+          label: t('monthly_expense'),
+          data: trend.map(tr => tr.expense),
           backgroundColor: 'rgba(239,68,68,0.7)',
           borderRadius: 6
         }
@@ -632,8 +636,8 @@ function renderTransactionList(containerId, transactions) {
     el.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">💫</div>
-        <div class="empty-text">Aucune transaction</div>
-        <div class="empty-sub">Utilisez le chat pour ajouter vos dépenses et revenus</div>
+        <div class="empty-text">${t('no_transactions')}</div>
+        <div class="empty-sub">${t('use_chat_hint')}</div>
       </div>`;
     return;
   }
@@ -1566,8 +1570,8 @@ async function checkPlan() {
 
     if (data.plan === 'trial') {
       const d = data.days_left ?? 0;
-      const label = d <= 0 ? 'dernier jour' : `${d} jour${d > 1 ? 's' : ''} restant${d > 1 ? 's' : ''}`;
-      if (trialText)   trialText.innerHTML = `🌱 Essai gratuit — <strong>${label}</strong>`;
+      const label = d <= 0 ? t('trial_last_day') : `${d} ${d > 1 ? t('days_left') : t('day_left')}`;
+      if (trialText)   trialText.innerHTML = `🌱 ${t('plan_trial')} — <strong>${label}</strong>`;
       if (trialBanner) trialBanner.style.display = 'flex';
       if (paywallEl)   paywallEl.style.display   = 'none';
       return;
@@ -2279,31 +2283,31 @@ function renderProfilePlan(data) {
   if (!nameEl || !descEl || !badgeEl) return;
 
   const fmt = iso => iso
-    ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    ? new Date(iso).toLocaleDateString(getLocale(), { day: 'numeric', month: 'long', year: 'numeric' })
     : '';
 
   if (data.plan === 'premium') {
-    nameEl.textContent  = data.is_admin ? 'Plan Admin ⭐' : 'Plan Premium ⭐';
+    nameEl.textContent  = data.is_admin ? `${t('plan_admin')} ⭐` : `${t('plan_premium')} ⭐`;
     const nextDate      = data.subscription_end ? fmt(data.subscription_end) : null;
     const daysLeft      = data.premium_days_left;
     descEl.textContent  = nextDate
-      ? `Prochain paiement le ${nextDate}${daysLeft != null ? ` · ${daysLeft} j restants` : ''}`
-      : 'Accès illimité';
+      ? `${t('next_payment')} ${nextDate}${daysLeft != null ? ` · ${daysLeft} ${t('days_left')}` : ''}`
+      : t('unlimited_access');
     badgeEl.textContent = 'Premium';
     badgeEl.className   = 'profile-plan-badge badge-premium';
     if (cardEl) cardEl.className = 'profile-plan-card card-premium';
   } else if (data.plan === 'trial') {
     const d             = data.days_left ?? 0;
-    const label         = d <= 1 ? 'dernier jour' : `${d} jours restants`;
-    nameEl.textContent  = 'Essai gratuit';
-    descEl.textContent  = `${label} · Expire le ${fmt(data.trial_end)} · Essai de 3 jours offert`;
-    badgeEl.textContent = 'Essai';
+    const label         = d <= 0 ? t('trial_last_day') : `${d} ${d > 1 ? t('days_left') : t('day_left')}`;
+    nameEl.textContent  = t('plan_trial');
+    descEl.textContent  = `${label} · ${t('expires_on')} ${fmt(data.trial_end)}`;
+    badgeEl.textContent = t('plan_trial_badge');
     badgeEl.className   = 'profile-plan-badge badge-trial';
     if (cardEl) cardEl.className = 'profile-plan-card card-trial';
   } else {
-    nameEl.textContent  = 'Plan Gratuit';
-    descEl.textContent  = 'Essai de 3 jours terminé · Passez Premium pour accéder à toutes les fonctionnalités';
-    badgeEl.textContent = 'Inactif';
+    nameEl.textContent  = t('plan_free');
+    descEl.textContent  = t('plan_free_desc');
+    badgeEl.textContent = t('plan_inactive');
     badgeEl.className   = 'profile-plan-badge badge-expired';
     if (cardEl) cardEl.className = 'profile-plan-card card-expired';
   }
@@ -2498,6 +2502,10 @@ function initProfileHandlers() {
       localStorage.setItem('kula_lang', lang);
       if (typeof applyI18n === 'function') applyI18n(lang);
       showToast(lang === 'fr' ? 'Langue : Français' : 'Language: English', 'success');
+      // Refresh current tab so translated dynamic strings (score, charts, dates) update
+      if (state.currentTab === 'dashboard') loadDashboard();
+      else if (state.currentTab === 'transactions') loadTransactions();
+      else if (state.currentTab === 'epargne') loadPoches();
       try {
         await api('/api/user/language', { method: 'PATCH', body: JSON.stringify({ language: lang }) });
       } catch { /* saved locally */ }
