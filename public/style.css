@@ -3595,3 +3595,142 @@ button, a, img, .nav-item, .nav-fab,
 .add-tx-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 .add-tx-submit.expense { background: linear-gradient(135deg, #ef4444, #dc2626); }
 .add-tx-spin { width: 18px; height: 18px; animation: spin 0.75s linear infinite; }
+
+/* ── Profile settings sections ──────────────────────────────────────────────── */
+
+/* Currency & Language button groups */
+.profile-currency-options,
+.profile-lang-options {
+  display: flex;
+  gap: 8px;
+}
+.currency-btn, .lang-btn {
+  flex: 1;
+  padding: 10px 6px;
+  border-radius: 10px;
+  border: 2px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.currency-btn.active, .lang-btn.active {
+  border-color: var(--green);
+  background: rgba(46,204,113,0.15);
+  color: var(--green);
+}
+.currency-btn:hover, .lang-btn:hover {
+  border-color: rgba(255,255,255,0.25);
+}
+
+/* Feedback */
+.profile-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.feedback-stars {
+  display: flex;
+  gap: 8px;
+  font-size: 28px;
+  cursor: pointer;
+}
+.feedback-star {
+  color: rgba(255,255,255,0.3);
+  transition: color 0.15s, transform 0.15s;
+}
+.feedback-star.active,
+.feedback-star:hover {
+  color: #f59e0b;
+  transform: scale(1.15);
+}
+.feedback-text {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  color: #fff;
+  padding: 10px 12px;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 60px;
+}
+.feedback-text::placeholder { color: rgba(255,255,255,0.35); }
+.btn-feedback-send {
+  align-self: flex-start;
+  padding: 10px 24px;
+  border-radius: 10px;
+  border: none;
+  background: var(--green);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-feedback-send:hover { opacity: 0.85; }
+
+/* About */
+.profile-about {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.about-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.about-logo {
+  font-size: 36px;
+}
+.about-app-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+.about-version {
+  font-size: 12px;
+  color: var(--gray);
+}
+.about-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.7);
+  margin: 0;
+}
+.about-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.about-contact a {
+  color: var(--green);
+  text-decoration: none;
+  font-size: 13px;
+}
+.about-contact a:hover { text-decoration: underline; }
+.about-legal {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  padding-top: 6px;
+}
+
+/* Logout in profile */
+.profile-section .btn-logout {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(239,68,68,0.3);
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.profile-section .btn-logout:hover {
+  background: rgba(239,68,68,0.2);
+}

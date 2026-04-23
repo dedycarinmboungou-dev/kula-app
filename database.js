@@ -146,6 +146,7 @@ if (!userColNames.includes('trial_start'))          db.exec("ALTER TABLE users A
 if (!userColNames.includes('trial_end'))            db.exec("ALTER TABLE users ADD COLUMN trial_end TEXT");
 if (!userColNames.includes('subscription_end'))     db.exec("ALTER TABLE users ADD COLUMN subscription_end TEXT");
 if (!userColNames.includes('moneroo_customer_id'))  db.exec("ALTER TABLE users ADD COLUMN moneroo_customer_id TEXT");
+if (!userColNames.includes('currency'))             db.exec("ALTER TABLE users ADD COLUMN currency TEXT NOT NULL DEFAULT 'XOF'");
 
 // Migration: add columns to transactions if missing
 const cols = db.prepare('PRAGMA table_info(transactions)').all();
@@ -175,7 +176,7 @@ const stmts = {
   // Users
   insertUser:     db.prepare(`INSERT INTO users (name, email, password_hash) VALUES ($name, $email, $hash)`),
   getUserByEmail: db.prepare(`SELECT * FROM users WHERE email = $email`),
-  getUserById:    db.prepare(`SELECT id, name, email, photo, created_at FROM users WHERE id = $id`),
+  getUserById:    db.prepare(`SELECT id, name, email, photo, currency, created_at FROM users WHERE id = $id`),
   updateUserName:  db.prepare(`UPDATE users SET name = $name WHERE id = $id`),
   updateUserPhoto: db.prepare(`UPDATE users SET photo = $photo WHERE id = $id`),
   setUserTrial: db.prepare(`
@@ -192,6 +193,9 @@ const stmts = {
   `),
   setMonerooCustomer: db.prepare(`
     UPDATE users SET moneroo_customer_id = $customerId WHERE id = $id
+  `),
+  updateUserCurrency: db.prepare(`
+    UPDATE users SET currency = $currency WHERE id = $id
   `),
 
   // Admin

@@ -147,6 +147,21 @@ async function syncOfflineQueue() {
 const notifGranted = () =>
   typeof Notification !== 'undefined' && Notification.permission === 'granted';
 
+// ── Currency ──────────────────────────────────────────────────────────────────
+const CURRENCIES = {
+  XOF: { symbol: 'FCFA', locale: 'fr-FR' },
+  USD: { symbol: '$',    locale: 'en-US' },
+  EUR: { symbol: '€',    locale: 'fr-FR' }
+};
+
+function getUserCurrency() {
+  return localStorage.getItem('kula_currency') || 'XOF';
+}
+
+function getCurrencySymbol() {
+  return CURRENCIES[getUserCurrency()]?.symbol || 'FCFA';
+}
+
 // ── Formatting ────────────────────────────────────────────────────────────────
 function formatAmount(amount) {
   if (typeof amount !== 'number') amount = parseFloat(amount) || 0;
@@ -343,14 +358,15 @@ async function loadDashboard() {
 
     // Balance
     const balEl = document.getElementById('total-balance');
-    balEl.innerHTML = `<span class="balance-currency">FCFA</span> ${formatAmount(data.balance)}`;
+    const cs = getCurrencySymbol();
+    balEl.innerHTML = `<span class="balance-currency">${cs}</span> ${formatAmount(data.balance)}`;
     balEl.className = `balance-amount${data.balance < 0 ? ' negative' : ''}`;
     document.getElementById('balance-sub').textContent =
-      `Ce mois: ${data.monthlyBalance >= 0 ? '+' : ''}${formatAmount(data.monthlyBalance)} FCFA`;
+      `Ce mois: ${data.monthlyBalance >= 0 ? '+' : ''}${formatAmount(data.monthlyBalance)} ${cs}`;
 
     // Monthly stats
-    document.getElementById('monthly-income').textContent = `${formatAmount(data.monthlyIncome)} FCFA`;
-    document.getElementById('monthly-expense').textContent = `${formatAmount(data.monthlyExpense)} FCFA`;
+    document.getElementById('monthly-income').textContent = `${formatAmount(data.monthlyIncome)} ${cs}`;
+    document.getElementById('monthly-expense').textContent = `${formatAmount(data.monthlyExpense)} ${cs}`;
 
     // Budget state for this month (passed to renderCategoryChart)
     state.budgets = {};
@@ -502,7 +518,7 @@ function renderCategoryChart(categories, totalExpense, budgets = {}) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: ctx => ` ${formatAmount(ctx.raw)} FCFA (${Math.round(ctx.raw / totalExpense * 100)}%)`
+            label: ctx => ` ${formatAmount(ctx.raw)} ${getCurrencySymbol()} (${Math.round(ctx.raw / totalExpense * 100)}%)`
           }
         }
       }
@@ -523,7 +539,7 @@ function renderCategoryChart(categories, totalExpense, budgets = {}) {
         <div class="category-budget-wrap">
           <div class="category-budget-bar" style="width:${bPct}%;background:${barColor}"></div>
         </div>
-        <div class="category-budget-label">${bPct}% du budget (${formatAmount(limite)} FCFA)</div>`;
+        <div class="category-budget-label">${bPct}% du budget (${formatAmount(limite)} ${getCurrencySymbol()})</div>`;
     }
     return `
       <div class="category-item">
@@ -579,7 +595,7 @@ function renderTrendChart(trend) {
           labels: { font: { size: 11 }, boxWidth: 12 }
         },
         tooltip: {
-          callbacks: { label: ctx => ` ${formatAmount(ctx.raw)} FCFA` }
+          callbacks: { label: ctx => ` ${formatAmount(ctx.raw)} ${getCurrencySymbol()}` }
         }
       },
       scales: {
@@ -621,7 +637,7 @@ function renderTransactionList(containerId, transactions) {
             ${formatDate(tx.date)}
           </div>
         </div>
-        <div class="tx-amount ${tx.type}">${sign}${formatAmount(tx.amount)} FCFA</div>
+        <div class="tx-amount ${tx.type}">${sign}${formatAmount(tx.amount)} ${getCurrencySymbol()}</div>
         <button class="tx-delete" onclick="deleteTransaction(${tx.id})" title="Supprimer">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12"/>
@@ -786,7 +802,7 @@ function renderTransactionPreview(tx, parentDiv) {
       <span class="tx-preview-label">Transaction détectée</span>
       <span class="tx-preview-type ${tx.type}">${typeLabel}</span>
     </div>
-    <div class="tx-preview-amount ${tx.type}">${sign}${formatAmount(tx.amount)} <small>FCFA</small></div>
+    <div class="tx-preview-amount ${tx.type}">${sign}${formatAmount(tx.amount)} <small>${getCurrencySymbol()}</small></div>
     <div class="tx-preview-details">
       ${meta.icon} ${tx.category} · ${escapeHtml(tx.description)}<br>
       📅 ${formatDate(tx.date)}
@@ -837,7 +853,7 @@ function renderSavedTransaction(tx, parentDiv) {
       <div class="tx-saved-desc">${escapeHtml(tx.description)}</div>
       <div class="tx-saved-cat">${escapeHtml(tx.category)}</div>
     </div>
-    <div class="tx-saved-amount ${tx.type}">${sign}${formatAmount(tx.amount)} FCFA</div>
+    <div class="tx-saved-amount ${tx.type}">${sign}${formatAmount(tx.amount)} ${getCurrencySymbol()}</div>
     <div class="tx-saved-check">✅</div>
   `;
   parentDiv.querySelector('.msg-bubble').appendChild(card);
@@ -1342,8 +1358,8 @@ function renderPoches(poches) {
   if (summary) {
     const totalActuel  = poches.reduce((s, p) => s + p.montant_actuel, 0);
     const totalObjectif = poches.reduce((s, p) => s + p.objectif_montant, 0);
-    document.getElementById('epargne-total-actuel').textContent    = `${formatAmount(totalActuel)} FCFA`;
-    document.getElementById('epargne-total-objectif').textContent  = `Objectif : ${formatAmount(totalObjectif)} FCFA`;
+    document.getElementById('epargne-total-actuel').textContent    = `${formatAmount(totalActuel)} ${getCurrencySymbol()}`;
+    document.getElementById('epargne-total-objectif').textContent  = `Objectif : ${formatAmount(totalObjectif)} ${getCurrencySymbol()}`;
     document.getElementById('epargne-nb-poches').textContent       = `${poches.length} poche${poches.length > 1 ? 's' : ''}`;
     summary.style.display = poches.length ? 'flex' : 'none';
   }
@@ -1384,8 +1400,8 @@ function renderPoches(poches) {
         <button class="btn-poche-delete" data-id="${p.id}" title="Supprimer">✕</button>
       </div>
       <div class="poche-amounts">
-        <div class="poche-amount-current">${formatAmount(p.montant_actuel)} <span class="currency">FCFA</span></div>
-        <div class="poche-amount-objectif">/ ${formatAmount(p.objectif_montant)} FCFA</div>
+        <div class="poche-amount-current">${formatAmount(p.montant_actuel)} <span class="currency">${getCurrencySymbol()}</span></div>
+        <div class="poche-amount-objectif">/ ${formatAmount(p.objectif_montant)} ${getCurrencySymbol()}</div>
       </div>
       <div class="poche-progress-bar">
         <div class="poche-progress-fill" style="width:${pct}%;background:${barColor}"></div>
@@ -1394,7 +1410,7 @@ function renderPoches(poches) {
         <span class="poche-pct" style="color:${barColor}">${pct}%</span>
         ${completed
           ? `<span class="poche-completed-badge">🎉 Objectif atteint !</span>`
-          : `<span class="poche-reste">Reste ${formatAmount(reste)} FCFA</span>`}
+          : `<span class="poche-reste">Reste ${formatAmount(reste)} ${getCurrencySymbol()}</span>`}
       </div>
       <div class="poche-actions">
         <button class="btn-alimenter" data-id="${p.id}" data-nom="${escapeHtml(p.nom)}">+ Ajouter</button>
@@ -1630,6 +1646,10 @@ function init() {
     const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
     document.getElementById('user-greeting').textContent = `${greeting}, ${user.name.split(' ')[0]} 👋`;
   }
+
+  // Apply saved currency & language on load
+  updateCurrencyLabels();
+  if (typeof applyI18n === 'function') applyI18n(localStorage.getItem('kula_lang') || 'fr');
 
   // Logout button
   document.getElementById('btn-logout').addEventListener('click', () => {
@@ -1876,7 +1896,7 @@ function checkBudgetNotifications(categories, budgets) {
       budgetAlertsSent[key] = 100;
       if (typeof Notification !== 'undefined') {
         new Notification(`🚨 Budget ${c.category} dépassé !`, {
-          body: `Tu as dépensé ${formatAmount(c.total)} FCFA sur ${formatAmount(limite)} FCFA prévu.`,
+          body: `Tu as dépensé ${formatAmount(c.total)} ${getCurrencySymbol()} sur ${formatAmount(limite)} ${getCurrencySymbol()} prévu.`,
           icon: '/icon-192.png', tag: `budget-over-${key}`, renotify: true
         });
       }
@@ -1884,7 +1904,7 @@ function checkBudgetNotifications(categories, budgets) {
       budgetAlertsSent[key] = 80;
       if (typeof Notification !== 'undefined') {
         new Notification(`⚠️ Budget ${c.category} à ${Math.round(pct)}%`, {
-          body: `Tu as dépensé ${formatAmount(c.total)} FCFA sur ${formatAmount(limite)} FCFA prévu.`,
+          body: `Tu as dépensé ${formatAmount(c.total)} ${getCurrencySymbol()} sur ${formatAmount(limite)} ${getCurrencySymbol()} prévu.`,
           icon: '/icon-192.png', tag: `budget-warn-${key}`, renotify: true
         });
       }
@@ -1943,7 +1963,7 @@ function renderBudgetList(budgetMap, spending) {
         ? `<div class="budget-progress-wrap">
              <div class="budget-progress-bar" style="width:${bPct}%;background:${barColor}"></div>
            </div>
-           <div class="budget-progress-label">${formatAmount(spent)} / ${formatAmount(limite)} FCFA (${bPct}%)</div>`
+           <div class="budget-progress-label">${formatAmount(spent)} / ${formatAmount(limite)} ${getCurrencySymbol()} (${bPct}%)</div>`
         : '';
       const catActions = cat.id
         ? `<button class="btn-cat-edit" data-cat-id="${cat.id}" title="Modifier">
@@ -1974,7 +1994,7 @@ function renderBudgetList(budgetMap, spending) {
                 placeholder="—" value="${limite > 0 ? limite : ''}"
                 data-cat="${escapeHtml(cat.nom)}" data-month="${month}"
                 onchange="saveBudget(this)">
-              <span class="budget-input-unit">FCFA</span>
+              <span class="budget-input-unit">${getCurrencySymbol()}</span>
             </div>
             <div class="budget-cat-actions">${catActions}</div>
           </div>
@@ -2105,6 +2125,12 @@ function initBudgetHandlers() {
 }
 
 // ── Profile panel ──────────────────────────────────────────────────────────────
+// Update all static currency labels in the DOM
+function updateCurrencyLabels() {
+  const sym = getCurrencySymbol();
+  document.querySelectorAll('.currency-label').forEach(el => { el.textContent = sym; });
+}
+
 function openProfile() {
   const overlay = document.getElementById('profile-overlay');
   const panel   = document.getElementById('profile-panel');
@@ -2147,10 +2173,27 @@ function openProfile() {
       document.getElementById('profile-avatar-img').style.display  = 'none';
       document.getElementById('profile-avatar-initial').style.display = '';
     }
+    // Sync currency from server
+    if (data.currency) {
+      localStorage.setItem('kula_currency', data.currency);
+      document.querySelectorAll('#currency-options .currency-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.currency === data.currency));
+      updateCurrencyLabels();
+    }
   }).catch(() => { /* panel already open — silent fail on data refresh */ });
 
   // Also refresh plan info
   api('/api/user/plan').then(renderProfilePlan).catch(() => {});
+
+  // Highlight saved language
+  const lang = localStorage.getItem('kula_lang') || 'fr';
+  document.querySelectorAll('#lang-options .lang-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === lang));
+
+  // Highlight saved currency
+  const cur = getUserCurrency();
+  document.querySelectorAll('#currency-options .currency-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.currency === cur));
 }
 
 function renderProfilePlan(data) {
@@ -2347,6 +2390,62 @@ function initProfileHandlers() {
     if (e.key === 'Enter') document.getElementById('btn-profile-save-name').click();
     if (e.key === 'Escape') document.getElementById('btn-profile-cancel-name').click();
   });
+
+  // ── Currency selector ──────────────────────────────────────────────────────
+  document.querySelectorAll('#currency-options .currency-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const currency = btn.dataset.currency;
+      document.querySelectorAll('#currency-options .currency-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      localStorage.setItem('kula_currency', currency);
+      updateCurrencyLabels();
+      try {
+        await api('/api/user/currency', { method: 'PATCH', body: JSON.stringify({ currency }) });
+      } catch { /* saved locally, will sync later */ }
+    });
+  });
+
+  // ── Language selector ──────────────────────────────────────────────────────
+  document.querySelectorAll('#lang-options .lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.dataset.lang;
+      document.querySelectorAll('#lang-options .lang-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      localStorage.setItem('kula_lang', lang);
+      if (typeof applyI18n === 'function') applyI18n(lang);
+      showToast(lang === 'fr' ? 'Langue : Français' : 'Language: English', 'success');
+    });
+  });
+
+  // ── Feedback (stars + WhatsApp) ────────────────────────────────────────────
+  let feedbackRating = 0;
+  document.querySelectorAll('#feedback-stars .feedback-star').forEach(star => {
+    star.addEventListener('click', () => {
+      feedbackRating = parseInt(star.dataset.star);
+      document.querySelectorAll('#feedback-stars .feedback-star').forEach((s, i) => {
+        s.textContent = i < feedbackRating ? '★' : '☆';
+        s.classList.toggle('active', i < feedbackRating);
+      });
+    });
+  });
+
+  document.getElementById('btn-feedback-send')?.addEventListener('click', () => {
+    if (!feedbackRating) { showToast('Choisis une note (1 à 5 étoiles)', 'error'); return; }
+    const message = document.getElementById('feedback-text').value.trim();
+    const email = getUser().email || '';
+    const stars = '⭐'.repeat(feedbackRating);
+    const text = `⭐ Avis Kula %0ANote: ${stars} (${feedbackRating}/5)%0AMessage: ${message || '—'}%0AUtilisateur: ${email}`;
+    window.open(`https://wa.me/+221767424309?text=${text}`, '_blank');
+    showToast('Merci pour votre avis !', 'success');
+    feedbackRating = 0;
+    document.querySelectorAll('#feedback-stars .feedback-star').forEach(s => { s.textContent = '☆'; s.classList.remove('active'); });
+    document.getElementById('feedback-text').value = '';
+  });
+
+  // ── About: load version ────────────────────────────────────────────────────
+  api('/api/version').then(d => {
+    if (d?.version) document.getElementById('about-version').textContent = `v${d.version}`;
+  }).catch(() => {});
 }
 
 // Make deleteTransaction global for inline onclick

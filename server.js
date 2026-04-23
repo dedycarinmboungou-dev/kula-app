@@ -616,6 +616,25 @@ app.put('/api/profile/photo', requireAuth, (req, res) => {
   }
 });
 
+// PATCH /api/user/currency — change user currency preference
+app.patch('/api/user/currency', requireAuth, (req, res) => {
+  const { currency } = req.body;
+  const valid = ['XOF', 'USD', 'EUR'];
+  if (!valid.includes(currency)) return res.status(400).json({ error: 'Devise invalide' });
+  stmts.updateUserCurrency.run({ currency, id: req.userId });
+  res.json({ currency });
+});
+
+// GET /api/version — app version from package.json
+app.get('/api/version', (req, res) => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+    res.json({ version: pkg.version });
+  } catch {
+    res.json({ version: '1.0.0' });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // BUDGETS
 // ═══════════════════════════════════════════════════════════════════════════════

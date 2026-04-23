@@ -103,8 +103,8 @@
     <div class="install-prompt-left">
       <div class="install-prompt-icon">📲</div>
       <div class="install-prompt-text">
-        <strong>Installer Kula sur mon téléphone</strong>
-        <span>Accès rapide, notifications & mises à jour</span>
+        <strong data-i18n="install_kula">Installer Kula sur mon téléphone</strong>
+        <span data-i18n="install_sub">Accès rapide, notifications & mises à jour</span>
       </div>
     </div>
     <button class="install-prompt-btn" id="btn-install">Installer</button>
@@ -339,8 +339,8 @@
 
     <div class="filter-tabs">
       <button class="filter-tab active" data-filter="all">Tout</button>
-      <button class="filter-tab" data-filter="income">Revenus</button>
-      <button class="filter-tab" data-filter="expense">Dépenses</button>
+      <button class="filter-tab" data-filter="income" data-i18n="income">Revenus</button>
+      <button class="filter-tab" data-filter="expense" data-i18n="expense">Dépenses</button>
     </div>
 
     <div class="month-filter-row">
@@ -369,7 +369,7 @@
         <rect x="3" y="14" width="7" height="7" rx="1"/>
         <rect x="14" y="14" width="7" height="7" rx="1"/>
       </svg>
-      <span class="nav-label">Tableau</span>
+      <span class="nav-label" data-i18n="nav_dashboard">Tableau</span>
     </button>
 
     <button class="nav-fab" data-tab="chat" id="nav-chat">
@@ -387,14 +387,14 @@
         <line x1="19" y1="12" x2="22" y2="12"/>
         <circle cx="9" cy="15" r="1" fill="currentColor"/>
       </svg>
-      <span class="nav-label">Épargne</span>
+      <span class="nav-label" data-i18n="nav_epargne">Épargne</span>
     </button>
 
     <button class="nav-item" data-tab="transactions">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
       </svg>
-      <span class="nav-label">Historique</span>
+      <span class="nav-label" data-i18n="nav_transactions">Historique</span>
     </button>
   </nav>
 
@@ -428,7 +428,7 @@
     <!-- Amount -->
     <div class="add-tx-amount-wrap">
       <input class="add-tx-amount" id="add-tx-amount" type="number" inputmode="decimal" min="1" placeholder="0" autocomplete="off"/>
-      <span class="add-tx-currency">FCFA</span>
+      <span class="add-tx-currency currency-label">FCFA</span>
     </div>
 
     <!-- Categories -->
@@ -585,6 +585,71 @@
     </div>
   </div>
 
+  <!-- Currency selector -->
+  <div class="profile-section">
+    <div class="profile-section-title">Devise</div>
+    <div class="profile-currency-options" id="currency-options">
+      <button class="currency-btn active" data-currency="XOF">XOF (FCFA)</button>
+      <button class="currency-btn" data-currency="USD">USD ($)</button>
+      <button class="currency-btn" data-currency="EUR">EUR (€)</button>
+    </div>
+  </div>
+
+  <!-- Language selector -->
+  <div class="profile-section">
+    <div class="profile-section-title">Langue</div>
+    <div class="profile-lang-options" id="lang-options">
+      <button class="lang-btn active" data-lang="fr">Français</button>
+      <button class="lang-btn" data-lang="en">English</button>
+    </div>
+  </div>
+
+  <!-- Feedback -->
+  <div class="profile-section">
+    <div class="profile-section-title">Donner mon avis</div>
+    <div class="profile-feedback">
+      <div class="feedback-stars" id="feedback-stars">
+        <span class="feedback-star" data-star="1">☆</span>
+        <span class="feedback-star" data-star="2">☆</span>
+        <span class="feedback-star" data-star="3">☆</span>
+        <span class="feedback-star" data-star="4">☆</span>
+        <span class="feedback-star" data-star="5">☆</span>
+      </div>
+      <textarea class="feedback-text" id="feedback-text" placeholder="Votre message (optionnel)" rows="3" maxlength="500"></textarea>
+      <button class="btn-feedback-send" id="btn-feedback-send">Envoyer</button>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div class="profile-section">
+    <div class="profile-section-title">À propos</div>
+    <div class="profile-about">
+      <div class="about-header">
+        <span class="about-logo">🌱</span>
+        <div>
+          <div class="about-app-name">Kula</div>
+          <div class="about-version" id="about-version">v1.0.0</div>
+        </div>
+      </div>
+      <p class="about-desc">
+        Kula (mot Kituba signifiant « grandir ») est votre coach financier
+        personnel conçu pour les entrepreneurs et familles d'Afrique.
+        Notez vos revenus et dépenses, suivez vos budgets, épargnez pour
+        vos projets et recevez des conseils personnalisés par IA.
+      </p>
+      <div class="about-contact">
+        <a href="https://wa.me/+221767424309" target="_blank" rel="noopener">📱 WhatsApp</a>
+        <a href="mailto:mindup05@gmail.com">✉️ mindup05@gmail.com</a>
+      </div>
+      <div class="about-legal">© 2026 MindUp Academy. Tous droits réservés.</div>
+    </div>
+  </div>
+
+  <!-- Logout -->
+  <div class="profile-section" style="padding-bottom:32px">
+    <button class="btn-logout" onclick="logout()">Déconnexion</button>
+  </div>
+
 </div>
 
 <!-- Poche modal backdrop -->
@@ -607,7 +672,7 @@
       </div>
 
       <div class="poche-field">
-        <label for="poche-objectif">Objectif (FCFA)</label>
+        <label for="poche-objectif">Objectif (<span class="currency-label">FCFA</span>)</label>
         <input type="number" id="poche-objectif" placeholder="ex : 500 000" min="1" inputmode="numeric">
       </div>
 
@@ -669,7 +734,7 @@
     </div>
     <div class="poche-modal-body">
       <div class="poche-field">
-        <label for="alimenter-montant">Montant à ajouter (FCFA)</label>
+        <label for="alimenter-montant">Montant à ajouter (<span class="currency-label">FCFA</span>)</label>
         <input type="number" id="alimenter-montant" placeholder="ex : 10 000" min="1" inputmode="numeric">
       </div>
       <button class="btn-create-poche" id="btn-alimenter-confirm">Ajouter 💰</button>
@@ -749,22 +814,16 @@
       <button class="pwa-install-now" id="btn-install-modal">Installer maintenant ↗</button>
     </div>
 
-    <!-- iOS guide -->
+    <!-- iOS guide (Chrome) -->
     <div class="pwa-guide" id="guide-ios">
       <div class="pwa-step">
         <div class="pwa-step-num">1</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Appuie sur l'icône <strong>Partager</strong> en bas de Safari</div>
+          <div class="pwa-step-title">Ouvre Kula dans <strong>Chrome</strong>, puis appuie sur <strong>⋮</strong> (menu)</div>
           <div class="pwa-mockup">
-            <div class="mockup-safari-bar">
+            <div class="mockup-bar">
               <span class="mockup-url">kula-app.onrender.com</span>
-            </div>
-            <div class="mockup-safari-bottom">
-              <span>◁</span>
-              <span>▷</span>
-              <span class="mockup-share-btn">⬆︎</span>
-              <span>□</span>
-              <span>⊕</span>
+              <span class="mockup-menu">⋮</span>
             </div>
           </div>
         </div>
@@ -772,13 +831,12 @@
       <div class="pwa-step">
         <div class="pwa-step-num">2</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Fais défiler et appuie sur <strong>"Sur l'écran d'accueil"</strong></div>
+          <div class="pwa-step-title">Appuie sur <strong>"Ajouter à l'écran d'accueil"</strong></div>
           <div class="pwa-mockup">
             <div class="mockup-sheet">
-              <div class="mockup-sheet-item">📤 Copier le lien</div>
-              <div class="mockup-sheet-item">📖 Ajouter aux favoris</div>
-              <div class="mockup-sheet-item mockup-sheet-highlight">＋ Sur l'écran d'accueil</div>
-              <div class="mockup-sheet-item">📩 Envoyer par message</div>
+              <div class="mockup-sheet-item">📤 Partager…</div>
+              <div class="mockup-sheet-item mockup-sheet-highlight">＋ Ajouter à l'écran d'accueil</div>
+              <div class="mockup-sheet-item">⬇️ Télécharger la page</div>
             </div>
           </div>
         </div>
@@ -786,21 +844,21 @@
       <div class="pwa-step">
         <div class="pwa-step-num">3</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Appuie sur <strong>"Ajouter"</strong> en haut à droite</div>
+          <div class="pwa-step-title">Confirme en appuyant sur <strong>"Ajouter"</strong></div>
           <div class="pwa-mockup">
-            <div class="mockup-ios-dialog">
-              <div class="mockup-ios-top">
+            <div class="mockup-dialog">
+              <div class="mockup-dialog-icon">🌱</div>
+              <div class="mockup-dialog-name">Kula</div>
+              <div class="mockup-dialog-sub">kula-app.onrender.com</div>
+              <div class="mockup-dialog-actions">
                 <span class="mockup-link">Annuler</span>
-                <span class="mockup-ios-title">Sur l'écran d'accueil</span>
                 <span class="mockup-btn-primary">Ajouter</span>
               </div>
-              <div class="mockup-ios-icon">🌱</div>
-              <div class="mockup-ios-name">Kula</div>
             </div>
           </div>
         </div>
       </div>
-      <div class="pwa-note">⚠️ Sur iPhone, utilise <strong>Safari</strong> (pas Chrome ni Firefox)</div>
+      <div class="pwa-note">💡 Sur iPhone, utilise <strong>Chrome</strong> pour installer Kula</div>
     </div>
 
   </div>
@@ -840,6 +898,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/i18n.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>
