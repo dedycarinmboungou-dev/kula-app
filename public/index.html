@@ -589,9 +589,9 @@
   <div class="profile-section">
     <div class="profile-section-title">Devise</div>
     <div class="profile-currency-options" id="currency-options">
-      <button class="currency-btn active" data-currency="XOF">XOF (FCFA)</button>
-      <button class="currency-btn" data-currency="USD">USD ($)</button>
-      <button class="currency-btn" data-currency="EUR">EUR (€)</button>
+      <button class="currency-btn active" data-currency="XOF" data-label="XOF (FCFA)">✓ XOF (FCFA)</button>
+      <button class="currency-btn" data-currency="USD" data-label="USD ($)">USD ($)</button>
+      <button class="currency-btn" data-currency="EUR" data-label="EUR (€)">EUR (€)</button>
     </div>
   </div>
 
@@ -599,8 +599,8 @@
   <div class="profile-section">
     <div class="profile-section-title">Langue</div>
     <div class="profile-lang-options" id="lang-options">
-      <button class="lang-btn active" data-lang="fr">Français</button>
-      <button class="lang-btn" data-lang="en">English</button>
+      <button class="lang-btn active" data-lang="fr" data-label="Français">✓ Français</button>
+      <button class="lang-btn" data-lang="en" data-label="English">English</button>
     </div>
   </div>
 
@@ -615,8 +615,8 @@
         <span class="feedback-star" data-star="4">☆</span>
         <span class="feedback-star" data-star="5">☆</span>
       </div>
-      <textarea class="feedback-text" id="feedback-text" placeholder="Votre message (optionnel)" rows="3" maxlength="500"></textarea>
-      <button class="btn-feedback-send" id="btn-feedback-send">Envoyer</button>
+      <textarea class="feedback-text" id="feedback-text" placeholder="Partagez votre expérience avec Kula..." rows="3" maxlength="500"></textarea>
+      <button class="btn-feedback-send" id="btn-feedback-send">Envoyer mon avis</button>
     </div>
   </div>
 
@@ -633,13 +633,20 @@
       </div>
       <p class="about-desc">
         Kula (mot Kituba signifiant « grandir ») est votre coach financier
-        personnel conçu pour les entrepreneurs et familles d'Afrique.
-        Notez vos revenus et dépenses, suivez vos budgets, épargnez pour
-        vos projets et recevez des conseils personnalisés par IA.
+        personnel propulsé par l'intelligence artificielle, conçu pour les
+        entrepreneurs et familles d'Afrique. Notez vos revenus et dépenses,
+        suivez vos budgets, épargnez pour vos projets et recevez des conseils
+        personnalisés grâce à l'IA.
       </p>
-      <div class="about-contact">
-        <a href="https://wa.me/+221767424309" target="_blank" rel="noopener">📱 WhatsApp</a>
-        <a href="mailto:mindup05@gmail.com">✉️ mindup05@gmail.com</a>
+      <div class="about-cards">
+        <a class="about-card" href="https://wa.me/+221767424309" target="_blank" rel="noopener">
+          <span class="about-card-icon">📱</span>
+          <span class="about-card-text">WhatsApp</span>
+        </a>
+        <a class="about-card" href="mailto:mindup05@gmail.com">
+          <span class="about-card-icon">✉️</span>
+          <span class="about-card-text">mindup05@gmail.com</span>
+        </a>
       </div>
       <div class="about-legal">© 2026 MindUp Academy. Tous droits réservés.</div>
     </div>
@@ -861,6 +868,20 @@
       <div class="pwa-note">💡 Sur iPhone, utilise <strong>Chrome</strong> pour installer Kula</div>
     </div>
 
+  </div>
+</div>
+
+<!-- Currency onboarding — shown once if no kula_currency -->
+<div class="welcome-overlay" id="currency-onboarding" style="display:none">
+  <div class="welcome-modal">
+    <div class="welcome-emoji">💱</div>
+    <h2 class="welcome-title" data-i18n="currency_onboarding_title">Quelle devise utilisez-vous ?</h2>
+    <p class="welcome-sub" data-i18n="currency_onboarding_sub">Vous pourrez la changer à tout moment dans les réglages.</p>
+    <div class="currency-onboarding-options">
+      <button class="currency-onboard-btn" data-currency="XOF">🇨🇫 XOF (FCFA)</button>
+      <button class="currency-onboard-btn" data-currency="USD">🇺🇸 USD ($)</button>
+      <button class="currency-onboard-btn" data-currency="EUR">🇪🇺 EUR (€)</button>
+    </div>
   </div>
 </div>
 

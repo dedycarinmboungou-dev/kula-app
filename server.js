@@ -625,6 +625,15 @@ app.patch('/api/user/currency', requireAuth, (req, res) => {
   res.json({ currency });
 });
 
+// PATCH /api/user/language — change user language preference
+app.patch('/api/user/language', requireAuth, (req, res) => {
+  const { language } = req.body;
+  const valid = ['fr', 'en'];
+  if (!valid.includes(language)) return res.status(400).json({ error: 'Langue invalide' });
+  stmts.updateUserLanguage.run({ language, id: req.userId });
+  res.json({ language });
+});
+
 // GET /api/version — app version from package.json
 app.get('/api/version', (req, res) => {
   try {
@@ -807,7 +816,7 @@ app.get('/api/report/pdf', requireAuth, async (req, res) => {
       const aiResp = await anthropic.messages.create({
         model: 'claude-haiku-4-5',
         max_tokens: 160,
-        system: 'Tu es Kula, conseiller financier bienveillant. Génère un seul conseil pratique en français (2-3 lignes max, pas de JSON, pas de titre).',
+        system: (user.language === 'en' ? 'IMPORTANT: Always respond in English. ' : '') + 'Tu es Kula, conseiller financier bienveillant. Génère un seul conseil pratique en français (2-3 lignes max, pas de JSON, pas de titre).',
         messages: [{
           role: 'user',
           content: `Conseil pour ${user.name.split(' ')[0]}, mois de ${monthLabel}. Revenus : ${fmt(stats.total_income)} FCFA. Dépenses : ${fmt(stats.total_expense)} FCFA.${topCat ? ` Top dépense : ${topCat.category}.` : ''}`
@@ -1168,7 +1177,8 @@ app.get('/api/coach/analysis', requireAuth, async (req, res) => {
     const quote  = KOLA_QUOTES[dayIdx % KOLA_QUOTES.length];
     const fmt    = n => Math.round(n).toLocaleString('fr-FR');
 
-    const systemPrompt = `Tu es Kula, le coach financier personnel de l'application Kula. Tu es comme un grand frère africain bienveillant, direct, motivant et chaleureux. Tu utilises des emojis. Tu parles en français, style familier mais respectueux. Ton objectif : que ${user.name.split(' ')[0]} réussisse financièrement. Réponds UNIQUEMENT avec du JSON valide : {"message":"<ton message>"}.`;
+    const langPreamble = user.language === 'en' ? 'IMPORTANT: Always respond in English. ' : '';
+    const systemPrompt = `${langPreamble}Tu es Kula, le coach financier personnel de l'application Kula. Tu es comme un grand frère africain bienveillant, direct, motivant et chaleureux. Tu utilises des emojis. Tu parles en français, style familier mais respectueux. Ton objectif : que ${user.name.split(' ')[0]} réussisse financièrement. Réponds UNIQUEMENT avec du JSON valide : {"message":"<ton message>"}.`;
 
     const userPrompt = `Il est ${hour}h (${moment}). Génère un message de coaching personnalisé pour ${user.name.split(' ')[0]}.
 
@@ -1217,7 +1227,8 @@ app.post('/api/coach/chat', requireAuth, async (req, res) => {
     const fmt  = n => Math.round(n).toLocaleString('fr-FR');
     const name = user.name.split(' ')[0];
 
-    const systemPrompt = `Tu es Kula, le coach financier personnel de ${name} dans l'application Kula. Tu es comme un grand frère africain — bienveillant, direct, motivant, avec de l'humour. Tu utilises des emojis. Tu parles en français familier mais respectueux.
+    const langPreamble2 = user.language === 'en' ? 'IMPORTANT: Always respond in English. ' : '';
+    const systemPrompt = `${langPreamble2}Tu es Kula, le coach financier personnel de ${name} dans l'application Kula. Tu es comme un grand frère africain — bienveillant, direct, motivant, avec de l'humour. Tu utilises des emojis. Tu parles en français familier mais respectueux.
 
 Données financières actuelles de ${name} :
 - Cette semaine : revenus ${fmt(ctx.week.income)} FCFA, dépenses ${fmt(ctx.week.expense)} FCFA, solde ${fmt(ctx.week.balance)} FCFA
@@ -1315,7 +1326,8 @@ app.post('/api/chat', requireAuth, checkAccess, async (req, res) => {
       ? `Revenus : ${incomeCats.join(', ') || 'aucune'}\nDépenses : ${expenseCats.join(', ') || 'aucune'}`
       : 'Revenus : Salaire, Business, Famille, Solde initial\nDépenses : Alimentation, Transport, Loisirs, Vêtements, Santé, Éducation, Téléphone, Logement, Autre';
 
-    const systemPrompt = `Tu es Kula, un conseiller financier personnel de confiance. Kula signifie "grandir" en kituba — et c'est exactement ce que tu aides les gens à faire : grandir financièrement.
+    const langPreamble3 = user.language === 'en' ? 'IMPORTANT: Always respond in English. ' : '';
+    const systemPrompt = `${langPreamble3}Tu es Kula, un conseiller financier personnel de confiance. Kula signifie "grandir" en kituba — et c'est exactement ce que tu aides les gens à faire : grandir financièrement.
 
 Ta personnalité : chaleureux, bienveillant et professionnel. Tu t'exprimes avec clarté et élégance, comme un conseiller qui respecte son client. Tu es ancré dans la réalité africaine francophone — tu connais le contexte, tu comprends les défis du quotidien — mais tu apportes la rigueur d'un vrai professionnel de la finance. Tu utilises quelques emojis choisis pour humaniser tes messages, jamais en excès.
 

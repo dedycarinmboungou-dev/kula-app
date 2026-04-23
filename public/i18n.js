@@ -87,6 +87,14 @@ const I18N = {
     days_left:        'j restants',
     subscribe_now:    "S'abonner maintenant",
 
+    // Currency onboarding
+    currency_onboarding_title: 'Quelle devise utilisez-vous ?',
+    currency_onboarding_sub:   'Vous pourrez la changer à tout moment dans les réglages.',
+
+    // Feedback
+    feedback_btn:     'Envoyer mon avis',
+    feedback_placeholder_long: 'Partagez votre expérience avec Kula...',
+
     // Toasts / messages
     saved:            'Enregistré',
     error:            'Erreur',
@@ -184,6 +192,14 @@ const I18N = {
     plan_trial_badge: 'Trial',
     days_left:        'days left',
     subscribe_now:    'Subscribe now',
+
+    // Currency onboarding
+    currency_onboarding_title: 'Which currency do you use?',
+    currency_onboarding_sub:   'You can change it anytime in settings.',
+
+    // Feedback
+    feedback_btn:     'Send my feedback',
+    feedback_placeholder_long: 'Share your experience with Kula...',
 
     // Toasts / messages
     saved:            'Saved',

@@ -148,10 +148,10 @@ const notifGranted = () =>
   typeof Notification !== 'undefined' && Notification.permission === 'granted';
 
 // ── Currency ──────────────────────────────────────────────────────────────────
-const CURRENCIES = {
-  XOF: { symbol: 'FCFA', locale: 'fr-FR' },
-  USD: { symbol: '$',    locale: 'en-US' },
-  EUR: { symbol: '€',    locale: 'fr-FR' }
+const CURRENCY_CONFIG = {
+  XOF: { symbol: 'FCFA', rate: 1,       decimals: 0, prefix: false },
+  USD: { symbol: '$',    rate: 1/655,    decimals: 2, prefix: true  },
+  EUR: { symbol: '€',    rate: 1/655.957, decimals: 2, prefix: false }
 };
 
 function getUserCurrency() {
@@ -159,10 +159,25 @@ function getUserCurrency() {
 }
 
 function getCurrencySymbol() {
-  return CURRENCIES[getUserCurrency()]?.symbol || 'FCFA';
+  return CURRENCY_CONFIG[getUserCurrency()]?.symbol || 'FCFA';
+}
+
+/** Convert an XOF amount to display currency and format it with symbol */
+function formatMoney(amountXOF) {
+  if (typeof amountXOF !== 'number') amountXOF = parseFloat(amountXOF) || 0;
+  const cur = getUserCurrency();
+  const cfg = CURRENCY_CONFIG[cur] || CURRENCY_CONFIG.XOF;
+  const converted = Math.abs(amountXOF) * cfg.rate;
+  const formatted = new Intl.NumberFormat(cur === 'USD' ? 'en-US' : 'fr-FR', {
+    minimumFractionDigits: cfg.decimals,
+    maximumFractionDigits: cfg.decimals
+  }).format(cfg.decimals ? converted : Math.round(converted));
+  if (cfg.prefix) return `${cfg.symbol}${formatted}`;
+  return `${formatted} ${cfg.symbol}`;
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────
+/** Format number only (no symbol) — still used internally */
 function formatAmount(amount) {
   if (typeof amount !== 'number') amount = parseFloat(amount) || 0;
   return new Intl.NumberFormat('fr-FR', {
@@ -358,15 +373,14 @@ async function loadDashboard() {
 
     // Balance
     const balEl = document.getElementById('total-balance');
-    const cs = getCurrencySymbol();
-    balEl.innerHTML = `<span class="balance-currency">${cs}</span> ${formatAmount(data.balance)}`;
+    balEl.textContent = formatMoney(data.balance);
     balEl.className = `balance-amount${data.balance < 0 ? ' negative' : ''}`;
     document.getElementById('balance-sub').textContent =
-      `Ce mois: ${data.monthlyBalance >= 0 ? '+' : ''}${formatAmount(data.monthlyBalance)} ${cs}`;
+      `${t('this_month')}: ${data.monthlyBalance >= 0 ? '+' : '−'}${formatMoney(data.monthlyBalance)}`;
 
     // Monthly stats
-    document.getElementById('monthly-income').textContent = `${formatAmount(data.monthlyIncome)} ${cs}`;
-    document.getElementById('monthly-expense').textContent = `${formatAmount(data.monthlyExpense)} ${cs}`;
+    document.getElementById('monthly-income').textContent = formatMoney(data.monthlyIncome);
+    document.getElementById('monthly-expense').textContent = formatMoney(data.monthlyExpense);
 
     // Budget state for this month (passed to renderCategoryChart)
     state.budgets = {};
@@ -518,7 +532,7 @@ function renderCategoryChart(categories, totalExpense, budgets = {}) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: ctx => ` ${formatAmount(ctx.raw)} ${getCurrencySymbol()} (${Math.round(ctx.raw / totalExpense * 100)}%)`
+            label: ctx => ` ${formatMoney(ctx.raw)} (${Math.round(ctx.raw / totalExpense * 100)}%)`
           }
         }
       }
@@ -539,7 +553,7 @@ function renderCategoryChart(categories, totalExpense, budgets = {}) {
         <div class="category-budget-wrap">
           <div class="category-budget-bar" style="width:${bPct}%;background:${barColor}"></div>
         </div>
-        <div class="category-budget-label">${bPct}% du budget (${formatAmount(limite)} ${getCurrencySymbol()})</div>`;
+        <div class="category-budget-label">${bPct}% ${t('of_budget')} (${formatMoney(limite)})</div>`;
     }
     return `
       <div class="category-item">
@@ -595,7 +609,7 @@ function renderTrendChart(trend) {
           labels: { font: { size: 11 }, boxWidth: 12 }
         },
         tooltip: {
-          callbacks: { label: ctx => ` ${formatAmount(ctx.raw)} ${getCurrencySymbol()}` }
+          callbacks: { label: ctx => ` ${formatMoney(ctx.raw)}` }
         }
       },
       scales: {
@@ -637,7 +651,7 @@ function renderTransactionList(containerId, transactions) {
             ${formatDate(tx.date)}
           </div>
         </div>
-        <div class="tx-amount ${tx.type}">${sign}${formatAmount(tx.amount)} ${getCurrencySymbol()}</div>
+        <div class="tx-amount ${tx.type}">${sign}${formatMoney(tx.amount)}</div>
         <button class="tx-delete" onclick="deleteTransaction(${tx.id})" title="Supprimer">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12"/>
@@ -802,7 +816,7 @@ function renderTransactionPreview(tx, parentDiv) {
       <span class="tx-preview-label">Transaction détectée</span>
       <span class="tx-preview-type ${tx.type}">${typeLabel}</span>
     </div>
-    <div class="tx-preview-amount ${tx.type}">${sign}${formatAmount(tx.amount)} <small>${getCurrencySymbol()}</small></div>
+    <div class="tx-preview-amount ${tx.type}">${sign}${formatMoney(tx.amount)}</div>
     <div class="tx-preview-details">
       ${meta.icon} ${tx.category} · ${escapeHtml(tx.description)}<br>
       📅 ${formatDate(tx.date)}
@@ -853,7 +867,7 @@ function renderSavedTransaction(tx, parentDiv) {
       <div class="tx-saved-desc">${escapeHtml(tx.description)}</div>
       <div class="tx-saved-cat">${escapeHtml(tx.category)}</div>
     </div>
-    <div class="tx-saved-amount ${tx.type}">${sign}${formatAmount(tx.amount)} ${getCurrencySymbol()}</div>
+    <div class="tx-saved-amount ${tx.type}">${sign}${formatMoney(tx.amount)}</div>
     <div class="tx-saved-check">✅</div>
   `;
   parentDiv.querySelector('.msg-bubble').appendChild(card);
@@ -1358,8 +1372,8 @@ function renderPoches(poches) {
   if (summary) {
     const totalActuel  = poches.reduce((s, p) => s + p.montant_actuel, 0);
     const totalObjectif = poches.reduce((s, p) => s + p.objectif_montant, 0);
-    document.getElementById('epargne-total-actuel').textContent    = `${formatAmount(totalActuel)} ${getCurrencySymbol()}`;
-    document.getElementById('epargne-total-objectif').textContent  = `Objectif : ${formatAmount(totalObjectif)} ${getCurrencySymbol()}`;
+    document.getElementById('epargne-total-actuel').textContent    = formatMoney(totalActuel);
+    document.getElementById('epargne-total-objectif').textContent  = `${t('objective')} : ${formatMoney(totalObjectif)}`;
     document.getElementById('epargne-nb-poches').textContent       = `${poches.length} poche${poches.length > 1 ? 's' : ''}`;
     summary.style.display = poches.length ? 'flex' : 'none';
   }
@@ -1400,8 +1414,8 @@ function renderPoches(poches) {
         <button class="btn-poche-delete" data-id="${p.id}" title="Supprimer">✕</button>
       </div>
       <div class="poche-amounts">
-        <div class="poche-amount-current">${formatAmount(p.montant_actuel)} <span class="currency">${getCurrencySymbol()}</span></div>
-        <div class="poche-amount-objectif">/ ${formatAmount(p.objectif_montant)} ${getCurrencySymbol()}</div>
+        <div class="poche-amount-current">${formatMoney(p.montant_actuel)}</div>
+        <div class="poche-amount-objectif">/ ${formatMoney(p.objectif_montant)}</div>
       </div>
       <div class="poche-progress-bar">
         <div class="poche-progress-fill" style="width:${pct}%;background:${barColor}"></div>
@@ -1409,8 +1423,8 @@ function renderPoches(poches) {
       <div class="poche-progress-meta">
         <span class="poche-pct" style="color:${barColor}">${pct}%</span>
         ${completed
-          ? `<span class="poche-completed-badge">🎉 Objectif atteint !</span>`
-          : `<span class="poche-reste">Reste ${formatAmount(reste)} ${getCurrencySymbol()}</span>`}
+          ? `<span class="poche-completed-badge">🎉 ${t('goal_reached')}</span>`
+          : `<span class="poche-reste">${t('remaining')} ${formatMoney(reste)}</span>`}
       </div>
       <div class="poche-actions">
         <button class="btn-alimenter" data-id="${p.id}" data-nom="${escapeHtml(p.nom)}">+ Ajouter</button>
@@ -1666,6 +1680,31 @@ function init() {
   document.getElementById('btn-welcome-close').addEventListener('click', () => {
     overlay.style.display = 'none';
     localStorage.setItem('kula_welcome_shown', '1');
+    // After closing welcome, show currency onboarding if not set yet
+    if (!localStorage.getItem('kula_currency')) {
+      const currencyOverlay = document.getElementById('currency-onboarding');
+      if (currencyOverlay) currencyOverlay.style.display = 'flex';
+    }
+  });
+
+  // Currency onboarding popup — show if no currency chosen and welcome already dismissed
+  if (localStorage.getItem('kula_welcome_shown') && !localStorage.getItem('kula_currency')) {
+    const currencyOverlay = document.getElementById('currency-onboarding');
+    if (currencyOverlay) currencyOverlay.style.display = 'flex';
+  }
+  document.querySelectorAll('.currency-onboard-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const currency = btn.dataset.currency;
+      localStorage.setItem('kula_currency', currency);
+      updateCurrencyLabels();
+      applyCurrency();
+      const currencyOverlay = document.getElementById('currency-onboarding');
+      if (currencyOverlay) currencyOverlay.style.display = 'none';
+      // Sync to server
+      try {
+        await api('/api/user/currency', { method: 'PATCH', body: JSON.stringify({ currency }) });
+      } catch { /* saved locally */ }
+    });
   });
 
   // Notifications & reminders
@@ -1896,7 +1935,7 @@ function checkBudgetNotifications(categories, budgets) {
       budgetAlertsSent[key] = 100;
       if (typeof Notification !== 'undefined') {
         new Notification(`🚨 Budget ${c.category} dépassé !`, {
-          body: `Tu as dépensé ${formatAmount(c.total)} ${getCurrencySymbol()} sur ${formatAmount(limite)} ${getCurrencySymbol()} prévu.`,
+          body: `${formatMoney(c.total)} / ${formatMoney(limite)}`,
           icon: '/icon-192.png', tag: `budget-over-${key}`, renotify: true
         });
       }
@@ -1904,7 +1943,7 @@ function checkBudgetNotifications(categories, budgets) {
       budgetAlertsSent[key] = 80;
       if (typeof Notification !== 'undefined') {
         new Notification(`⚠️ Budget ${c.category} à ${Math.round(pct)}%`, {
-          body: `Tu as dépensé ${formatAmount(c.total)} ${getCurrencySymbol()} sur ${formatAmount(limite)} ${getCurrencySymbol()} prévu.`,
+          body: `${formatMoney(c.total)} / ${formatMoney(limite)}`,
           icon: '/icon-192.png', tag: `budget-warn-${key}`, renotify: true
         });
       }
@@ -1963,7 +2002,7 @@ function renderBudgetList(budgetMap, spending) {
         ? `<div class="budget-progress-wrap">
              <div class="budget-progress-bar" style="width:${bPct}%;background:${barColor}"></div>
            </div>
-           <div class="budget-progress-label">${formatAmount(spent)} / ${formatAmount(limite)} ${getCurrencySymbol()} (${bPct}%)</div>`
+           <div class="budget-progress-label">${formatMoney(spent)} / ${formatMoney(limite)} (${bPct}%)</div>`
         : '';
       const catActions = cat.id
         ? `<button class="btn-cat-edit" data-cat-id="${cat.id}" title="Modifier">
@@ -1994,7 +2033,7 @@ function renderBudgetList(budgetMap, spending) {
                 placeholder="—" value="${limite > 0 ? limite : ''}"
                 data-cat="${escapeHtml(cat.nom)}" data-month="${month}"
                 onchange="saveBudget(this)">
-              <span class="budget-input-unit">${getCurrencySymbol()}</span>
+              <span class="budget-input-unit currency-label">${getCurrencySymbol()}</span>
             </div>
             <div class="budget-cat-actions">${catActions}</div>
           </div>
@@ -2131,6 +2170,15 @@ function updateCurrencyLabels() {
   document.querySelectorAll('.currency-label').forEach(el => { el.textContent = sym; });
 }
 
+// Refresh all visible data with current currency — called on currency change
+function applyCurrency() {
+  updateCurrencyLabels();
+  // Re-render the active tab so amounts update immediately
+  if (state.currentTab === 'dashboard') loadDashboard();
+  else if (state.currentTab === 'transactions') loadTransactions();
+  else if (state.currentTab === 'epargne') loadPoches();
+}
+
 function openProfile() {
   const overlay = document.getElementById('profile-overlay');
   const panel   = document.getElementById('profile-panel');
@@ -2176,24 +2224,42 @@ function openProfile() {
     // Sync currency from server
     if (data.currency) {
       localStorage.setItem('kula_currency', data.currency);
-      document.querySelectorAll('#currency-options .currency-btn').forEach(b =>
-        b.classList.toggle('active', b.dataset.currency === data.currency));
+      document.querySelectorAll('#currency-options .currency-btn').forEach(b => {
+        const active = b.dataset.currency === data.currency;
+        b.classList.toggle('active', active);
+        b.textContent = active ? '✓ ' + b.dataset.label : b.dataset.label;
+      });
       updateCurrencyLabels();
+    }
+    // Sync language from server
+    if (data.language) {
+      localStorage.setItem('kula_lang', data.language);
+      document.querySelectorAll('#lang-options .lang-btn').forEach(b => {
+        const active = b.dataset.lang === data.language;
+        b.classList.toggle('active', active);
+        b.textContent = active ? '✓ ' + b.dataset.label : b.dataset.label;
+      });
     }
   }).catch(() => { /* panel already open — silent fail on data refresh */ });
 
   // Also refresh plan info
   api('/api/user/plan').then(renderProfilePlan).catch(() => {});
 
-  // Highlight saved language
+  // Highlight saved language with checkmark
   const lang = localStorage.getItem('kula_lang') || 'fr';
-  document.querySelectorAll('#lang-options .lang-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.lang === lang));
+  document.querySelectorAll('#lang-options .lang-btn').forEach(b => {
+    const active = b.dataset.lang === lang;
+    b.classList.toggle('active', active);
+    b.textContent = active ? '✓ ' + b.dataset.label : b.dataset.label;
+  });
 
-  // Highlight saved currency
+  // Highlight saved currency with checkmark
   const cur = getUserCurrency();
-  document.querySelectorAll('#currency-options .currency-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.currency === cur));
+  document.querySelectorAll('#currency-options .currency-btn').forEach(b => {
+    const active = b.dataset.currency === cur;
+    b.classList.toggle('active', active);
+    b.textContent = active ? '✓ ' + b.dataset.label : b.dataset.label;
+  });
 }
 
 function renderProfilePlan(data) {
@@ -2395,10 +2461,15 @@ function initProfileHandlers() {
   document.querySelectorAll('#currency-options .currency-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const currency = btn.dataset.currency;
-      document.querySelectorAll('#currency-options .currency-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#currency-options .currency-btn').forEach(b => {
+        b.classList.remove('active');
+        b.textContent = b.dataset.label;
+      });
       btn.classList.add('active');
+      btn.textContent = '✓ ' + btn.dataset.label;
       localStorage.setItem('kula_currency', currency);
       updateCurrencyLabels();
+      applyCurrency();
       try {
         await api('/api/user/currency', { method: 'PATCH', body: JSON.stringify({ currency }) });
       } catch { /* saved locally, will sync later */ }
@@ -2407,13 +2478,20 @@ function initProfileHandlers() {
 
   // ── Language selector ──────────────────────────────────────────────────────
   document.querySelectorAll('#lang-options .lang-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const lang = btn.dataset.lang;
-      document.querySelectorAll('#lang-options .lang-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('#lang-options .lang-btn').forEach(b => {
+        b.classList.remove('active');
+        b.textContent = b.dataset.label;
+      });
       btn.classList.add('active');
+      btn.textContent = '✓ ' + btn.dataset.label;
       localStorage.setItem('kula_lang', lang);
       if (typeof applyI18n === 'function') applyI18n(lang);
       showToast(lang === 'fr' ? 'Langue : Français' : 'Language: English', 'success');
+      try {
+        await api('/api/user/language', { method: 'PATCH', body: JSON.stringify({ language: lang }) });
+      } catch { /* saved locally */ }
     });
   });
 
@@ -2434,8 +2512,8 @@ function initProfileHandlers() {
     const message = document.getElementById('feedback-text').value.trim();
     const email = getUser().email || '';
     const stars = '⭐'.repeat(feedbackRating);
-    const text = `⭐ Avis Kula %0ANote: ${stars} (${feedbackRating}/5)%0AMessage: ${message || '—'}%0AUtilisateur: ${email}`;
-    window.open(`https://wa.me/+221767424309?text=${text}`, '_blank');
+    const text = `⭐ Avis Kula\nNote: ${stars} (${feedbackRating}/5)\nMessage: ${message || '—'}\nUtilisateur: ${email}`;
+    window.open(`https://wa.me/+221767424309?text=${encodeURIComponent(text)}`, '_blank');
     showToast('Merci pour votre avis !', 'success');
     feedbackRating = 0;
     document.querySelectorAll('#feedback-stars .feedback-star').forEach(s => { s.textContent = '☆'; s.classList.remove('active'); });
