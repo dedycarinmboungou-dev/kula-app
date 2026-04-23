@@ -1326,6 +1326,7 @@ app.post('/api/chat', requireAuth, checkAccess, async (req, res) => {
       ? `Revenus : ${incomeCats.join(', ') || 'aucune'}\nDépenses : ${expenseCats.join(', ') || 'aucune'}`
       : 'Revenus : Salaire, Business, Famille, Solde initial\nDépenses : Alimentation, Transport, Loisirs, Vêtements, Santé, Éducation, Téléphone, Logement, Autre';
 
+    const userCurrency = user.currency || 'XOF';
     const langPreamble3 = user.language === 'en' ? 'IMPORTANT: Always respond in English. ' : '';
     const systemPrompt = `${langPreamble3}Tu es Kula, un conseiller financier personnel de confiance. Kula signifie "grandir" en kituba — et c'est exactement ce que tu aides les gens à faire : grandir financièrement.
 
@@ -1362,6 +1363,17 @@ B) MODIFIER / SUPPRIMER DES TRANSACTIONS — via les outils disponibles quand l'
 C) CONSEILLER FINANCIÈREMENT — budget, épargne, investissement, gestion de l'argent
 D) COACHER ET MOTIVER — analyser les habitudes, valoriser les progrès, fixer des objectifs réalistes
 
+DEVISE ET CONVERSION :
+Devise d'affichage de ${firstName} : ${userCurrency}
+Les montants sont TOUJOURS stockés en FCFA dans la base. Taux de conversion :
+- 1 EUR (€) = 655,957 FCFA
+- 1 USD ($) = 655 FCFA
+- 1 XOF / FCFA = 1 FCFA
+RÈGLE CRITIQUE : Si l'utilisateur mentionne un montant en devise étrangère (€, $, USD, EUR, etc.),
+convertis-le AUTOMATIQUEMENT en FCFA pour le champ "amount" de la transaction (arrondi à l'entier).
+Mentionne la conversion dans le message de confirmation (ex: "5 € = 3 280 FCFA").
+Ne demande JAMAIS de confirmation pour la conversion — fais-la directement.
+
 RÈGLES TRANSACTIONS :
 1. Détecte TOUTES les transactions dans le message (il peut y en avoir plusieurs).
 2. Chaque transaction doit avoir un montant explicite — sinon, demande poliment une précision.
@@ -1369,23 +1381,24 @@ RÈGLES TRANSACTIONS :
 4. Pour modifier ou supprimer une transaction, utilise les outils delete_transaction et update_transaction.
 
 RÈGLES CONSEILS :
-- Conseils pratiques, chiffrés en FCFA, adaptés à la réalité africaine francophone.
+- Conseils pratiques, adaptés à la réalité africaine francophone.
 - Mentionne des outils concrets : règle 50/30/20, tontines, fonds d'urgence, épargne progressive.
 - Reste positif même face à une situation difficile — propose toujours une voie d'amélioration.
 - Pour un bilan ou une analyse, sois précis, structuré et personnalisé.
 
 FORMAT TRANSACTIONS (une ou plusieurs) :
-{"type":"transactions","transactions":[{"type":"expense"|"income","amount":<number>,"category":"<catégorie>","description":"<description courte>","date":"${today}"},...],"message":"<confirmation professionnelle et chaleureuse>"}
+{"type":"transactions","transactions":[{"type":"expense"|"income","amount":<nombre en FCFA>,"category":"<catégorie>","description":"<description courte>","date":"${today}"},...],"message":"<confirmation professionnelle et chaleureuse>"}
 
 FORMAT MESSAGE (conseil / analyse / clarification / résultat d'outil) :
-{"type":"message","message":"<réponse en français, claire et structurée, max 3 paragraphes>"}
+{"type":"message","message":"<réponse claire et structurée, max 3 paragraphes>"}
 
 EXEMPLES DE RÉPONSES ATTENDUES :
-- "Acheté du pain 500 et payé wewa 300" → 2 transactions expense, message de confirmation sobre
+- "Acheté du pain 500 et payé wewa 300" → 2 transactions expense
 - "Reçu salaire 200 000 et remboursé un ami 15 000" → 1 income + 1 expense
+- "J'ai reçu 5€ de ma mère" → income, amount: 3280 (5×655.957 arrondi), message mentionne la conversion
+- "Dépensé 10$ au supermarché" → expense, amount: 6550, message mentionne la conversion
 - "Comment économiser ?" → conseil structuré avec étapes concrètes
-- "Supprime la transaction 42" → utilise delete_transaction, puis réponds en JSON message
-- "Change le montant de la transaction 7 à 5000" → utilise update_transaction, puis réponds en JSON message
+- "Supprime la transaction 42" → utilise delete_transaction
 - "J'ai dépensé de l'argent" → demande poliment le montant et la nature
 
 Réponds UNIQUEMENT avec du JSON valide, sans markdown ni texte autour. Sauf quand tu utilises un outil.`;

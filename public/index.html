@@ -225,7 +225,7 @@
       <!-- Welcome message -->
       <div class="msg bot">
         <div class="msg-avatar">K</div>
-        <div class="msg-bubble">
+        <div class="msg-bubble" id="chat-welcome-bubble">
           👋 Bonjour ! Je suis <strong>Kula</strong>, ton coach financier 🌱<br><br>
           Je note tes dépenses et revenus, et je te donne des conseils personnalisés. Dis-moi simplement :<br>
           <em>"Acheté manioc 2500 FCFA"</em><br>
@@ -242,6 +242,7 @@
         <div class="chat-input-pill">
           <textarea
             id="chat-input"
+            data-i18n-placeholder="coach_placeholder"
             placeholder="Décris ta transaction…"
             rows="1"
             maxlength="500"
@@ -404,6 +405,20 @@
       <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
     </svg>
   </button>
+
+  <!-- ── Guided Tour ──────────────────────────────────────────────────── -->
+  <div class="tour-overlay" id="tour-overlay" style="display:none" aria-modal="true">
+    <div class="tour-spotlight" id="tour-spotlight"></div>
+    <div class="tour-tooltip" id="tour-tooltip">
+      <div class="tour-header">
+        <div class="tour-step-badge" id="tour-step-badge">1/5</div>
+        <button class="tour-btn-skip" id="tour-btn-skip">Passer</button>
+      </div>
+      <div class="tour-title" id="tour-title"></div>
+      <div class="tour-desc" id="tour-desc"></div>
+      <button class="tour-btn-next" id="tour-btn-next">Suivant →</button>
+    </div>
+  </div>
 
 </div>
 

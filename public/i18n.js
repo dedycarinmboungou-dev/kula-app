@@ -95,6 +95,33 @@ const I18N = {
     feedback_btn:     'Envoyer mon avis',
     feedback_placeholder_long: 'Partagez votre expérience avec Kula...',
 
+    // Chat UI
+    tx_detected:          'Transaction détectée',
+    saving:               'Enregistrement…',
+    saved_offline_msg:    '📡 Sauvegardé hors ligne — sync dès reconnexion',
+    chat_not_understood:  "Je n'ai pas compris. Pouvez-vous reformuler ?",
+    confirm_delete_tx:    'Supprimer cette transaction ?',
+    confirm_delete_pocket:'Supprimer cette poche ?',
+
+    // Tour
+    tour_skip:   'Passer',
+    tour_next:   'Suivant →',
+    tour_done:   'Terminer',
+    tour_step1_title: '📊 Tableau de bord',
+    tour_step1_desc:  'Suivez votre solde, revenus et dépenses du mois en un coup d\'œil.',
+    tour_step2_title: '➕ Ajouter une transaction',
+    tour_step2_desc:  'Appuyez ici pour enregistrer rapidement une dépense ou un revenu.',
+    tour_step3_title: '🐷 Épargne',
+    tour_step3_desc:  'Créez des poches d\'épargne pour vos projets et suivez votre progression.',
+    tour_step4_title: '🌱 Coach IA',
+    tour_step4_desc:  'Dites simplement "j\'ai dépensé 2500 FCFA au marché" — Kula enregistre tout.',
+    tour_step5_title: '👤 Votre profil',
+    tour_step5_desc:  'Gérez votre compte, devise, langue et abonnement ici.',
+
+    // Chat welcome
+    chat_welcome_title: 'Kula — Coach Financier 🌱',
+    chat_welcome_body:  '👋 Bonjour ! Je suis <strong>Kula</strong>, ton coach financier 🌱<br><br>Je note tes dépenses et revenus, et je te donne des conseils personnalisés. Dis-moi simplement :<br><em>"Acheté manioc 2500 FCFA"</em><br><em>"Reçu salaire 250 000"</em><br><em>"Comment mieux épargner ?"</em>',
+
     // Toasts / messages
     saved:            'Enregistré',
     error:            'Erreur',
@@ -201,6 +228,33 @@ const I18N = {
     feedback_btn:     'Send my feedback',
     feedback_placeholder_long: 'Share your experience with Kula...',
 
+    // Chat UI
+    tx_detected:          'Transaction detected',
+    saving:               'Saving…',
+    saved_offline_msg:    '📡 Saved offline — will sync when reconnected',
+    chat_not_understood:  "I didn't understand. Could you rephrase?",
+    confirm_delete_tx:    'Delete this transaction?',
+    confirm_delete_pocket:'Delete this pocket?',
+
+    // Tour
+    tour_skip:   'Skip',
+    tour_next:   'Next →',
+    tour_done:   'Done',
+    tour_step1_title: '📊 Dashboard',
+    tour_step1_desc:  'Track your balance, income and expenses at a glance.',
+    tour_step2_title: '➕ Add a transaction',
+    tour_step2_desc:  'Tap here to quickly record an expense or income.',
+    tour_step3_title: '🐷 Savings',
+    tour_step3_desc:  'Create savings pockets for your projects and track your progress.',
+    tour_step4_title: '🌱 AI Coach',
+    tour_step4_desc:  'Just say "I spent $5 at the market" — Kula records everything.',
+    tour_step5_title: '👤 Your profile',
+    tour_step5_desc:  'Manage your account, currency, language and subscription here.',
+
+    // Chat welcome
+    chat_welcome_title: 'Kula — Financial Coach 🌱',
+    chat_welcome_body:  '👋 Hello! I\'m <strong>Kula</strong>, your financial coach 🌱<br><br>I track your expenses and income and give you personalized advice. Just tell me:<br><em>"Bought groceries $5"</em><br><em>"Received salary $500"</em><br><em>"How can I save more?"</em>',
+
     // Toasts / messages
     saved:            'Saved',
     error:            'Error',
@@ -237,9 +291,27 @@ function applyI18n(lang) {
     'install-prompt-sub':   'install_sub'
   };
 
-  // Placeholders
+  // All data-i18n-placeholder attributes
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.dataset.i18nPlaceholder;
+    if (tr[key]) el.placeholder = tr[key];
+  });
+
+  // Feedback textarea placeholder
   const feedbackEl = document.getElementById('feedback-text');
-  if (feedbackEl) feedbackEl.placeholder = tr.feedback_placeholder || tr.feedback_placeholder;
+  if (feedbackEl) feedbackEl.placeholder = tr.feedback_placeholder_long || tr.feedback_placeholder;
+
+  // Chat topbar title
+  const chatTopbar = document.querySelector('.chat-topbar-title');
+  if (chatTopbar && tr.chat_welcome_title) chatTopbar.textContent = tr.chat_welcome_title;
+
+  // Chat welcome bubble (first bot message)
+  const chatWelcomeBubble = document.getElementById('chat-welcome-bubble');
+  if (chatWelcomeBubble && tr.chat_welcome_body) chatWelcomeBubble.innerHTML = tr.chat_welcome_body;
+
+  // Chat input placeholder
+  const chatInput = document.getElementById('chat-input');
+  if (chatInput && tr.coach_placeholder) chatInput.placeholder = tr.coach_placeholder;
 
   // Update greeting
   const user = typeof getUser === 'function' ? getUser() : {};

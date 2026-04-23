@@ -3790,3 +3790,79 @@ button, a, img, .nav-item, .nav-fab,
 .profile-section .btn-logout:hover {
   background: rgba(239,68,68,0.2);
 }
+
+/* ── Guided Tour ──────────────────────────────────────────────────────────── */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+}
+.tour-spotlight {
+  position: fixed;
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);
+  transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+  pointer-events: none;
+  z-index: 100000;
+}
+.tour-tooltip {
+  position: fixed;
+  left: 20px;
+  right: 20px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+  pointer-events: all;
+  z-index: 100001;
+  transition: top 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+.tour-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.tour-step-badge {
+  background: #ecfdf5;
+  color: #10B981;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1.5px solid #10B981;
+}
+.tour-btn-skip {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.tour-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 8px;
+}
+.tour-desc {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--gray);
+  margin-bottom: 16px;
+}
+.tour-btn-next {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  border: none;
+  background: #10B981;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.tour-btn-next:hover { background: #059669; }

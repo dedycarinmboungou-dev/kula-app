@@ -688,7 +688,7 @@ async function loadTransactions() {
 
 // ── Delete transaction ──────────────────────────────────────────────────────────
 async function deleteTransaction(id) {
-  if (!confirm('Supprimer cette transaction ?')) return;
+  if (!confirm(t('confirm_delete_tx'))) return;
   try {
     await api(`/api/transactions/${id}`, { method: 'DELETE' });
     showToast('Transaction supprimée', 'success');
@@ -807,13 +807,13 @@ function removeTypingIndicator() {
 function renderTransactionPreview(tx, parentDiv) {
   const meta = getCatMeta(tx.category);
   const sign = tx.type === 'income' ? '+' : '-';
-  const typeLabel = tx.type === 'income' ? 'Revenu' : 'Dépense';
+  const typeLabel = tx.type === 'income' ? t('income') : t('expense');
 
   const preview = document.createElement('div');
   preview.className = 'tx-preview';
   preview.innerHTML = `
     <div class="tx-preview-header">
-      <span class="tx-preview-label">Transaction détectée</span>
+      <span class="tx-preview-label">${t('tx_detected')}</span>
       <span class="tx-preview-type ${tx.type}">${typeLabel}</span>
     </div>
     <div class="tx-preview-amount ${tx.type}">${sign}${formatMoney(tx.amount)}</div>
@@ -822,21 +822,21 @@ function renderTransactionPreview(tx, parentDiv) {
       📅 ${formatDate(tx.date)}
     </div>
     <div class="tx-preview-actions">
-      <button class="btn-confirm" id="btn-confirm-tx">✅ Enregistrer</button>
-      <button class="btn-cancel" id="btn-cancel-tx">Annuler</button>
+      <button class="btn-confirm" id="btn-confirm-tx">✅ ${t('save')}</button>
+      <button class="btn-cancel" id="btn-cancel-tx">${t('cancel')}</button>
     </div>
   `;
 
   parentDiv.querySelector('.msg-bubble').appendChild(preview);
 
   preview.querySelector('#btn-confirm-tx').addEventListener('click', async () => {
-    preview.querySelector('.tx-preview-actions').innerHTML = '<div style="text-align:center;color:#6B7280;font-size:13px">Enregistrement…</div>';
+    preview.querySelector('.tx-preview-actions').innerHTML = `<div style="text-align:center;color:#6B7280;font-size:13px">${t('saving')}</div>`;
     try {
       const result = await saveTransaction(tx);
       if (result.offline) {
         preview.querySelector('.tx-preview-actions').innerHTML =
-          '<div style="text-align:center;color:#F59E0B;font-weight:600;font-size:13px">📡 Sauvegardé hors ligne — sync dès reconnexion</div>';
-        showToast('Hors ligne — transaction en file d\'attente', 'info');
+          `<div style="text-align:center;color:#F59E0B;font-weight:600;font-size:13px">${t('saved_offline_msg')}</div>`;
+        showToast(t('saved_offline_msg'), 'info');
       } else {
         preview.querySelector('.tx-preview-actions').innerHTML =
           '<div style="text-align:center;color:#10B981;font-weight:600;font-size:14px">✅ Enregistré !</div>';
@@ -907,7 +907,7 @@ async function sendChatMessage() {
       loadDashboard();
       if (state.currentTab === 'transactions') loadTransactions();
     } else {
-      const msg = response.message || "Je n'ai pas compris. Pouvez-vous reformuler ?";
+      const msg = response.message || t('chat_not_understood');
       addChatMessage('bot', msg);
       state.chatHistory.push({ role: 'assistant', content: msg });
       // If Kula used a tool (delete/update/add_to_poche), refresh data
@@ -1431,7 +1431,7 @@ function renderPoches(poches) {
       </div>`;
 
     card.querySelector('.btn-poche-delete').addEventListener('click', async () => {
-      if (!confirm(`Supprimer la poche "${p.nom}" ?`)) return;
+      if (!confirm(`${t('confirm_delete_pocket')} "${p.nom}" ?`)) return;
       try {
         await api(`/api/poches/${p.id}`, { method: 'DELETE' });
         showToast(`Poche "${p.nom}" supprimée`, 'success');
@@ -1667,7 +1667,7 @@ function init() {
 
   // Logout button
   document.getElementById('btn-logout').addEventListener('click', () => {
-    if (confirm('Se déconnecter de Kula ?')) logout();
+    if (confirm(t('logout_confirm'))) logout();
   });
 
   // Welcome popup — show once per browser (key: kula_welcome_shown)
@@ -1680,10 +1680,12 @@ function init() {
   document.getElementById('btn-welcome-close').addEventListener('click', () => {
     overlay.style.display = 'none';
     localStorage.setItem('kula_welcome_shown', '1');
-    // After closing welcome, show currency onboarding if not set yet
+    // After closing welcome, show currency onboarding if not set yet, then tour
     if (!localStorage.getItem('kula_currency')) {
       const currencyOverlay = document.getElementById('currency-onboarding');
       if (currencyOverlay) currencyOverlay.style.display = 'flex';
+    } else {
+      setTimeout(startTour, 400);
     }
   });
 
@@ -1700,12 +1702,19 @@ function init() {
       applyCurrency();
       const currencyOverlay = document.getElementById('currency-onboarding');
       if (currencyOverlay) currencyOverlay.style.display = 'none';
+      // Start tour after currency choice
+      setTimeout(startTour, 400);
       // Sync to server
       try {
         await api('/api/user/currency', { method: 'PATCH', body: JSON.stringify({ currency }) });
       } catch { /* saved locally */ }
     });
   });
+
+  // Show tour for users who already passed the welcome/currency steps
+  if (localStorage.getItem('kula_welcome_shown') && localStorage.getItem('kula_currency')) {
+    setTimeout(startTour, 1200);
+  }
 
   // Notifications & reminders
   initNotifications();
@@ -2533,6 +2542,87 @@ window.openProfile      = openProfile;
 window.openBudgets      = openBudgets;
 window.saveBudget       = saveBudget;
 window.switchTab        = switchTab;
+
+// ── Guided Tour ───────────────────────────────────────────────────────────────
+const TOUR_STEPS = [
+  { target: '#tab-dashboard',          titleKey: 'tour_step1_title', descKey: 'tour_step1_desc' },
+  { target: '#fab-add-tx',             titleKey: 'tour_step2_title', descKey: 'tour_step2_desc' },
+  { target: '[data-tab="epargne"]',    titleKey: 'tour_step3_title', descKey: 'tour_step3_desc' },
+  { target: '#nav-chat',               titleKey: 'tour_step4_title', descKey: 'tour_step4_desc' },
+  { target: '#user-badge',             titleKey: 'tour_step5_title', descKey: 'tour_step5_desc' }
+];
+
+let _tourStep = 0;
+
+function startTour() {
+  if (localStorage.getItem('kula_tour_done')) return;
+  const overlay = document.getElementById('tour-overlay');
+  if (!overlay) return;
+  overlay.style.display = 'block';
+  _tourStep = 0;
+  _showTourStep(0);
+}
+
+function _showTourStep(index) {
+  const steps = TOUR_STEPS;
+  if (index >= steps.length) { _endTour(); return; }
+  const step = steps[index];
+
+  const badge   = document.getElementById('tour-step-badge');
+  const title   = document.getElementById('tour-title');
+  const desc    = document.getElementById('tour-desc');
+  const btnNext = document.getElementById('tour-btn-next');
+  const btnSkip = document.getElementById('tour-btn-skip');
+  const spotlight = document.getElementById('tour-spotlight');
+  const tooltip   = document.getElementById('tour-tooltip');
+  if (!badge || !title || !desc || !btnNext) return;
+
+  badge.textContent   = `${index + 1}/${steps.length}`;
+  title.textContent   = t(step.titleKey);
+  desc.textContent    = t(step.descKey);
+  btnNext.textContent = index === steps.length - 1 ? t('tour_done') : t('tour_next');
+  btnSkip.textContent = t('tour_skip');
+
+  btnNext.onclick = () => _showTourStep(index + 1);
+  btnSkip.onclick = _endTour;
+
+  // Position spotlight on the target element
+  const target = document.querySelector(step.target);
+  if (target) {
+    const rect = target.getBoundingClientRect();
+    const pad  = 8;
+    spotlight.style.display  = 'block';
+    spotlight.style.left     = `${rect.left   - pad}px`;
+    spotlight.style.top      = `${rect.top    - pad}px`;
+    spotlight.style.width    = `${rect.width  + pad * 2}px`;
+    spotlight.style.height   = `${rect.height + pad * 2}px`;
+
+    // Place tooltip above or below the spotlight
+    const tooltipHeight = 200;
+    const viewH = window.innerHeight;
+    const spaceBelow = viewH - rect.bottom - pad;
+    const spaceAbove = rect.top - pad;
+    if (spaceBelow >= tooltipHeight || spaceBelow >= spaceAbove) {
+      tooltip.style.top    = `${rect.bottom + pad + 12}px`;
+      tooltip.style.bottom = 'auto';
+    } else {
+      tooltip.style.bottom = `${viewH - rect.top + pad + 12}px`;
+      tooltip.style.top    = 'auto';
+    }
+  } else {
+    // Fallback: center of screen, no spotlight
+    spotlight.style.display = 'none';
+    tooltip.style.top    = '50%';
+    tooltip.style.bottom = 'auto';
+    tooltip.style.transform = 'translateY(-50%)';
+  }
+}
+
+function _endTour() {
+  const overlay = document.getElementById('tour-overlay');
+  if (overlay) overlay.style.display = 'none';
+  localStorage.setItem('kula_tour_done', '1');
+}
 
 document.addEventListener('DOMContentLoaded', init);
 
