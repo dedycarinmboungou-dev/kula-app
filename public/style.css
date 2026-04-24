@@ -55,7 +55,7 @@ html, body {
 /* No text selection on UI elements */
 button, a, nav, .nav-item, .nav-fab, .filter-tab,
 .auth-tab, .balance-card, .stat-card, .section-header,
-.chat-topbar, .install-prompt, .welcome-modal,
+.chat-topbar, .install-card, .welcome-modal,
 .pwa-modal-header, .pwa-os-tabs {
   -webkit-user-select: none;
   user-select: none;
@@ -63,7 +63,7 @@ button, a, nav, .nav-item, .nav-fab, .filter-tab,
 
 /* No long-press context menu on interactive elements */
 button, a, img, .nav-item, .nav-fab,
-.install-prompt-btn, .install-prompt-close,
+.install-card-btn, .install-card-close,
 .btn-back, .btn-logout, .user-badge {
   -webkit-touch-callout: none;
 }
@@ -1785,79 +1785,99 @@ button, a, img, .nav-item, .nav-fab,
   margin: 8px 0 4px;
 }
 
-/* ─── PWA Install prompt (below header, in page flow) ──────────────────────── */
-.install-prompt {
-  background: linear-gradient(135deg, #047857, #065F46);
-  padding: 12px 20px;
+/* ─── PWA Install card (floating bottom sheet) ───────────────────────────── */
+.install-card {
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  width: calc(100% - 32px);
+  max-width: 420px;
+  background: var(--white);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  padding: 16px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 900;
+  animation: installCardIn 0.4s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+
+@keyframes installCardIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(30px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.install-card-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: var(--light-gray);
+  border: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 12px;
+  color: var(--gray);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.install-card-body {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: white;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  animation: slideInDown 0.35s ease;
+  padding-right: 28px;
 }
 
-@keyframes slideInDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
+.install-card-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(16,185,129,0.25);
 }
 
-.install-prompt-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-}
-
-.install-prompt-icon { font-size: 26px; flex-shrink: 0; }
-
-.install-prompt-text {
+.install-card-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
-.install-prompt-text strong {
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.install-prompt-text span {
-  font-size: 11px;
-  opacity: 0.8;
-}
-
-.install-prompt-btn {
-  background: rgba(255,255,255,0.2);
-  border: 1.5px solid rgba(255,255,255,0.4);
-  color: white;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 8px 16px;
-  border-radius: 20px;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  font-family: inherit;
-  transition: background 0.15s;
-}
-
-.install-prompt-btn:active { background: rgba(255,255,255,0.35); }
-
-.install-prompt-close {
-  background: none;
-  border: none;
-  color: rgba(255,255,255,0.6);
+.install-card-info strong {
   font-size: 14px;
+  font-weight: 700;
+  color: var(--dark);
+}
+
+.install-card-info span {
+  font-size: 12px;
+  color: var(--gray);
+}
+
+.install-card-btn {
+  width: 100%;
+  background: #10B981;
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
   cursor: pointer;
-  padding: 4px;
-  flex-shrink: 0;
-  line-height: 1;
+  transition: background 0.15s, transform 0.1s;
+  letter-spacing: 0.2px;
+}
+
+.install-card-btn:active {
+  background: #047857;
+  transform: scale(0.98);
 }
 
 /* ─── PWA Install guide modal ───────────────────────────────────────────────── */

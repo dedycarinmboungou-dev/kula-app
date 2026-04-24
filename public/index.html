@@ -10,6 +10,7 @@
   <meta name="description" content="Kula - Fais grandir ton argent">
   <title>Kula 🌱</title>
   <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -98,17 +99,17 @@
     <button class="offline-sync-btn" id="btn-sync-offline">Synchroniser</button>
   </div>
 
-  <!-- PWA Install prompt — in page flow, below header -->
-  <div class="install-prompt" id="install-prompt" style="display:none">
-    <div class="install-prompt-left">
-      <div class="install-prompt-icon">📲</div>
-      <div class="install-prompt-text">
+  <!-- PWA Install card — floating bottom sheet -->
+  <div class="install-card" id="install-prompt" style="display:none">
+    <button class="install-card-close" id="btn-install-close" aria-label="Fermer">✕</button>
+    <div class="install-card-body">
+      <img class="install-card-icon" src="icon-192.png" alt="Kula">
+      <div class="install-card-info">
         <strong data-i18n="install_kula">Installer Kula sur mon téléphone</strong>
-        <span data-i18n="install_sub">Accès rapide, notifications & mises à jour</span>
+        <span data-i18n="install_sub">Accès rapide, notifications &amp; mises à jour</span>
       </div>
     </div>
-    <button class="install-prompt-btn" id="btn-install" data-i18n="install_btn">Installer</button>
-    <button class="install-prompt-close" id="btn-install-close" aria-label="Fermer">✕</button>
+    <button class="install-card-btn" id="btn-install" data-i18n="install_btn">Installer</button>
   </div>
 
   <!-- ── Tab: Dashboard ────────────────────────────────────────────────── -->
