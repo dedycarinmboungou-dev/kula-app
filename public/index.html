@@ -31,7 +31,7 @@
           <span id="user-initial">K</span>
           <span class="update-dot" id="update-dot" style="display:none"></span>
         </button>
-        <button class="btn-logout" id="btn-logout" title="Déconnexion">
+        <button class="btn-logout" id="btn-logout" data-i18n-title="logout" title="Déconnexion">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
@@ -52,7 +52,7 @@
   <!-- ── Trial banner — shown during free trial ───────────────── -->
   <div class="trial-banner" id="trial-banner" style="display:none">
     <span class="trial-banner-text" id="trial-banner-text">🌱 Essai gratuit — <strong>3 jours restants</strong></span>
-    <button class="trial-upgrade-btn" id="trial-upgrade-btn">Passer Premium</button>
+    <button class="trial-upgrade-btn" id="trial-upgrade-btn" data-i18n="upgrade_premium">Passer Premium</button>
   </div>
 
   <!-- ── Paywall overlay — shown when trial expired ──────────── -->
@@ -60,14 +60,14 @@
     <div class="paywall-card">
       <div class="paywall-logo">🌱</div>
       <h2 class="paywall-title">Kula Premium</h2>
-      <p class="paywall-subtitle">Votre essai de 3 jours est terminé</p>
+      <p class="paywall-subtitle" data-i18n="trial_expired">Votre essai de 3 jours est terminé</p>
 
       <ul class="paywall-features">
-        <li><span class="pf-check">✓</span> Coach Kula IA illimité</li>
-        <li><span class="pf-check">✓</span> Transactions &amp; historique complet</li>
-        <li><span class="pf-check">✓</span> Poches d'épargne &amp; budgets</li>
-        <li><span class="pf-check">✓</span> Rapports PDF &amp; analyses</li>
-        <li><span class="pf-check">✓</span> Notifications intelligentes</li>
+        <li><span class="pf-check">✓</span> <span data-i18n="pw_feat_coach">Coach Kula IA illimité</span></li>
+        <li><span class="pf-check">✓</span> <span data-i18n="pw_feat_tx">Transactions &amp; historique complet</span></li>
+        <li><span class="pf-check">✓</span> <span data-i18n="pw_feat_savings">Poches d'épargne &amp; budgets</span></li>
+        <li><span class="pf-check">✓</span> <span data-i18n="pw_feat_pdf">Rapports PDF &amp; analyses</span></li>
+        <li><span class="pf-check">✓</span> <span data-i18n="pw_feat_notif">Notifications intelligentes</span></li>
       </ul>
 
       <div class="paywall-price">
@@ -76,14 +76,14 @@
       </div>
 
       <button class="paywall-cta" id="paywall-cta">
-        <span id="paywall-cta-text">S'abonner maintenant</span>
+        <span id="paywall-cta-text" data-i18n="subscribe_now">S'abonner maintenant</span>
         <svg id="paywall-cta-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none">
           <circle cx="12" cy="12" r="10" stroke-opacity=".25"/>
           <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
         </svg>
       </button>
 
-      <p class="paywall-secure">🔒 Paiement sécurisé · Annulable à tout moment</p>
+      <p class="paywall-secure" data-i18n="secure_payment">🔒 Paiement sécurisé · Annulable à tout moment</p>
     </div>
   </div>
 
@@ -119,7 +119,7 @@
     <div class="balance-card">
       <div class="balance-bg-circle"></div>
       <div class="balance-bg-circle2"></div>
-      <div class="balance-label">Solde total</div>
+      <div class="balance-label" data-i18n="total_balance">Solde total</div>
       <div class="balance-amount" id="total-balance">
         <span class="loading-spinner"></span>
       </div>
@@ -268,7 +268,7 @@
 
       <!-- ── Voice recording panel (shown during recording) ── -->
       <div class="voice-rec-panel" id="voice-rec-panel" aria-hidden="true">
-        <button class="voice-cancel-btn" id="voice-cancel-btn" title="Annuler">
+        <button class="voice-cancel-btn" id="voice-cancel-btn" data-i18n-title="voice_cancel_title" title="Annuler">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line stroke-linecap="round" x1="18" y1="6" x2="6" y2="18"/>
             <line stroke-linecap="round" x1="6" y1="6" x2="18" y2="18"/>
@@ -281,10 +281,10 @@
             <span class="vb"></span><span class="vb"></span><span class="vb"></span>
             <span class="vb"></span><span class="vb"></span>
           </div>
-          <div class="voice-rec-label" id="voice-rec-label">Écoute en cours…</div>
+          <div class="voice-rec-label" id="voice-rec-label" data-i18n="voice_rec_label">Écoute en cours…</div>
         </div>
         <div class="voice-timer" id="voice-timer">0:00</div>
-        <button class="voice-stop-btn" id="voice-stop-btn" title="Terminer l'enregistrement">
+        <button class="voice-stop-btn" id="voice-stop-btn" data-i18n-title="voice_stop_title" title="Terminer l'enregistrement">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <rect x="5" y="5" width="14" height="14" rx="3"/>
           </svg>
@@ -294,7 +294,7 @@
       <!-- ── Processing state ────────────────────────────── -->
       <div class="voice-processing" id="voice-processing" aria-hidden="true">
         <div class="voice-proc-ring"></div>
-        <span>Traitement vocal…</span>
+        <span data-i18n="voice_processing_label">Traitement vocal…</span>
       </div>
 
     </div>
@@ -306,7 +306,7 @@
     <!-- Summary card -->
     <div class="epargne-summary" id="epargne-summary" style="display:none">
       <div>
-        <div class="epargne-summary-label">Total épargné</div>
+        <div class="epargne-summary-label" data-i18n="total_saved">Total épargné</div>
         <div class="epargne-summary-amount" id="epargne-total-actuel">0 FCFA</div>
         <div class="epargne-summary-sub" id="epargne-total-objectif"></div>
       </div>
@@ -318,10 +318,10 @@
 
     <!-- Header + add button -->
     <div class="epargne-header">
-      <span class="epargne-title">Mes Poches</span>
+      <span class="epargne-title" data-i18n="my_pockets">Mes Poches</span>
       <button class="btn-add-poche" id="btn-add-poche">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Nouvelle poche
+        <span data-i18n="new_pocket">Nouvelle poche</span>
       </button>
     </div>
 
@@ -329,8 +329,8 @@
     <div id="poches-list">
       <div class="empty-state">
         <div class="empty-icon">🐷</div>
-        <div class="empty-text">Aucune poche d'épargne</div>
-        <div class="empty-sub">Crée ta première poche pour commencer !</div>
+        <div class="empty-text" data-i18n="no_pockets">Aucune poche d'épargne</div>
+        <div class="empty-sub" data-i18n="no_pockets_sub">Crée ta première poche pour commencer !</div>
       </div>
     </div>
 
@@ -340,9 +340,9 @@
   <section class="tab-panel" id="tab-transactions">
 
     <div class="filter-tabs">
-      <button class="filter-tab active" data-filter="all">Tout</button>
-      <button class="filter-tab" data-filter="income" data-i18n="income">Revenus</button>
-      <button class="filter-tab" data-filter="expense" data-i18n="expense">Dépenses</button>
+      <button class="filter-tab active" data-filter="all" data-i18n="filter_all">Tout</button>
+      <button class="filter-tab" data-filter="income" data-i18n="income">Revenu</button>
+      <button class="filter-tab" data-filter="expense" data-i18n="expense">Dépense</button>
     </div>
 
     <div class="month-filter-row">
@@ -401,7 +401,7 @@
   </nav>
 
   <!-- ── FAB Add Transaction ──────────────────────────────────────────── -->
-  <button class="fab-add-tx" id="fab-add-tx" title="Ajouter une transaction" aria-label="Ajouter une transaction">
+  <button class="fab-add-tx" id="fab-add-tx" data-i18n-title="add" title="Ajouter une transaction" aria-label="Add transaction">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
       <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
     </svg>
@@ -433,11 +433,11 @@
     <div class="add-tx-tabs">
       <button class="add-tx-tab add-tx-tab--expense active" id="atab-expense" data-type="expense">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M17 7l-10 10M7 7h10v10"/></svg>
-        Dépense
+        <span data-i18n="expense_tab">Dépense</span>
       </button>
       <button class="add-tx-tab add-tx-tab--income" id="atab-income" data-type="income">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M7 17L17 7M7 7h10v10"/></svg>
-        Revenu
+        <span data-i18n="income_tab">Revenu</span>
       </button>
     </div>
 
@@ -448,24 +448,24 @@
     </div>
 
     <!-- Categories -->
-    <div class="add-tx-label">Catégorie</div>
+    <div class="add-tx-label" data-i18n="category">Catégorie</div>
     <div class="add-tx-cats" id="add-tx-cats"></div>
-    <input class="add-tx-autre" id="add-tx-autre" type="text" placeholder="Précisez la catégorie…" style="display:none" maxlength="60"/>
+    <input class="add-tx-autre" id="add-tx-autre" type="text" data-i18n-placeholder="specify_category" placeholder="Précisez la catégorie…" style="display:none" maxlength="60"/>
 
     <!-- Description -->
-    <div class="add-tx-label">Description <span class="add-tx-opt">(optionnel)</span></div>
-    <input class="add-tx-input" id="add-tx-desc" type="text" placeholder="Ex: Course au marché…" maxlength="200"/>
+    <div class="add-tx-label" data-i18n="desc_optional">Description (optionnel)</div>
+    <input class="add-tx-input" id="add-tx-desc" type="text" data-i18n-placeholder="desc_placeholder" placeholder="Ex : Course au marché…" maxlength="200"/>
 
     <!-- Date -->
-    <div class="add-tx-label">Date</div>
+    <div class="add-tx-label" data-i18n="date">Date</div>
     <input class="add-tx-input" id="add-tx-date" type="date"/>
 
     <!-- Photo -->
-    <div class="add-tx-label">Justificatif <span class="add-tx-opt">(optionnel)</span></div>
+    <div class="add-tx-label" data-i18n="receipt_optional">Justificatif (optionnel)</div>
     <div class="add-tx-photo-row">
       <label class="add-tx-photo-btn" for="add-tx-photo-input">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path stroke-linecap="round" d="M21 15l-5-5L5 21"/></svg>
-        Joindre une photo
+        <span data-i18n="attach_photo">Joindre une photo</span>
       </label>
       <input type="file" id="add-tx-photo-input" accept="image/*" style="display:none"/>
       <span class="add-tx-photo-name" id="add-tx-photo-name"></span>
@@ -474,7 +474,7 @@
 
     <!-- Submit -->
     <button class="add-tx-submit" id="add-tx-submit">
-      <span id="add-tx-submit-text">Enregistrer</span>
+      <span id="add-tx-submit-text" data-i18n="save">Enregistrer</span>
       <svg class="add-tx-spin" id="add-tx-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="display:none"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
     </button>
 
@@ -487,23 +487,23 @@
     <div class="pdf-modal-header">
       <div class="pdf-modal-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        Exporter en PDF
+        <span data-i18n="export_pdf_title">Exporter en PDF</span>
       </div>
       <button class="pdf-modal-close" id="pdf-modal-close">✕</button>
     </div>
     <div class="pdf-modal-body">
-      <label class="pdf-label">Choisir le mois</label>
+      <label class="pdf-label" data-i18n="choose_month">Choisir le mois</label>
       <select id="pdf-month-select" class="pdf-select"></select>
       <div class="pdf-preview">
         <div class="pdf-preview-icon">📄</div>
         <div class="pdf-preview-info">
-          <div class="pdf-preview-title" id="pdf-preview-title">Rapport Kula</div>
-          <div class="pdf-preview-sub">Transactions · Catégories · Conseil Kula</div>
+          <div class="pdf-preview-title" id="pdf-preview-title" data-i18n="report_kula">Rapport Kula</div>
+          <div class="pdf-preview-sub" data-i18n="report_sub">Transactions · Catégories · Conseil Kula</div>
         </div>
       </div>
       <button class="btn-pdf-download" id="btn-pdf-download">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span id="pdf-btn-label">Télécharger le PDF</span>
+        <span id="pdf-btn-label" data-i18n="download_pdf">Télécharger le PDF</span>
       </button>
     </div>
   </div>
@@ -518,11 +518,11 @@
     <button class="profile-back" id="budget-back" aria-label="Fermer">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
     </button>
-    <span class="profile-topbar-title">Budgets mensuels</span>
+    <span class="profile-topbar-title" data-i18n="budgets">Budgets mensuels</span>
     <span class="budget-month-label" id="budget-month-label"></span>
   </div>
   <div class="budget-panel-body">
-    <p class="budget-panel-hint">Définissez une limite mensuelle par catégorie. Laissez vide pour désactiver.</p>
+    <p class="budget-panel-hint" data-i18n="budget_hint">Définissez une limite mensuelle par catégorie. Laissez vide pour désactiver.</p>
     <div class="budget-list" id="budget-list">
       <!-- filled by JS -->
     </div>
@@ -537,8 +537,8 @@
 
   <!-- Update banner inside panel (hidden until SW signals) -->
   <div class="profile-update-bar" id="profile-update-bar" style="display:none">
-    <span>🔄 Nouvelle version disponible</span>
-    <button onclick="window.location.reload()">Mettre à jour</button>
+    <span data-i18n="new_version">🔄 Nouvelle version disponible</span>
+    <button onclick="window.location.reload()" data-i18n="update_btn">Mettre à jour</button>
   </div>
 
   <!-- Top bar -->
@@ -570,19 +570,19 @@
   <div class="profile-info">
     <div class="profile-name-row">
       <span class="profile-name" id="profile-name">—</span>
-      <button class="profile-edit-btn" id="profile-edit-name-btn" title="Modifier le nom">
+      <button class="profile-edit-btn" id="profile-edit-name-btn" title="Edit">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
         </svg>
-        Modifier
+        <span data-i18n="edit_name_btn">Modifier</span>
       </button>
     </div>
     <div class="profile-name-edit" id="profile-name-edit" style="display:none">
-      <input type="text" class="profile-name-input" id="profile-name-input" maxlength="60" placeholder="Votre nom">
+      <input type="text" class="profile-name-input" id="profile-name-input" maxlength="60" data-i18n-placeholder="your_name_placeholder" placeholder="Votre nom">
       <div class="profile-name-edit-actions">
-        <button class="btn-profile-save" id="btn-profile-save-name">Enregistrer</button>
-        <button class="btn-profile-cancel" id="btn-profile-cancel-name">Annuler</button>
+        <button class="btn-profile-save" id="btn-profile-save-name" data-i18n="save_btn">Enregistrer</button>
+        <button class="btn-profile-cancel" id="btn-profile-cancel-name" data-i18n="cancel_btn">Annuler</button>
       </div>
     </div>
     <span class="profile-email" id="profile-email">—</span>
@@ -632,7 +632,7 @@
         <span class="feedback-star" data-star="5">☆</span>
       </div>
       <textarea class="feedback-text" id="feedback-text" placeholder="Partagez votre expérience avec Kula..." rows="3" maxlength="500"></textarea>
-      <button class="btn-feedback-send" id="btn-feedback-send">Envoyer mon avis</button>
+      <button class="btn-feedback-send" id="btn-feedback-send" data-i18n="feedback_btn">Envoyer mon avis</button>
     </div>
   </div>
 
@@ -647,7 +647,7 @@
           <div class="about-version" id="about-version">v1.0.0</div>
         </div>
       </div>
-      <p class="about-desc">
+      <p class="about-desc" id="about-desc" data-i18n="about_desc">
         Kula (mot Kituba signifiant « grandir ») est votre coach financier
         personnel propulsé par l'intelligence artificielle, conçu pour les
         entrepreneurs et familles d'Afrique. Notez vos revenus et dépenses,
@@ -664,13 +664,13 @@
           <span class="about-card-text">mindup05@gmail.com</span>
         </a>
       </div>
-      <div class="about-legal">© 2026 MindUp Academy. Tous droits réservés.</div>
+      <div class="about-legal" id="about-legal" data-i18n="about_legal">© 2026 MindUp Academy. Tous droits réservés.</div>
     </div>
   </div>
 
   <!-- Logout -->
   <div class="profile-section" style="padding-bottom:32px">
-    <button class="btn-logout" onclick="logout()">Déconnexion</button>
+    <button class="btn-logout" onclick="logout()" data-i18n="logout">Déconnexion</button>
   </div>
 
 </div>
@@ -682,7 +682,7 @@
     <!-- Header -->
     <div class="poche-modal-header">
       <div class="poche-modal-title">
-        <span>🐷</span> Nouvelle poche d'épargne
+        <span>🐷</span> <span data-i18n="new_pocket_title">Nouvelle poche d'épargne</span>
       </div>
       <button class="poche-modal-close" id="poche-modal-close">✕</button>
     </div>
@@ -690,21 +690,21 @@
     <!-- Fields -->
     <div class="poche-modal-body">
       <div class="poche-field">
-        <label for="poche-nom">Nom de la poche</label>
-        <input type="text" id="poche-nom" placeholder="ex : Voiture, Voyage, Téléphone…" maxlength="50" autocomplete="off">
+        <label for="poche-nom" data-i18n="pocket_name">Nom de la poche</label>
+        <input type="text" id="poche-nom" data-i18n-placeholder="pocket_name_placeholder" placeholder="ex : Voiture, Voyage, Téléphone…" maxlength="50" autocomplete="off">
       </div>
 
       <div class="poche-field">
-        <label for="poche-objectif">Objectif (<span class="currency-label">FCFA</span>)</label>
+        <label for="poche-objectif"><span data-i18n="target_amount">Objectif</span> (<span class="currency-label">FCFA</span>)</label>
         <input type="number" id="poche-objectif" placeholder="ex : 500 000" min="1" inputmode="numeric">
       </div>
 
       <div class="poche-field">
-        <label for="poche-echeance">Date cible <span style="font-weight:400;color:#9ca3af">(optionnel)</span></label>
+        <label for="poche-echeance"><span data-i18n="target_date">Date cible</span> <span style="font-weight:400;color:#9ca3af">(<span data-i18n="optional">optionnel</span>)</span></label>
         <input type="date" id="poche-echeance">
       </div>
 
-      <button class="btn-create-poche" id="btn-create-poche">Créer la poche 🐷</button>
+      <button class="btn-create-poche" id="btn-create-poche" data-i18n="create_pocket_btn">Créer la poche 🐷</button>
     </div>
 
   </div>
@@ -735,13 +735,13 @@
         <div class="poche-field" style="flex:1">
           <label for="cat-modal-type">Type</label>
           <select id="cat-modal-type" class="cat-type-select">
-            <option value="expense">Dépense</option>
-            <option value="income">Revenu</option>
-            <option value="both">Les deux</option>
+            <option value="expense" data-i18n="cat_type_expense">Dépense</option>
+            <option value="income" data-i18n="cat_type_income">Revenu</option>
+            <option value="both" data-i18n="cat_type_both">Les deux</option>
           </select>
         </div>
       </div>
-      <button class="btn-create-poche" id="btn-cat-save">Créer</button>
+      <button class="btn-create-poche" id="btn-cat-save" data-i18n="cat_create">Créer</button>
     </div>
   </div>
 </div>
@@ -757,10 +757,10 @@
     </div>
     <div class="poche-modal-body">
       <div class="poche-field">
-        <label for="alimenter-montant">Montant à ajouter (<span class="currency-label">FCFA</span>)</label>
+        <label for="alimenter-montant"><span data-i18n="amount_to_add">Montant à ajouter</span> (<span class="currency-label">FCFA</span>)</label>
         <input type="number" id="alimenter-montant" placeholder="ex : 10 000" min="1" inputmode="numeric">
       </div>
-      <button class="btn-create-poche" id="btn-alimenter-confirm">Ajouter 💰</button>
+      <button class="btn-create-poche" id="btn-alimenter-confirm" data-i18n="add_funds_btn">Ajouter 💰</button>
     </div>
   </div>
 </div>
@@ -772,15 +772,15 @@
 <div class="reminder-banner" id="reminder-banner" style="display:none">
   <span class="reminder-icon">💡</span>
   <span class="reminder-text" id="reminder-text"></span>
-  <button class="reminder-action" id="reminder-action">Ajouter</button>
-  <button class="reminder-close" id="reminder-close" aria-label="Fermer">✕</button>
+  <button class="reminder-action" id="reminder-action" data-i18n="reminder_add">Ajouter</button>
+  <button class="reminder-close" id="reminder-close" aria-label="Close">✕</button>
 </div>
 
 <!-- PWA Install guide modal -->
 <div class="pwa-modal-overlay" id="pwa-modal" style="display:none">
   <div class="pwa-modal">
     <div class="pwa-modal-header">
-      <div class="pwa-modal-title">📲 Installer Kula</div>
+      <div class="pwa-modal-title" data-i18n="pwa_install_title">📲 Installer Kula</div>
       <button class="pwa-modal-close" id="pwa-modal-close">✕</button>
     </div>
 
@@ -792,14 +792,14 @@
       <div class="pwa-step">
         <div class="pwa-step-num">1</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Appuie sur le bouton "Installer"</div>
+          <div class="pwa-step-title" data-i18n="pwa_android_step1">Appuie sur le bouton "Installer"</div>
           <div class="pwa-mockup">
             <div class="mockup-bar">
               <span class="mockup-url">kula-app.onrender.com</span>
               <span class="mockup-menu">⋮</span>
             </div>
             <div class="mockup-highlight">
-              <div class="mockup-btn-green">📲 Installer Kula sur mon téléphone</div>
+              <div class="mockup-btn-green" data-i18n="pwa_mockup_install_banner">📲 Installer Kula sur mon téléphone</div>
             </div>
           </div>
         </div>
@@ -807,15 +807,15 @@
       <div class="pwa-step">
         <div class="pwa-step-num">2</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Une fenêtre s'ouvre — appuie sur <strong>Installer</strong></div>
+          <div class="pwa-step-title" data-i18n-html="pwa_android_step2">Une fenêtre s'ouvre — appuie sur <strong>Installer</strong></div>
           <div class="pwa-mockup">
             <div class="mockup-dialog">
               <div class="mockup-dialog-icon">🌱</div>
               <div class="mockup-dialog-name">Kula</div>
               <div class="mockup-dialog-sub">kula-app.onrender.com</div>
               <div class="mockup-dialog-actions">
-                <span class="mockup-link">Annuler</span>
-                <span class="mockup-btn-primary">Installer</span>
+                <span class="mockup-link" data-i18n="pwa_mockup_cancel">Annuler</span>
+                <span class="mockup-btn-primary" data-i18n="pwa_mockup_install">Installer</span>
               </div>
             </div>
           </div>
@@ -824,14 +824,14 @@
       <div class="pwa-step">
         <div class="pwa-step-num">3</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">C'est fait ! L'icône Kula apparaît sur ton écran 🎉</div>
+          <div class="pwa-step-title" data-i18n="pwa_android_step3">C'est fait ! L'icône Kula apparaît sur ton écran 🎉</div>
           <div class="pwa-mockup pwa-mockup-home">
             <div class="mockup-app-icon">🌱</div>
             <div class="mockup-app-label">Kula</div>
           </div>
         </div>
       </div>
-      <button class="pwa-install-now" id="btn-install-modal">Installer maintenant ↗</button>
+      <button class="pwa-install-now" id="btn-install-modal" data-i18n="pwa_android_btn">Installer maintenant ↗</button>
     </div>
 
     <!-- iOS Safari guide -->
@@ -839,7 +839,7 @@
       <div class="pwa-step">
         <div class="pwa-step-num">1</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Appuie sur <strong>Partager</strong> <span class="pwa-icon-share">⬆</span> en bas de Safari</div>
+          <div class="pwa-step-title" data-i18n-html="pwa_safari_step1">Appuie sur <strong>Partager</strong> <span class="pwa-icon-share">⬆</span> en bas de Safari</div>
           <div class="pwa-mockup">
             <div class="mockup-bar safari">
               <span class="mockup-url">kula-app.onrender.com</span>
@@ -857,12 +857,12 @@
       <div class="pwa-step">
         <div class="pwa-step-num">2</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Appuie sur <strong>"Sur l'écran d'accueil"</strong></div>
+          <div class="pwa-step-title" data-i18n-html="pwa_safari_step2">Appuie sur <strong>"Sur l'écran d'accueil"</strong></div>
           <div class="pwa-mockup">
             <div class="mockup-sheet">
-              <div class="mockup-sheet-item">📋 Copier</div>
-              <div class="mockup-sheet-item mockup-sheet-highlight">＋ Sur l'écran d'accueil</div>
-              <div class="mockup-sheet-item">📌 Ajouter aux favoris</div>
+              <div class="mockup-sheet-item" data-i18n="pwa_mockup_copy">📋 Copier</div>
+              <div class="mockup-sheet-item mockup-sheet-highlight" data-i18n="pwa_mockup_homescreen">＋ Sur l'écran d'accueil</div>
+              <div class="mockup-sheet-item" data-i18n="pwa_mockup_bookmarks">📌 Ajouter aux favoris</div>
             </div>
           </div>
         </div>
@@ -870,15 +870,15 @@
       <div class="pwa-step">
         <div class="pwa-step-num">3</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Appuie sur <strong>"Ajouter"</strong> en haut à droite</div>
+          <div class="pwa-step-title" data-i18n-html="pwa_safari_step3">Appuie sur <strong>"Ajouter"</strong> en haut à droite</div>
           <div class="pwa-mockup">
             <div class="mockup-dialog">
               <div class="mockup-dialog-icon">🌱</div>
               <div class="mockup-dialog-name">Kula</div>
               <div class="mockup-dialog-sub">kula-app.onrender.com</div>
               <div class="mockup-dialog-actions">
-                <span class="mockup-link">Annuler</span>
-                <span class="mockup-btn-primary">Ajouter</span>
+                <span class="mockup-link" data-i18n="pwa_mockup_cancel">Annuler</span>
+                <span class="mockup-btn-primary" data-i18n="pwa_mockup_add">Ajouter</span>
               </div>
             </div>
           </div>
@@ -891,7 +891,7 @@
       <div class="pwa-step">
         <div class="pwa-step-num">1</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Appuie sur <strong>⋮</strong> en haut à droite</div>
+          <div class="pwa-step-title" data-i18n-html="pwa_chrome_step1">Appuie sur <strong>⋮</strong> en haut à droite</div>
           <div class="pwa-mockup">
             <div class="mockup-bar">
               <span class="mockup-url">kula-app.onrender.com</span>
@@ -903,12 +903,12 @@
       <div class="pwa-step">
         <div class="pwa-step-num">2</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Appuie sur <strong>"Ajouter à l'écran d'accueil"</strong></div>
+          <div class="pwa-step-title" data-i18n-html="pwa_chrome_step2">Appuie sur <strong>"Ajouter à l'écran d'accueil"</strong></div>
           <div class="pwa-mockup">
             <div class="mockup-sheet">
-              <div class="mockup-sheet-item">📤 Partager…</div>
-              <div class="mockup-sheet-item mockup-sheet-highlight">＋ Ajouter à l'écran d'accueil</div>
-              <div class="mockup-sheet-item">⬇️ Télécharger la page</div>
+              <div class="mockup-sheet-item" data-i18n="pwa_mockup_share">📤 Partager…</div>
+              <div class="mockup-sheet-item mockup-sheet-highlight" data-i18n="pwa_mockup_add_home">＋ Ajouter à l'écran d'accueil</div>
+              <div class="mockup-sheet-item" data-i18n="pwa_mockup_download">⬇️ Télécharger la page</div>
             </div>
           </div>
         </div>
@@ -916,15 +916,15 @@
       <div class="pwa-step">
         <div class="pwa-step-num">3</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Confirme en appuyant sur <strong>"Ajouter"</strong></div>
+          <div class="pwa-step-title" data-i18n-html="pwa_chrome_step3">Confirme en appuyant sur <strong>"Ajouter"</strong></div>
           <div class="pwa-mockup">
             <div class="mockup-dialog">
               <div class="mockup-dialog-icon">🌱</div>
               <div class="mockup-dialog-name">Kula</div>
               <div class="mockup-dialog-sub">kula-app.onrender.com</div>
               <div class="mockup-dialog-actions">
-                <span class="mockup-link">Annuler</span>
-                <span class="mockup-btn-primary">Ajouter</span>
+                <span class="mockup-link" data-i18n="pwa_mockup_cancel">Annuler</span>
+                <span class="mockup-btn-primary" data-i18n="pwa_mockup_add">Ajouter</span>
               </div>
             </div>
           </div>
@@ -953,32 +953,32 @@
 <div class="welcome-overlay" id="welcome-overlay" style="display:none">
   <div class="welcome-modal">
     <div class="welcome-emoji">🌱</div>
-    <h2 class="welcome-title">Bienvenue sur Kula !</h2>
-    <p class="welcome-sub">Ton assistant budget qui grandit avec toi.</p>
+    <h2 class="welcome-title" data-i18n="welcome_title">Bienvenue sur Kula !</h2>
+    <p class="welcome-sub" data-i18n="welcome_sub">Ton assistant budget qui grandit avec toi.</p>
     <div class="welcome-steps">
       <div class="welcome-step">
         <div class="welcome-step-icon">💬</div>
         <div class="welcome-step-text">
-          <strong>Parle naturellement</strong>
-          <span>«&nbsp;Acheté du pain 500 FCFA&nbsp;»</span>
+          <strong data-i18n="welcome_step1_title">Parle naturellement</strong>
+          <span data-i18n="welcome_step1_sub">«&nbsp;Acheté du pain 500 FCFA&nbsp;»</span>
         </div>
       </div>
       <div class="welcome-step">
         <div class="welcome-step-icon">🤖</div>
         <div class="welcome-step-text">
-          <strong>L'IA classe automatiquement</strong>
-          <span>Catégorie, montant, date — tout est géré</span>
+          <strong data-i18n="welcome_step2_title">L'IA classe automatiquement</strong>
+          <span data-i18n="welcome_step2_sub">Catégorie, montant, date — tout est géré</span>
         </div>
       </div>
       <div class="welcome-step">
         <div class="welcome-step-icon">📊</div>
         <div class="welcome-step-text">
-          <strong>Suis ton budget en temps réel</strong>
-          <span>Tableau de bord, tendances, catégories</span>
+          <strong data-i18n="welcome_step3_title">Suis ton budget en temps réel</strong>
+          <span data-i18n="welcome_step3_sub">Tableau de bord, tendances, catégories</span>
         </div>
       </div>
     </div>
-    <button class="welcome-btn" id="btn-welcome-close">C'est parti ! 🚀</button>
+    <button class="welcome-btn" id="btn-welcome-close" data-i18n="welcome_btn">C'est parti ! 🚀</button>
   </div>
 </div>
 

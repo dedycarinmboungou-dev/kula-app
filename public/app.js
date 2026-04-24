@@ -72,9 +72,9 @@ function showOfflineDataBanner(cachedAt) {
   const bar = document.getElementById('offline-data-bar');
   if (!bar) return;
   const when = cachedAt
-    ? new Date(parseInt(cachedAt)).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-    : 'dernière connexion';
-  bar.querySelector('.offline-data-text').textContent = `📵 Mode hors ligne · données du ${when}`;
+    ? new Date(parseInt(cachedAt)).toLocaleString(getLocale(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : t('offline_last');
+  bar.querySelector('.offline-data-text').textContent = `${t('offline_data')} ${when}`;
   bar.style.display = 'flex';
 }
 function hideOfflineDataBanner() {
@@ -118,7 +118,7 @@ function renderOfflineBadge() {
   if (q.length === 0) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
   document.getElementById('offline-sync-count').textContent =
-    `${q.length} transaction${q.length > 1 ? 's' : ''} en attente de sync`;
+    `${q.length} ${t('tx_pending')}`;
 }
 
 async function syncOfflineQueue() {
@@ -138,7 +138,7 @@ async function syncOfflineQueue() {
   localStorage.setItem(OFFLINE_KEY, JSON.stringify(remaining));
   renderOfflineBadge();
   if (synced > 0) {
-    showToast(`${synced} transaction${synced > 1 ? 's synchronisées' : ' synchronisée'} ✅`, 'success');
+    showToast(`${synced} ${t('synced_msg')}`, 'success');
     loadDashboard();
   }
 }
@@ -175,7 +175,7 @@ function formatMoney(amountXOF) {
   const cur = getUserCurrency();
   const cfg = CURRENCY_CONFIG[cur] || CURRENCY_CONFIG.XOF;
   const converted = Math.abs(amountXOF) * cfg.rate;
-  const formatted = new Intl.NumberFormat(cur === 'USD' ? 'en-US' : 'fr-FR', {
+  const formatted = new Intl.NumberFormat(getLocale(), {
     minimumFractionDigits: cfg.decimals,
     maximumFractionDigits: cfg.decimals
   }).format(cfg.decimals ? converted : Math.round(converted));
@@ -187,7 +187,7 @@ function formatMoney(amountXOF) {
 /** Format number only (no symbol) — still used internally */
 function formatAmount(amount) {
   if (typeof amount !== 'number') amount = parseFloat(amount) || 0;
-  return new Intl.NumberFormat('fr-FR', {
+  return new Intl.NumberFormat(getLocale(), {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(Math.round(Math.abs(amount)));
@@ -220,7 +220,7 @@ function openExportModal() {
   for (let i = 0; i < 12; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const val = d.toISOString().slice(0, 7);
-    const lbl = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    const lbl = d.toLocaleDateString(getLocale(), { month: 'long', year: 'numeric' });
     const opt = document.createElement('option');
     opt.value = val;
     opt.textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
@@ -231,7 +231,7 @@ function openExportModal() {
   // Update preview title on change
   function updatePreview() {
     const lbl = sel.options[sel.selectedIndex]?.text || '';
-    prev.textContent = `Rapport Kula — ${lbl}`;
+    prev.textContent = `${t('report_kula')} — ${lbl}`;
   }
   sel.onchange = updatePreview;
   updatePreview();
@@ -246,7 +246,7 @@ async function downloadPDF() {
   const label = document.getElementById('pdf-btn-label');
 
   btn.disabled = true;
-  label.textContent = 'Génération en cours…';
+  label.textContent = t('generating');
 
   try {
     const res = await fetch(`/api/report/pdf?month=${month}`, {
@@ -254,7 +254,7 @@ async function downloadPDF() {
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'Erreur inconnue' }));
+      const err = await res.json().catch(() => ({ error: t('unknown_error') }));
       throw new Error(err.error || `HTTP ${res.status}`);
     }
 
@@ -270,12 +270,12 @@ async function downloadPDF() {
     URL.revokeObjectURL(url);
 
     document.getElementById('pdf-modal').style.display = 'none';
-    showToast(`Rapport ${lbl} téléchargé ✅`, 'success');
+    showToast(t('report_downloaded'), 'success');
   } catch (err) {
-    showToast(`Erreur : ${err.message}`, 'error');
+    showToast(`${t('error_prefix')} : ${err.message}`, 'error');
   } finally {
     btn.disabled = false;
-    label.textContent = 'Télécharger le PDF';
+    label.textContent = t('download_pdf');
   }
 }
 
@@ -319,7 +319,7 @@ async function api(path, opts = {}) {
   try {
     res = await fetch(path, { headers, signal: ctrl.signal, ...opts });
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('Serveur non disponible — réessaie dans quelques secondes');
+    if (e.name === 'AbortError') throw new Error(t('error_timeout'));
     throw e;
   } finally {
     clearTimeout(timeout);
@@ -415,8 +415,8 @@ async function loadDashboard() {
   } catch (err) {
     console.error('Dashboard error:', err.message, err);
     const balEl = document.getElementById('total-balance');
-    if (balEl) balEl.textContent = 'Erreur';
-    showToast('Erreur dashboard: ' + (err.message || 'réseau ?'), 'error');
+    if (balEl) balEl.textContent = t('error');
+    showToast(t('error_dashboard') + ': ' + (err.message || ''), 'error');
   }
 }
 
@@ -663,7 +663,7 @@ function renderTransactionList(containerId, transactions) {
           </div>
         </div>
         <div class="tx-amount ${tx.type}">${sign}${formatMoney(tx.amount)}</div>
-        <button class="tx-delete" onclick="deleteTransaction(${tx.id})" title="Supprimer">
+        <button class="tx-delete" onclick="deleteTransaction(${tx.id})" title="${t('delete_btn')}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6L6 18M6 6l12 12"/>
           </svg>
@@ -693,7 +693,7 @@ async function loadTransactions() {
     renderTransactionList('all-tx-list', txs);
   } catch (err) {
     console.error('Load transactions error:', err);
-    showToast('Erreur lors du chargement', 'error');
+    showToast(t('error_loading'), 'error');
   }
 }
 
@@ -702,11 +702,11 @@ async function deleteTransaction(id) {
   if (!confirm(t('confirm_delete_tx'))) return;
   try {
     await api(`/api/transactions/${id}`, { method: 'DELETE' });
-    showToast('Transaction supprimée', 'success');
+    showToast(t('tx_deleted'), 'success');
     if (state.currentTab === 'transactions') loadTransactions();
     else loadDashboard();
   } catch (err) {
-    showToast('Erreur: ' + err.message, 'error');
+    showToast(t('error_prefix') + ' : ' + err.message, 'error');
   }
 }
 
@@ -850,8 +850,8 @@ function renderTransactionPreview(tx, parentDiv) {
         showToast(t('saved_offline_msg'), 'info');
       } else {
         preview.querySelector('.tx-preview-actions').innerHTML =
-          '<div style="text-align:center;color:#10B981;font-weight:600;font-size:14px">✅ Enregistré !</div>';
-        showToast('Transaction enregistrée !', 'success');
+          `<div style="text-align:center;color:#10B981;font-weight:600;font-size:14px">✅ ${t('saved')} !</div>`;
+        showToast(t('saved'), 'success');
       }
       state.pendingTransaction = null;
     } catch (err) {
@@ -861,7 +861,7 @@ function renderTransactionPreview(tx, parentDiv) {
   });
 
   preview.querySelector('#btn-cancel-tx').addEventListener('click', () => {
-    preview.innerHTML = '<div style="text-align:center;color:#6B7280;font-size:13px">Transaction annulée</div>';
+    preview.innerHTML = `<div style="text-align:center;color:#6B7280;font-size:13px">${t('tx_cancelled')}</div>`;
     state.pendingTransaction = null;
   });
 }
@@ -910,7 +910,7 @@ async function sendChatMessage() {
 
     if (response.type === 'transactions' && Array.isArray(response.transactions) && response.transactions.length) {
       // Transactions already saved by the backend — show saved cards
-      const confirmMsg = response.message || `${response.transactions.length} transaction(s) enregistrée(s) ✅`;
+      const confirmMsg = response.message || `${response.transactions.length} ${t('tx_registered')}`;
       const botMsg = addChatMessage('bot', confirmMsg);
       response.transactions.forEach(tx => renderSavedTransaction(tx, botMsg));
       state.chatHistory.push({ role: 'assistant', content: confirmMsg });
@@ -930,11 +930,11 @@ async function sendChatMessage() {
       // Notification si objectif de poche atteint
       if (response.poche_goal_reached) {
         const nom = response.poche_goal_reached.nom;
-        showToast(`🎉 Objectif "${nom}" atteint !`, 'success');
+        showToast(`${t('goal_toast')} "${nom}"`, 'success');
         if ('serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           navigator.serviceWorker.ready.then(reg => {
-            reg.showNotification('Kula 🌱 — Félicitations !', {
-              body: `🎉 Félicitations ! Tu as atteint ton objectif "${nom}" !`,
+            reg.showNotification(t('goal_congrats_title'), {
+              body: `${t('goal_congrats_body')} "${nom}" !`,
               icon: '/icon-192.png',
               badge: '/icon-192.png',
               tag: `poche-goal-${nom}`
@@ -953,7 +953,8 @@ async function sendChatMessage() {
 }
 
 // ── Scheduled notifications (8h, 13h, 20h) ────────────────────────────────────
-const DAILY_QUOTES = [
+const DAILY_QUOTES = {
+  fr: [
   'L\'argent est un bon serviteur mais un mauvais maître. — Francis Bacon',
   'Ne remets pas à demain l\'épargne que tu peux faire aujourd\'hui.',
   'Petit à petit, l\'oiseau fait son nid. Petit à petit, l\'épargne grandit.',
@@ -984,11 +985,46 @@ const DAILY_QUOTES = [
   'Celui qui plan son argent ne sera jamais pris au dépourvu.',
   'La générosité commence par avoir — et avoir commence par gérer.',
   'Chaque sou compte quand on sait pourquoi on l\'économise.'
-];
+  ],
+  en: [
+  `Money is a good servant but a bad master. — Francis Bacon`,
+  `Don't put off until tomorrow the savings you can make today.`,
+  `Little by little, the bird builds its nest. Little by little, savings grow.`,
+  `Those who can't manage a little won't manage a lot.`,
+  `Wealth is not in what you earn, but in what you keep.`,
+  `A budget is not a prison — it's a map to freedom.`,
+  `Water that flows gently carves the rock. Regular savings build fortune.`,
+  `Spending without counting is walking without watching where you go.`,
+  `The ant works in summer so it won't go hungry in winter.`,
+  `Know your expenses before you know your shortcomings.`,
+  `Every dollar saved is a dollar earned twice.`,
+  `The best investment you can make is in yourself.`,
+  `An unexpected expense only ruins those who planned for nothing.`,
+  `Financial independence starts with one decision: to save.`,
+  `Who controls their money controls their destiny.`,
+  `A modest income well managed beats a fortune poorly handled.`,
+  `Today's financial discipline is tomorrow's freedom.`,
+  `Don't confuse price and value — they're not the same thing.`,
+  `Your future is built with today's habits.`,
+  `Sow savings, reap security.`,
+  `Money is a tool — learn to use it before it controls you.`,
+  `Count what you have before counting what you want.`,
+  `Good budget management is self-respect.`,
+  `It's not income that makes you rich, it's wisdom in spending.`,
+  `Happiness can't be bought, but financial peace can be saved.`,
+  `Watch where your money goes — it'll tell you where your life goes.`,
+  `Start small, stay consistent: saving is a habit, not an amount.`,
+  `Those who plan their money will never be caught off guard.`,
+  `Generosity starts with having — and having starts with managing.`,
+  `Every penny counts when you know why you're saving it.`
+  ]
+};
 
 function getDailyQuote() {
+  const lang = localStorage.getItem('kula_lang') || 'fr';
+  const quotes = DAILY_QUOTES[lang] || DAILY_QUOTES.fr;
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
-  return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
+  return quotes[dayOfYear % quotes.length];
 }
 
 // Show a notification via the Service Worker (works even when app is in background/PWA)
@@ -1015,8 +1051,8 @@ function scheduleNotifications() {
 
   const SLOTS = [
     { hour: 8,  key: 'morning',   msg: null /* uses daily quote */ },
-    { hour: 13, key: 'afternoon', msg: '☀️ Pause déjeuner ! Quelques dépenses à enregistrer dans Kula ?' },
-    { hour: 20, key: 'evening',   msg: '🌙 Bonsoir ! Prends 2 minutes pour faire le bilan de ta journée.' }
+    { hour: 13, key: 'afternoon', msgKey: 'notif_afternoon' },
+    { hour: 20, key: 'evening',   msgKey: 'notif_evening' }
   ];
 
   const today = new Date().toDateString();
@@ -1033,7 +1069,7 @@ function scheduleNotifications() {
 
     setTimeout(async () => {
       if (!notifGranted()) return;
-      const body = slot.msg ?? `💡 Citation du jour : ${getDailyQuote()}`;
+      const body = slot.msgKey ? t(slot.msgKey) : `${t('notif_quote')} : ${getDailyQuote()}`;
       await swNotify('Kula 🌱', body, `kula-notif-${slot.key}`);
       localStorage.setItem(storageKey, Date.now().toString());
     }, target - now);
@@ -1126,7 +1162,7 @@ const voice = (() => {
     cancelled = false;
 
     recognition = new SpeechRecognition();
-    recognition.lang = 'fr-FR';
+    recognition.lang = getLocale();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
@@ -1151,16 +1187,16 @@ const voice = (() => {
           input.focus();
         }
       } else {
-        showToast('Aucune parole détectée. Réessaie.', 'error');
+        showToast(t('no_speech'), 'error');
       }
     };
 
     recognition.onerror = (event) => {
       if (cancelled) return;
       if (event.error === 'not-allowed') {
-        showToast('Accès au micro refusé. Autorisez-le dans votre navigateur.', 'error');
+        showToast(t('mic_denied'), 'error');
       } else if (event.error !== 'aborted' && event.error !== 'no-speech') {
-        showToast('Erreur vocale : ' + event.error, 'error');
+        showToast(t('voice_error') + ': ' + event.error, 'error');
       }
     };
 
@@ -1176,7 +1212,7 @@ const voice = (() => {
     try {
       recognition.start();
     } catch {
-      showToast('Reconnaissance vocale non disponible sur ce navigateur.', 'error');
+      showToast(t('voice_unavailable'), 'error');
       recognition = null;
     }
   }
@@ -1200,11 +1236,11 @@ function autoResize(el) {
 // ── Init ────────────────────────────────────────────────────────────────────────
 // ── Notifications & reminders ──────────────────────────────────────────────────
 const REMINDER_MESSAGES = [
-  { days: 1,  icon: '👀', text: 'Tu n\'as rien enregistré aujourd\'hui. Une petite dépense oubliée ?' },
-  { days: 2,  icon: '📝', text: 'Ça fait 2 jours sans transaction. Ton budget attend une mise à jour !' },
-  { days: 3,  icon: '⏰', text: '3 jours sans mise à jour — prends 2 minutes pour noter tes dépenses.' },
-  { days: 7,  icon: '🌱', text: 'Une semaine sans suivi ! Pour bien grandir, Kula a besoin de tes transactions.' },
-  { days: 999, icon: '💪', text: 'Ça fait longtemps ! Reviens noter tes finances, tu es le patron de ton argent.' }
+  { days: 1,  icon: '👀', key: 'reminder_1d' },
+  { days: 2,  icon: '📝', key: 'reminder_2d' },
+  { days: 3,  icon: '⏰', key: 'reminder_3d' },
+  { days: 7,  icon: '🌱', key: 'reminder_7d' },
+  { days: 999, icon: '💪', key: 'reminder_long' }
 ];
 
 function getReminderMessage(daysSince) {
@@ -1217,8 +1253,8 @@ function getReminderMessage(daysSince) {
 function showReminderBanner(daysSince) {
   const banner  = document.getElementById('reminder-banner');
   const textEl  = document.getElementById('reminder-text');
-  const { icon, text } = getReminderMessage(daysSince);
-  textEl.textContent = text;
+  const { icon, key } = getReminderMessage(daysSince);
+  textEl.textContent = t(key);
   document.querySelector('.reminder-icon').textContent = icon;
   banner.style.display = 'flex';
   setTimeout(() => banner.classList.add('visible'), 50);
@@ -1370,7 +1406,7 @@ async function loadPoches() {
     const poches = await api('/api/poches');
     if (poches) renderPoches(poches);
   } catch {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Erreur de chargement</div></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">${t('error_loading')}</div></div>`;
   }
 }
 
@@ -1385,7 +1421,7 @@ function renderPoches(poches) {
     const totalObjectif = poches.reduce((s, p) => s + p.objectif_montant, 0);
     document.getElementById('epargne-total-actuel').textContent    = formatMoney(totalActuel);
     document.getElementById('epargne-total-objectif').textContent  = `${t('objective')} : ${formatMoney(totalObjectif)}`;
-    document.getElementById('epargne-nb-poches').textContent       = `${poches.length} poche${poches.length > 1 ? 's' : ''}`;
+    document.getElementById('epargne-nb-poches').textContent       = `${poches.length} ${poches.length > 1 ? t('pocket_unit_plural') : t('pocket_unit')}`;
     summary.style.display = poches.length ? 'flex' : 'none';
   }
 
@@ -1393,8 +1429,8 @@ function renderPoches(poches) {
     list.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">🐷</div>
-        <div class="empty-text">Aucune poche d'épargne</div>
-        <div class="empty-sub">Crée ta première poche pour commencer à épargner !</div>
+        <div class="empty-text">${t('no_pockets')}</div>
+        <div class="empty-sub">${t('no_pockets_sub')}</div>
       </div>`;
     return;
   }
@@ -1410,8 +1446,8 @@ function renderPoches(poches) {
     if (p.date_echeance) {
       const d = new Date(p.date_echeance + 'T12:00:00');
       const daysLeft = Math.ceil((d - Date.now()) / 86400000);
-      const dateLabel = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-      echeanceHtml = `<div class="poche-echeance">📅 ${dateLabel}${daysLeft > 0 ? ` · ${daysLeft}j` : ' · Échéance dépassée'}</div>`;
+      const dateLabel = d.toLocaleDateString(getLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
+      echeanceHtml = `<div class="poche-echeance">📅 ${dateLabel}${daysLeft > 0 ? ` · ${daysLeft}${t('days_short')}` : ` · ${t('deadline_passed')}`}</div>`;
     }
 
     const card = document.createElement('div');
@@ -1422,7 +1458,7 @@ function renderPoches(poches) {
           <div class="poche-nom">${escapeHtml(p.nom)}</div>
           ${echeanceHtml}
         </div>
-        <button class="btn-poche-delete" data-id="${p.id}" title="Supprimer">✕</button>
+        <button class="btn-poche-delete" data-id="${p.id}" title="${t('delete_btn')}">✕</button>
       </div>
       <div class="poche-amounts">
         <div class="poche-amount-current">${formatMoney(p.montant_actuel)}</div>
@@ -1438,16 +1474,16 @@ function renderPoches(poches) {
           : `<span class="poche-reste">${t('remaining')} ${formatMoney(reste)}</span>`}
       </div>
       <div class="poche-actions">
-        <button class="btn-alimenter" data-id="${p.id}" data-nom="${escapeHtml(p.nom)}">+ Ajouter</button>
+        <button class="btn-alimenter" data-id="${p.id}" data-nom="${escapeHtml(p.nom)}">${t('add_to_pocket')}</button>
       </div>`;
 
     card.querySelector('.btn-poche-delete').addEventListener('click', async () => {
       if (!confirm(`${t('confirm_delete_pocket')} "${p.nom}" ?`)) return;
       try {
         await api(`/api/poches/${p.id}`, { method: 'DELETE' });
-        showToast(`Poche "${p.nom}" supprimée`, 'success');
+        showToast(`${t('pocket_deleted')} — "${p.nom}"`, 'success');
         loadPoches();
-      } catch (err) { showToast('Erreur : ' + err.message, 'error'); }
+      } catch (err) { showToast(t('error_prefix') + ' : ' + err.message, 'error'); }
     });
 
     card.querySelector('.btn-alimenter').addEventListener('click', () => {
@@ -1487,26 +1523,26 @@ function initPocheHandlers() {
     const objectifDisplay = parseFloat(document.getElementById('poche-objectif').value);
     const echeance        = document.getElementById('poche-echeance').value || null;
 
-    if (!nom)                        return showToast('Le nom est requis', 'error');
-    if (!objectifDisplay || objectifDisplay <= 0) return showToast('Objectif invalide', 'error');
+    if (!nom)                        return showToast(t('name_required'), 'error');
+    if (!objectifDisplay || objectifDisplay <= 0) return showToast(t('goal_invalid'), 'error');
 
     const objectif = toXOF(objectifDisplay); // convert to XOF for storage
 
     btnCreate.disabled    = true;
-    btnCreate.textContent = 'Création…';
+    btnCreate.textContent = t('creating');
     try {
       await api('/api/poches', {
         method: 'POST',
         body: JSON.stringify({ nom, objectif_montant: objectif, date_echeance: echeance })
       });
       closeModal();
-      showToast(`Poche "${nom}" créée 🐷`, 'success');
+      showToast(`${t('pocket_created')} — "${nom}" 🐷`, 'success');
       loadPoches();
     } catch (err) {
-      showToast('Erreur : ' + err.message, 'error');
+      showToast(t('error_prefix') + ' : ' + err.message, 'error');
     } finally {
       btnCreate.disabled    = false;
-      btnCreate.textContent = 'Créer la poche 🐷';
+      btnCreate.textContent = t('create_pocket_btn');
     }
   });
 }
@@ -1537,26 +1573,26 @@ function initAlimenterHandlers() {
 
   btnConfirm?.addEventListener('click', async () => {
     const montantDisplay = parseFloat(document.getElementById('alimenter-montant').value);
-    if (!montantDisplay || montantDisplay <= 0) return showToast('Montant invalide', 'error');
+    if (!montantDisplay || montantDisplay <= 0) return showToast(t('invalid_amount'), 'error');
     if (!currentPocheId) return;
 
     const montant = toXOF(montantDisplay); // convert to XOF for storage
 
     btnConfirm.disabled = true;
-    btnConfirm.textContent = 'Ajout…';
+    btnConfirm.textContent = t('adding');
     try {
       await api(`/api/poches/${currentPocheId}/alimenter`, {
         method: 'POST',
         body: JSON.stringify({ montant })
       });
       closeModal();
-      showToast('Montant ajouté 💰', 'success');
+      showToast(t('amount_added'), 'success');
       loadPoches();
     } catch (err) {
-      showToast('Erreur : ' + err.message, 'error');
+      showToast(t('error_prefix') + ' : ' + err.message, 'error');
     } finally {
       btnConfirm.disabled = false;
-      btnConfirm.textContent = 'Ajouter 💰';
+      btnConfirm.textContent = t('add_funds_btn');
     }
   });
 }
@@ -1601,7 +1637,7 @@ async function initiatePayment() {
   if (!btn) return;
 
   btn.disabled       = true;
-  btnText.textContent = 'Connexion au paiement…';
+  btnText.textContent = t('connecting_payment');
   if (spinner) spinner.style.display = 'inline';
 
   try {
@@ -1609,15 +1645,15 @@ async function initiatePayment() {
     if (data?.checkout_url) {
       window.location.href = data.checkout_url;
     } else {
-      showToast(data?.error || 'Erreur lors de l\'initiation du paiement.', 'error');
+      showToast(data?.error || t('error_payment'), 'error');
       btn.disabled        = false;
-      btnText.textContent = 'S\'abonner maintenant';
+      btnText.textContent = t('subscribe_now');
       if (spinner) spinner.style.display = 'none';
     }
   } catch (err) {
-    showToast(err.message || 'Erreur réseau. Réessaie.', 'error');
+    showToast(err.message || t('error_network'), 'error');
     btn.disabled        = false;
-    btnText.textContent = 'S\'abonner maintenant';
+    btnText.textContent = t('subscribe_now');
     if (spinner) spinner.style.display = 'none';
   }
 }
@@ -1745,11 +1781,11 @@ function init() {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('payment') === 'success') {
     history.replaceState({}, '', '/');
-    showToast('Paiement reçu ! Activation en cours…', 'success');
+    showToast(t('payment_success'), 'success');
     setTimeout(() => checkPlan(), 3000); // webhook may take a moment
   } else if (urlParams.get('payment') === 'cancel') {
     history.replaceState({}, '', '/');
-    showToast('Paiement annulé.', 'error');
+    showToast(t('payment_cancel'), 'error');
   }
 
   // Handle manifest shortcut ?tab=chat
@@ -1808,7 +1844,7 @@ function init() {
   // Offline queue — badge + auto-sync on reconnect
   renderOfflineBadge();
   window.addEventListener('online', () => {
-    showToast('Connexion rétablie 🌐', 'success');
+    showToast(t('connection_restored'), 'success');
     syncOfflineQueue();
   });
   document.getElementById('btn-sync-offline')?.addEventListener('click', syncOfflineQueue);
@@ -2003,7 +2039,7 @@ function openBudgets() {
 
   const month = state.currentMonth;
   document.getElementById('budget-month-label').textContent =
-    new Date(month + '-01').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    new Date(month + '-01').toLocaleDateString(getLocale(), { month: 'long', year: 'numeric' });
 
   overlay.style.display = 'block';
   setTimeout(() => { panel.style.transform = 'translateY(0)'; }, 0);
@@ -2035,8 +2071,8 @@ function renderBudgetList(budgetMap, spending) {
 
   list.innerHTML = `
     <div class="cat-manage-header">
-      <span class="cat-manage-title">Catégories de dépenses</span>
-      <button class="btn-add-cat" id="btn-add-cat">+ Nouvelle</button>
+      <span class="cat-manage-title">${t('cat_expenses_title')}</span>
+      <button class="btn-add-cat" id="btn-add-cat">${t('new_cat_btn')}</button>
     </div>` +
     expenseCats.map(cat => {
       const limite   = budgetMap[cat.nom] || 0;
@@ -2050,13 +2086,13 @@ function renderBudgetList(budgetMap, spending) {
            <div class="budget-progress-label">${formatMoney(spent)} / ${formatMoney(limite)} (${bPct}%)</div>`
         : '';
       const catActions = cat.id
-        ? `<button class="btn-cat-edit" data-cat-id="${cat.id}" title="Modifier">
+        ? `<button class="btn-cat-edit" data-cat-id="${cat.id}" title="${t('edit_name')}">
              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
              </svg>
            </button>
-           <button class="btn-cat-delete" data-cat-id="${cat.id}" data-cat-nom="${escapeHtml(cat.nom)}" title="Supprimer">
+           <button class="btn-cat-delete" data-cat-id="${cat.id}" data-cat-nom="${escapeHtml(cat.nom)}" title="${t('delete_btn')}">
              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                <polyline points="3 6 5 6 21 6"/>
                <path d="M19 6l-1 14H6L5 6"/>
@@ -2112,9 +2148,9 @@ async function saveBudget(input) {
     }
     // Refresh dashboard category list with new budgets
     loadDashboard();
-    showToast(`Budget ${category} ${limite > 0 ? 'enregistré' : 'supprimé'}`, 'success');
+    showToast(`${category} — ${limite > 0 ? t('budget_saved') : t('budget_removed')}`, 'success');
   } catch (err) {
-    showToast('Erreur : ' + err.message, 'error');
+    showToast(t('error_prefix') + ' : ' + err.message, 'error');
   }
 }
 
@@ -2131,8 +2167,8 @@ function openCatModal(catId) {
   document.getElementById('cat-modal-icone').value   = '📦';
   document.getElementById('cat-modal-couleur').value = '#6B7280';
   document.getElementById('cat-modal-type').value    = 'expense';
-  document.getElementById('cat-modal-title').textContent = catId ? 'Modifier la catégorie' : 'Nouvelle catégorie';
-  document.getElementById('btn-cat-save').textContent = catId ? 'Enregistrer' : 'Créer';
+  document.getElementById('cat-modal-title').textContent = catId ? t('edit_category') : t('new_category');
+  document.getElementById('btn-cat-save').textContent = catId ? t('save') : t('cat_create');
 
   if (catId) {
     const cat = state.userCats.find(c => c.id === catId);
@@ -2148,14 +2184,14 @@ function openCatModal(catId) {
 }
 
 async function deleteCat(catId, nom) {
-  if (!confirm(`Supprimer la catégorie "${nom}" ?`)) return;
+  if (!confirm(`${t('confirm_delete_cat')} "${nom}" ?`)) return;
   try {
     await api(`/api/categories/${catId}`, { method: 'DELETE' });
-    showToast(`Catégorie "${nom}" supprimée`, 'success');
+    showToast(`${t('cat_deleted')} — "${nom}"`, 'success');
     await loadUserCategories();
     openBudgets();
   } catch (err) {
-    showToast('Erreur : ' + err.message, 'error');
+    showToast(t('error_prefix') + ' : ' + err.message, 'error');
   }
 }
 
@@ -2177,7 +2213,7 @@ function initCatModalHandlers() {
     const icone   = document.getElementById('cat-modal-icone').value.trim() || '📦';
     const couleur = document.getElementById('cat-modal-couleur').value || '#6B7280';
     const type    = document.getElementById('cat-modal-type').value;
-    if (!nom) return showToast('Nom requis', 'error');
+    if (!nom) return showToast(t('name_required_err'), 'error');
 
     btnSave.disabled = true;
     const origLabel = btnSave.textContent;
@@ -2185,16 +2221,16 @@ function initCatModalHandlers() {
     try {
       if (catId) {
         await api(`/api/categories/${catId}`, { method: 'PUT', body: JSON.stringify({ nom, icone, couleur, type }) });
-        showToast(`Catégorie "${nom}" mise à jour`, 'success');
+        showToast(`${t('cat_updated')} — "${nom}"`, 'success');
       } else {
         await api('/api/categories', { method: 'POST', body: JSON.stringify({ nom, icone, couleur, type }) });
-        showToast(`Catégorie "${nom}" créée`, 'success');
+        showToast(`${t('cat_created')} — "${nom}"`, 'success');
       }
       closeModal();
       await loadUserCategories();
       openBudgets();
     } catch (err) {
-      showToast('Erreur : ' + err.message, 'error');
+      showToast(t('error_prefix') + ' : ' + err.message, 'error');
     } finally {
       btnSave.disabled = false;
       btnSave.textContent = origLabel;
@@ -2258,7 +2294,7 @@ function openProfile() {
     if (data.created_at) {
       const d = new Date(data.created_at);
       document.getElementById('profile-since').textContent =
-        'Membre depuis ' + d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+        t('member_since') + ' ' + d.toLocaleDateString(getLocale(), { month: 'long', year: 'numeric' });
     }
     if (data.photo) {
       setProfilePhoto(data.photo);
@@ -2413,7 +2449,7 @@ function initProfileHandlers() {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      showToast('Image trop grande (max 5 Mo)', 'error');
+      showToast(t('photo_too_large'), 'error');
       return;
     }
 
@@ -2441,10 +2477,10 @@ function initProfileHandlers() {
             method: 'PUT',
             body: JSON.stringify({ photo: base64 })
           });
-          showToast('Photo mise à jour ✓', 'success');
+          showToast(t('photo_updated'), 'success');
         } catch (err) {
           console.error('[photo upload]', err);
-          showToast('Erreur sauvegarde : ' + err.message, 'error');
+          showToast(t('error_save_prefix') + ' : ' + err.message, 'error');
         }
       };
       img.src = ev.target.result;
@@ -2467,7 +2503,7 @@ function initProfileHandlers() {
   document.getElementById('btn-profile-save-name')?.addEventListener('click', async () => {
     const input = document.getElementById('profile-name-input');
     const newName = input.value.trim();
-    if (!newName) { showToast('Le nom ne peut pas être vide', 'error'); return; }
+    if (!newName) { showToast(t('name_empty'), 'error'); return; }
 
     try {
       const res = await api('/api/profile/name', {
@@ -2490,9 +2526,9 @@ function initProfileHandlers() {
       document.getElementById('user-greeting').textContent =
         `${greeting}, ${res.name.split(' ')[0]} 👋`;
 
-      showToast('Nom mis à jour', 'success');
+      showToast(t('name_updated'), 'success');
     } catch (err) {
-      showToast('Erreur : ' + err.message, 'error');
+      showToast(t('error_prefix') + ' : ' + err.message, 'error');
     }
   });
 
@@ -2533,7 +2569,7 @@ function initProfileHandlers() {
       btn.textContent = '✓ ' + btn.dataset.label;
       localStorage.setItem('kula_lang', lang);
       if (typeof applyI18n === 'function') applyI18n(lang);
-      showToast(lang === 'fr' ? 'Langue : Français' : 'Language: English', 'success');
+      showToast(t('lang_changed'), 'success');
       // Refresh current tab so translated dynamic strings (score, charts, dates) update
       if (state.currentTab === 'dashboard') loadDashboard();
       else if (state.currentTab === 'transactions') loadTransactions();
@@ -2557,13 +2593,13 @@ function initProfileHandlers() {
   });
 
   document.getElementById('btn-feedback-send')?.addEventListener('click', () => {
-    if (!feedbackRating) { showToast('Choisis une note (1 à 5 étoiles)', 'error'); return; }
+    if (!feedbackRating) { showToast(t('feedback_pick'), 'error'); return; }
     const message = document.getElementById('feedback-text').value.trim();
     const email = getUser().email || '';
     const stars = '⭐'.repeat(feedbackRating);
     const text = `⭐ Avis Kula\nNote: ${stars} (${feedbackRating}/5)\nMessage: ${message || '—'}\nUtilisateur: ${email}`;
     window.open(`https://wa.me/+221767424309?text=${encodeURIComponent(text)}`, '_blank');
-    showToast('Merci pour votre avis !', 'success');
+    showToast(t('feedback_thanks'), 'success');
     feedbackRating = 0;
     document.querySelectorAll('#feedback-stars .feedback-star').forEach(s => { s.textContent = '☆'; s.classList.remove('active'); });
     document.getElementById('feedback-text').value = '';
@@ -2778,13 +2814,13 @@ const addTxModal = (() => {
 
   async function submit() {
     const displayAmount = parseFloat(amountEl().value);
-    if (!displayAmount || displayAmount <= 0) { showToast('Montant invalide', 'error'); return; }
-    if (!selectedCat)                         { showToast('Sélectionnez une catégorie', 'error'); return; }
+    if (!displayAmount || displayAmount <= 0) { showToast(t('invalid_amount'), 'error'); return; }
+    if (!selectedCat)                         { showToast(t('select_category'), 'error'); return; }
 
     let category = selectedCat;
     if (selectedCat === 'Autre') {
       const txt = autreEl().value.trim();
-      if (!txt) { showToast('Précisez la catégorie', 'error'); return; }
+      if (!txt) { showToast(t('specify_cat'), 'error'); return; }
       category = txt;
     }
 
@@ -2794,7 +2830,7 @@ const addTxModal = (() => {
 
     // Disable submit
     submitEl().disabled = true;
-    submitTx().textContent = 'Enregistrement…';
+    submitTx().textContent = t('registering');
     spinEl().style.display = 'inline';
 
     try {
@@ -2810,7 +2846,7 @@ const addTxModal = (() => {
         })
       });
 
-      showToast(currentType === 'expense' ? '💸 Dépense ajoutée !' : '💰 Revenu ajouté !', 'success');
+      showToast(currentType === 'expense' ? t('expense_added') : t('income_added'), 'success');
       close();
 
       // Refresh dashboard data
@@ -2819,10 +2855,10 @@ const addTxModal = (() => {
         loadTransactions();
       }
     } catch (err) {
-      showToast(err.message || 'Erreur lors de l\'enregistrement', 'error');
+      showToast(err.message || t('error_saving'), 'error');
     } finally {
       submitEl().disabled = false;
-      submitTx().textContent = 'Enregistrer';
+      submitTx().textContent = t('save');
       spinEl().style.display = 'none';
     }
   }
