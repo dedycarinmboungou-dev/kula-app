@@ -162,6 +162,13 @@ function getCurrencySymbol() {
   return CURRENCY_CONFIG[getUserCurrency()]?.symbol || 'FCFA';
 }
 
+/** Convert a user-entered amount (in display currency) back to XOF for storage */
+function toXOF(displayAmount) {
+  const cur = getUserCurrency();
+  const rate = CURRENCY_CONFIG[cur]?.rate || 1;
+  return Math.round(displayAmount / rate);
+}
+
 /** Convert an XOF amount to display currency and format it with symbol */
 function formatMoney(amountXOF) {
   if (typeof amountXOF !== 'number') amountXOF = parseFloat(amountXOF) || 0;
@@ -1476,12 +1483,14 @@ function initPocheHandlers() {
   modal?.addEventListener('click', e => e.stopPropagation());
 
   btnCreate?.addEventListener('click', async () => {
-    const nom      = document.getElementById('poche-nom').value.trim();
-    const objectif = parseFloat(document.getElementById('poche-objectif').value);
-    const echeance = document.getElementById('poche-echeance').value || null;
+    const nom             = document.getElementById('poche-nom').value.trim();
+    const objectifDisplay = parseFloat(document.getElementById('poche-objectif').value);
+    const echeance        = document.getElementById('poche-echeance').value || null;
 
-    if (!nom)              return showToast('Le nom est requis', 'error');
-    if (!objectif || objectif <= 0) return showToast('Objectif invalide', 'error');
+    if (!nom)                        return showToast('Le nom est requis', 'error');
+    if (!objectifDisplay || objectifDisplay <= 0) return showToast('Objectif invalide', 'error');
+
+    const objectif = toXOF(objectifDisplay); // convert to XOF for storage
 
     btnCreate.disabled    = true;
     btnCreate.textContent = 'Création…';
@@ -1527,9 +1536,11 @@ function initAlimenterHandlers() {
   modal?.addEventListener('click', e => e.stopPropagation());
 
   btnConfirm?.addEventListener('click', async () => {
-    const montant = parseFloat(document.getElementById('alimenter-montant').value);
-    if (!montant || montant <= 0) return showToast('Montant invalide', 'error');
+    const montantDisplay = parseFloat(document.getElementById('alimenter-montant').value);
+    if (!montantDisplay || montantDisplay <= 0) return showToast('Montant invalide', 'error');
     if (!currentPocheId) return;
+
+    const montant = toXOF(montantDisplay); // convert to XOF for storage
 
     btnConfirm.disabled = true;
     btnConfirm.textContent = 'Ajout…';
@@ -2658,6 +2669,8 @@ const addTxModal = (() => {
   function open() {
     // Default date = today
     dateEl().value = new Date().toISOString().slice(0, 10);
+    // Refresh currency label in form
+    updateCurrencyLabels();
     overlay().classList.add('open');
     overlay().setAttribute('aria-hidden', 'false');
     amountEl().focus();
@@ -2743,9 +2756,9 @@ const addTxModal = (() => {
   }
 
   async function submit() {
-    const amount = parseFloat(amountEl().value);
-    if (!amount || amount <= 0) { showToast('Montant invalide', 'error'); return; }
-    if (!selectedCat)           { showToast('Sélectionnez une catégorie', 'error'); return; }
+    const displayAmount = parseFloat(amountEl().value);
+    if (!displayAmount || displayAmount <= 0) { showToast('Montant invalide', 'error'); return; }
+    if (!selectedCat)                         { showToast('Sélectionnez une catégorie', 'error'); return; }
 
     let category = selectedCat;
     if (selectedCat === 'Autre') {
@@ -2756,6 +2769,7 @@ const addTxModal = (() => {
 
     const description = descEl().value.trim() || category;
     const date        = dateEl().value || new Date().toISOString().slice(0, 10);
+    const amount      = toXOF(displayAmount); // convert to XOF for storage
 
     // Disable submit
     submitEl().disabled = true;
