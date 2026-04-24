@@ -18,6 +18,8 @@ const I18N = {
     total_balance:    'Solde total',
     monthly_income:   'Revenus',
     monthly_expense:  'Dépenses',
+    income_label:     'Revenus du mois',
+    expense_label:    'Dépenses du mois',
     this_month:       'Ce mois',
     categories:       'Catégories',
     trend:            'Tendance',
@@ -185,6 +187,8 @@ const I18N = {
     total_balance:    'Total balance',
     monthly_income:   'Income',
     monthly_expense:  'Expenses',
+    income_label:     'Monthly income',
+    expense_label:    'Monthly expenses',
     this_month:       'This month',
     categories:       'Categories',
     trend:            'Trend',
@@ -353,11 +357,13 @@ function applyI18n(lang) {
 
   // Specific elements by ID
   const map = {
-    'profile-topbar-title': 'my_profile',
-    'feedback-text':        null, // placeholder
-    'install-prompt-title': 'install_kula',
-    'install-prompt-sub':   'install_sub'
+    'profile-topbar-title': 'my_profile'
   };
+  Object.entries(map).forEach(([id, key]) => {
+    if (!key) return;
+    const el = document.getElementById(id);
+    if (el && tr[key]) el.textContent = tr[key];
+  });
 
   // All data-i18n-placeholder attributes
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {

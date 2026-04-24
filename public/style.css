@@ -56,7 +56,7 @@ html, body {
 button, a, nav, .nav-item, .nav-fab, .filter-tab,
 .auth-tab, .balance-card, .stat-card, .section-header,
 .chat-topbar, .install-card, .welcome-modal,
-.pwa-modal-header, .pwa-os-tabs {
+.pwa-modal-header {
   -webkit-user-select: none;
   user-select: none;
 }
@@ -1936,32 +1936,32 @@ button, a, img, .nav-item, .nav-fab,
   flex-shrink: 0;
 }
 
-/* OS Tabs */
-.pwa-os-tabs {
-  display: flex;
-  gap: 8px;
-  padding: 14px 20px 0;
-}
-
-.pwa-os-tab {
-  flex: 1;
-  padding: 10px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--light-gray);
-  font-size: 14px;
+/* Detected browser badge */
+.pwa-detected-badge {
+  margin: 10px 20px 0;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065F46;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--gray);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.2s;
+  padding: 6px 12px;
+  border-radius: 20px;
+  display: inline-block;
 }
 
-.pwa-os-tab.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: white;
+/* Safari bottom bar mockup */
+.mockup-safari-bar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f0f0f5;
+  border-radius: 0 0 6px 6px;
+  border-top: 1px solid #ddd;
 }
+.mockup-safari-btn { font-size: 15px; color: #555; }
+.mockup-safari-share { font-size: 17px; color: #007AFF; font-weight: bold; }
+.pwa-icon-share { color: #007AFF; font-weight: bold; }
 
 /* Guide panels */
 .pwa-guide { display: none; padding: 16px 20px 24px; }

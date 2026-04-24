@@ -1390,11 +1390,13 @@ C) CONSEILLER FINANCIÈREMENT — budget, épargne, investissement, gestion de l
 D) COACHER ET MOTIVER — analyser les habitudes, valoriser les progrès, fixer des objectifs réalistes
 
 DEVISE ET CONVERSION :
-Devise d'affichage de ${firstName} : ${userCurrency}
+Devise choisie par ${firstName} : ${userCurrency}
 Les montants sont TOUJOURS stockés en FCFA dans la base. Taux de conversion :
 - 1 EUR (€) = 655,957 FCFA
 - 1 USD ($) = 655 FCFA
 - 1 XOF / FCFA = 1 FCFA
+RÈGLE DEVISE PAR DÉFAUT : Si l'utilisateur mentionne un montant SANS préciser de devise, considère
+que ce montant est en ${userCurrency}. Convertis-le en FCFA si nécessaire.
 RÈGLE CRITIQUE : Si l'utilisateur mentionne un montant en devise étrangère (€, $, USD, EUR, etc.),
 convertis-le AUTOMATIQUEMENT en FCFA pour le champ "amount" de la transaction (arrondi à l'entier).
 Mentionne la conversion dans le message de confirmation (ex: "5 € = 3 280 FCFA").

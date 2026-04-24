@@ -1847,7 +1847,10 @@ function init() {
   // Already installed (running in standalone mode) → nothing to do
   if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) return;
 
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const ua    = navigator.userAgent;
+  const isIOS    = /iphone|ipad|ipod/i.test(ua);
+  const isSafari = isIOS && /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS/i.test(ua);
+  const isIOSChrome = isIOS && /CriOS/i.test(ua);
   let deferredPrompt = null;
 
   function showInstallPrompt() {
@@ -1917,23 +1920,41 @@ function init() {
       document.getElementById('pwa-modal').style.display = 'none';
   });
 
-  // OS tabs
-  document.querySelectorAll('.pwa-os-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.pwa-os-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.pwa-guide').forEach(g => g.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById(`guide-${tab.dataset.os}`)?.classList.add('active');
-    });
-  });
-
-  function openPWAModal(os = 'android') {
+  function openPWAModal() {
     const modal = document.getElementById('pwa-modal');
     if (!modal) return;
-    // Activate correct OS tab
-    document.querySelectorAll('.pwa-os-tab').forEach(t => t.classList.toggle('active', t.dataset.os === os));
+
+    // Auto-detect which guide to show
+    let guideId, browserLabel;
+    if (isSafari) {
+      guideId      = 'guide-ios-safari';
+      browserLabel = '🧭 Safari sur iPhone';
+    } else if (isIOSChrome) {
+      guideId      = 'guide-ios-chrome';
+      browserLabel = '🟡 Chrome sur iPhone';
+    } else if (isIOS) {
+      guideId      = 'guide-ios-safari'; // fallback for other iOS browsers
+      browserLabel = '📱 iPhone';
+    } else {
+      guideId      = 'guide-android';
+      browserLabel = null;
+    }
+
+    // Show correct guide only
     document.querySelectorAll('.pwa-guide').forEach(g => g.classList.remove('active'));
-    document.getElementById(`guide-${os}`)?.classList.add('active');
+    document.getElementById(guideId)?.classList.add('active');
+
+    // Show detected browser badge
+    const badge = document.getElementById('pwa-detected-badge');
+    if (badge) {
+      if (browserLabel) {
+        badge.textContent = `Détecté : ${browserLabel}`;
+        badge.style.display = 'block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
     modal.style.display = 'flex';
   }
 })();
@@ -2564,7 +2585,7 @@ window.switchTab        = switchTab;
 
 // ── Guided Tour ───────────────────────────────────────────────────────────────
 const TOUR_STEPS = [
-  { target: '#tab-dashboard',          titleKey: 'tour_step1_title', descKey: 'tour_step1_desc' },
+  { target: '.balance-card',           titleKey: 'tour_step1_title', descKey: 'tour_step1_desc' },
   { target: '#fab-add-tx',             titleKey: 'tour_step2_title', descKey: 'tour_step2_desc' },
   { target: '[data-tab="epargne"]',    titleKey: 'tour_step3_title', descKey: 'tour_step3_desc' },
   { target: '#nav-chat',               titleKey: 'tour_step4_title', descKey: 'tour_step4_desc' },

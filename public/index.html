@@ -147,12 +147,12 @@
     <div class="stats-row">
       <div class="stat-card">
         <div class="stat-icon income">💰</div>
-        <div class="stat-label">Revenus du mois</div>
+        <div class="stat-label" data-i18n="income_label">Revenus du mois</div>
         <div class="stat-amount income" id="monthly-income">—</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon expense">💸</div>
-        <div class="stat-label">Dépenses du mois</div>
+        <div class="stat-label" data-i18n="expense_label">Dépenses du mois</div>
         <div class="stat-amount expense" id="monthly-expense">—</div>
       </div>
     </div>
@@ -548,7 +548,7 @@
         <path d="M19 12H5M12 5l-7 7 7 7"/>
       </svg>
     </button>
-    <span class="profile-topbar-title">Mon Profil</span>
+    <span class="profile-topbar-title" id="profile-topbar-title">Mon Profil</span>
   </div>
 
   <!-- Avatar -->
@@ -784,14 +784,11 @@
       <button class="pwa-modal-close" id="pwa-modal-close">✕</button>
     </div>
 
-    <!-- OS tabs -->
-    <div class="pwa-os-tabs">
-      <button class="pwa-os-tab active" data-os="android">🤖 Android</button>
-      <button class="pwa-os-tab" data-os="ios">🍎 iPhone</button>
-    </div>
+    <!-- Detected browser badge (shown when auto-detected) -->
+    <div class="pwa-detected-badge" id="pwa-detected-badge" style="display:none"></div>
 
     <!-- Android guide -->
-    <div class="pwa-guide active" id="guide-android">
+    <div class="pwa-guide" id="guide-android">
       <div class="pwa-step">
         <div class="pwa-step-num">1</div>
         <div class="pwa-step-content">
@@ -837,12 +834,64 @@
       <button class="pwa-install-now" id="btn-install-modal">Installer maintenant ↗</button>
     </div>
 
-    <!-- iOS guide (Chrome) -->
-    <div class="pwa-guide" id="guide-ios">
+    <!-- iOS Safari guide -->
+    <div class="pwa-guide" id="guide-ios-safari">
       <div class="pwa-step">
         <div class="pwa-step-num">1</div>
         <div class="pwa-step-content">
-          <div class="pwa-step-title">Ouvre Kula dans <strong>Chrome</strong>, puis appuie sur <strong>⋮</strong> (menu)</div>
+          <div class="pwa-step-title">Appuie sur <strong>Partager</strong> <span class="pwa-icon-share">⬆</span> en bas de Safari</div>
+          <div class="pwa-mockup">
+            <div class="mockup-bar safari">
+              <span class="mockup-url">kula-app.onrender.com</span>
+            </div>
+            <div class="mockup-safari-bar">
+              <span class="mockup-safari-btn">◀</span>
+              <span class="mockup-safari-btn">▶</span>
+              <span class="mockup-safari-share">⬆</span>
+              <span class="mockup-safari-btn">⊡</span>
+              <span class="mockup-safari-btn">⊞</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pwa-step">
+        <div class="pwa-step-num">2</div>
+        <div class="pwa-step-content">
+          <div class="pwa-step-title">Appuie sur <strong>"Sur l'écran d'accueil"</strong></div>
+          <div class="pwa-mockup">
+            <div class="mockup-sheet">
+              <div class="mockup-sheet-item">📋 Copier</div>
+              <div class="mockup-sheet-item mockup-sheet-highlight">＋ Sur l'écran d'accueil</div>
+              <div class="mockup-sheet-item">📌 Ajouter aux favoris</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pwa-step">
+        <div class="pwa-step-num">3</div>
+        <div class="pwa-step-content">
+          <div class="pwa-step-title">Appuie sur <strong>"Ajouter"</strong> en haut à droite</div>
+          <div class="pwa-mockup">
+            <div class="mockup-dialog">
+              <div class="mockup-dialog-icon">🌱</div>
+              <div class="mockup-dialog-name">Kula</div>
+              <div class="mockup-dialog-sub">kula-app.onrender.com</div>
+              <div class="mockup-dialog-actions">
+                <span class="mockup-link">Annuler</span>
+                <span class="mockup-btn-primary">Ajouter</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- iOS Chrome guide -->
+    <div class="pwa-guide" id="guide-ios-chrome">
+      <div class="pwa-step">
+        <div class="pwa-step-num">1</div>
+        <div class="pwa-step-content">
+          <div class="pwa-step-title">Appuie sur <strong>⋮</strong> en haut à droite</div>
           <div class="pwa-mockup">
             <div class="mockup-bar">
               <span class="mockup-url">kula-app.onrender.com</span>
@@ -881,7 +930,6 @@
           </div>
         </div>
       </div>
-      <div class="pwa-note">💡 Sur iPhone, utilise <strong>Chrome</strong> pour installer Kula</div>
     </div>
 
   </div>
