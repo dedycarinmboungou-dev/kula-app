@@ -156,7 +156,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for other static assets (CSS, JS, icons)
+  // Network-first for JS/CSS (always get fresh code); cache-first for images/fonts
+  const isCode = url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
+  if (isCode) {
+    event.respondWith(
+      fetch(request).then(response => {
+        if (response.ok) {
+          caches.open(CACHE_NAME).then(c => c.put(request, response.clone()));
+        }
+        return response;
+      }).catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Cache-first for other static assets (icons, fonts, images)
   event.respondWith(
     caches.match(request).then((cached) =>
       cached || fetch(request).then((response) => {
