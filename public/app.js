@@ -279,52 +279,129 @@ async function downloadPDF() {
   }
 }
 
-// ── Month selector ────────────────────────────────────────────────────────────
-let monthSelectorsInitialized = false;
+// ── Month calendar picker ─────────────────────────────────────────────────────
+const monthCal = {
+  target: null,       // 'dashboard' | 'transactions'
+  year: new Date().getFullYear(),
+  initialized: false
+};
+
+function getMonthShortNames() {
+  const names = [];
+  for (let m = 0; m < 12; m++) {
+    const d = new Date(2026, m, 1);
+    let lbl = d.toLocaleDateString(getLocale(), { month: 'short' });
+    names.push(lbl.charAt(0).toUpperCase() + lbl.slice(1));
+  }
+  return names;
+}
+
+function updateMonthLabels() {
+  const dashLabel = document.getElementById('month-picker-label');
+  const txLabel   = document.getElementById('tx-month-picker-label');
+  if (dashLabel) dashLabel.textContent = formatMonthLabel(state.currentMonth);
+  if (txLabel)   txLabel.textContent   = formatMonthLabel(state.txMonth);
+}
+
+function openMonthCal(target) {
+  monthCal.target = target;
+  const selected = target === 'transactions' ? state.txMonth : state.currentMonth;
+  monthCal.year = parseInt(selected.split('-')[0]);
+  renderMonthCal(selected);
+  document.getElementById('month-cal-overlay').style.display = 'flex';
+}
+
+function closeMonthCal() {
+  document.getElementById('month-cal-overlay').style.display = 'none';
+}
+
+function renderMonthCal(selectedMonth) {
+  const now       = new Date();
+  const nowMonth  = now.toISOString().slice(0, 7);
+  const names     = getMonthShortNames();
+  const grid      = document.getElementById('month-cal-grid');
+  const yearLabel = document.getElementById('month-cal-year');
+
+  yearLabel.textContent = monthCal.year;
+
+  grid.innerHTML = names.map((name, i) => {
+    const val   = `${monthCal.year}-${String(i + 1).padStart(2, '0')}`;
+    const isFuture   = val > nowMonth;
+    const isCurrent  = val === nowMonth;
+    const isSelected = val === selectedMonth;
+    const cls = 'month-cal-cell'
+      + (isSelected ? ' selected' : '')
+      + (isCurrent && !isSelected ? ' current' : '')
+      + (isFuture ? ' future' : '');
+    return `<button class="${cls}" data-month="${val}">${name}</button>`;
+  }).join('');
+
+  grid.querySelectorAll('.month-cal-cell:not(.future)').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const month = btn.dataset.month;
+      if (monthCal.target === 'transactions') {
+        state.txMonth = month;
+        loadTransactions();
+      } else {
+        state.currentMonth = month;
+        state.txMonth = month;
+        loadDashboard();
+      }
+      updateMonthLabels();
+      closeMonthCal();
+    });
+  });
+}
 
 function initMonthSelectors() {
+  // Always sync to real current month on init
   const now = new Date();
   const currentMonth = now.toISOString().slice(0, 7);
-  const months = [];
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(d.toISOString().slice(0, 7));
-  }
-
-  // If the real current month isn't in state yet (e.g. app was cached from last month), update it
-  if (!months.includes(state.currentMonth)) {
+  if (state.currentMonth > currentMonth || state.currentMonth < '2024-01') {
     state.currentMonth = currentMonth;
     state.txMonth = currentMonth;
   }
 
-  [document.getElementById('month-select'), document.getElementById('tx-month-select')].forEach(sel => {
-    if (!sel) return;
-    const target = sel.id === 'tx-month-select' ? state.txMonth : state.currentMonth;
-    sel.innerHTML = months.map(m =>
-      `<option value="${m}"${m === target ? ' selected' : ''}>${formatMonthLabel(m)}</option>`
-    ).join('');
-  });
+  updateMonthLabels();
 
-  // Only bind event listeners once
-  if (!monthSelectorsInitialized) {
-    monthSelectorsInitialized = true;
+  if (!monthCal.initialized) {
+    monthCal.initialized = true;
 
-    document.getElementById('month-select').addEventListener('change', e => {
-      state.currentMonth = e.target.value;
-      document.getElementById('tx-month-select').value = e.target.value;
-      loadDashboard();
+    // Dashboard month picker button
+    document.getElementById('month-picker-btn').addEventListener('click', () => openMonthCal('dashboard'));
+
+    // Transactions month picker button
+    document.getElementById('tx-month-picker-btn').addEventListener('click', () => openMonthCal('transactions'));
+
+    // Close on overlay click
+    document.getElementById('month-cal-overlay').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeMonthCal();
     });
 
-    document.getElementById('tx-month-select').addEventListener('change', e => {
-      state.txMonth = e.target.value;
-      loadTransactions();
+    // Year navigation
+    document.getElementById('month-cal-prev').addEventListener('click', () => {
+      monthCal.year--;
+      const selected = monthCal.target === 'transactions' ? state.txMonth : state.currentMonth;
+      renderMonthCal(selected);
+    });
+    document.getElementById('month-cal-next').addEventListener('click', () => {
+      const maxYear = new Date().getFullYear();
+      if (monthCal.year < maxYear) {
+        monthCal.year++;
+        const selected = monthCal.target === 'transactions' ? state.txMonth : state.currentMonth;
+        renderMonthCal(selected);
+      }
     });
 
-    // Re-initialize month selectors when app comes back to foreground (new day/month)
+    // Re-sync month labels when app returns to foreground
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        initMonthSelectors();
-        // Also refresh dashboard data
+        const fresh = new Date().toISOString().slice(0, 7);
+        if (state.currentMonth > fresh) {
+          state.currentMonth = fresh;
+          state.txMonth = fresh;
+        }
+        updateMonthLabels();
         loadDashboard();
       }
     });

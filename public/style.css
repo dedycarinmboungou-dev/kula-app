@@ -190,31 +190,118 @@ button, a, img, .nav-item, .nav-fab,
   font-style: italic;
 }
 
-.month-selector {
+/* ─── Month picker button (header) ─────────────────────────────────────────── */
+.month-picker-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: rgba(255,255,255,0.12);
   border: 1px solid rgba(255,255,255,0.2);
   border-radius: 20px;
-  padding: 6px 12px;
+  padding: 6px 14px;
   cursor: pointer;
-}
-
-.month-selector select {
-  background: transparent;
-  border: none;
   color: var(--white);
   font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
-  outline: none;
-  -webkit-appearance: none;
+  white-space: nowrap;
+  transition: background 0.2s;
 }
+.month-picker-btn:active { background: rgba(255,255,255,0.22); }
+.month-picker-btn svg { opacity: 0.7; flex-shrink: 0; }
 
-.month-selector select option {
-  background: #065F46;
-  color: white;
+/* Transactions tab variant */
+.month-picker-btn-tx {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  color: var(--dark);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+}
+.month-picker-btn-tx:active { background: var(--light); }
+.month-picker-btn-tx svg { stroke: var(--dark); }
+
+/* ─── Month calendar popup ─────────────────────────────────────────────────── */
+.month-cal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+.month-cal {
+  background: var(--white);
+  border-radius: 20px;
+  padding: 20px;
+  width: min(320px, 90vw);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  animation: slideUp 0.2s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.month-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.month-cal-year {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--dark);
+}
+.month-cal-arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--light);
+  color: var(--dark);
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.month-cal-arrow:active { background: var(--border); }
+.month-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.month-cal-cell {
+  padding: 12px 4px;
+  border-radius: 12px;
+  border: none;
+  background: var(--light);
+  color: var(--dark);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+.month-cal-cell:active { transform: scale(0.95); }
+.month-cal-cell.selected {
+  background: var(--primary);
+  color: var(--white);
+  font-weight: 700;
+}
+.month-cal-cell.current {
+  border: 2px solid var(--primary);
+}
+.month-cal-cell.future {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 /* ─── Bottom Navigation ────────────────────────────────────────────────────── */
@@ -1560,21 +1647,6 @@ button, a, img, .nav-item, .nav-fab,
   margin-bottom: 16px;
   align-items: center;
 }
-
-.month-filter-row select {
-  flex: 1;
-  padding: 10px 14px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 500;
-  background: var(--white);
-  color: var(--dark);
-  outline: none;
-  cursor: pointer;
-}
-
-.month-filter-row select:focus { border-color: var(--primary); }
 
 /* ─── PDF Export button ──────────────────────────────────────────────────────── */
 .btn-export-pdf {
