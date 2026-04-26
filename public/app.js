@@ -280,31 +280,55 @@ async function downloadPDF() {
 }
 
 // ── Month selector ────────────────────────────────────────────────────────────
+let monthSelectorsInitialized = false;
+
 function initMonthSelectors() {
   const now = new Date();
+  const currentMonth = now.toISOString().slice(0, 7);
   const months = [];
   for (let i = 0; i < 12; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push(d.toISOString().slice(0, 7));
   }
 
+  // If the real current month isn't in state yet (e.g. app was cached from last month), update it
+  if (!months.includes(state.currentMonth)) {
+    state.currentMonth = currentMonth;
+    state.txMonth = currentMonth;
+  }
+
   [document.getElementById('month-select'), document.getElementById('tx-month-select')].forEach(sel => {
     if (!sel) return;
+    const target = sel.id === 'tx-month-select' ? state.txMonth : state.currentMonth;
     sel.innerHTML = months.map(m =>
-      `<option value="${m}"${m === state.currentMonth ? ' selected' : ''}>${formatMonthLabel(m)}</option>`
+      `<option value="${m}"${m === target ? ' selected' : ''}>${formatMonthLabel(m)}</option>`
     ).join('');
   });
 
-  document.getElementById('month-select').addEventListener('change', e => {
-    state.currentMonth = e.target.value;
-    document.getElementById('tx-month-select').value = e.target.value;
-    loadDashboard();
-  });
+  // Only bind event listeners once
+  if (!monthSelectorsInitialized) {
+    monthSelectorsInitialized = true;
 
-  document.getElementById('tx-month-select').addEventListener('change', e => {
-    state.txMonth = e.target.value;
-    loadTransactions();
-  });
+    document.getElementById('month-select').addEventListener('change', e => {
+      state.currentMonth = e.target.value;
+      document.getElementById('tx-month-select').value = e.target.value;
+      loadDashboard();
+    });
+
+    document.getElementById('tx-month-select').addEventListener('change', e => {
+      state.txMonth = e.target.value;
+      loadTransactions();
+    });
+
+    // Re-initialize month selectors when app comes back to foreground (new day/month)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        initMonthSelectors();
+        // Also refresh dashboard data
+        loadDashboard();
+      }
+    });
+  }
 }
 
 // ── API helpers ───────────────────────────────────────────────────────────────
@@ -1708,7 +1732,7 @@ function init() {
     const initial = user.name.charAt(0).toUpperCase();
     document.getElementById('user-initial').textContent = initial;
     const hour = new Date().getHours();
-    const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+    const greeting = hour < 12 ? t('greeting_morning') : hour < 18 ? t('greeting_afternoon') : t('greeting_evening');
     document.getElementById('user-greeting').textContent = `${greeting}, ${user.name.split(' ')[0]} 👋`;
   }
 
