@@ -294,11 +294,20 @@ function requireAuth(req, res, next) {
     const payload = jwt.verify(token, JWT_SECRET);
     req.userId = payload.userId;
     req.user   = payload;
+    // Throttled last-seen update (max once per 5 min)
+    try {
+      const now = new Date().toISOString();
+      const threshold = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      stmts.updateLastSeen.run({ now, threshold, id: req.userId });
+    } catch { /* silent */ }
     next();
   } catch {
     res.status(401).json({ error: 'Session expirée, veuillez vous reconnecter' });
   }
 }
+
+
+
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 function dateAddDays(days, from = new Date()) {
@@ -1925,42 +1934,120 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-app.get('/api/admin/stats', requireAuth, requireAdmin, (req, res) => {
+// ── VUE 1: Overview (6 KPIs) ─────────────────────────────────────────────────
+app.get('/api/admin/overview', requireAuth, requireAdmin, (req, res) => {
   try {
-    const stats = stmts.getAdminStats.get();
-    console.log('[Admin] stats:', stats);
-    res.json(stats);
-  } catch (e) {
-    console.error('[Admin] stats error:', e.message);
-    res.status(500).json({ error: e.message });
-  }
+    const ov = stmts.getAdminOverview.get();
+    const mrr = (ov.premium_active || 0) * 3000;
+    res.json({ ...ov, mrr });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── VUE 2: Users list (filtrable) ────────────────────────────────────────────
 app.get('/api/admin/users', requireAuth, requireAdmin, (req, res) => {
   try {
-    const now   = today();
-    const rows  = stmts.getAllUsers.all();
-    console.log('[Admin] users count:', rows.length);
-    const users = rows.map(u => {
-      const isPremium = u.plan === 'premium' && u.subscription_end >= now;
+    const now    = today();
+    const rows   = stmts.getAdminUsersWithTx.all();
+    let users = rows.map(u => {
+      const isPremium = u.plan === 'premium' && u.subscription_end && u.subscription_end >= now;
       const inTrial   = u.plan === 'free' && u.trial_end && u.trial_end >= now;
-      return { ...u, effective_plan: isPremium ? 'premium' : (inTrial ? 'trial' : 'free') };
+      let days_left = null;
+      if (isPremium && u.subscription_end) days_left = Math.max(0, Math.ceil((new Date(u.subscription_end) - Date.now()) / 86400000));
+      else if (inTrial && u.trial_end) days_left = Math.max(0, Math.ceil((new Date(u.trial_end) - Date.now()) / 86400000));
+      let last_seen_days = null;
+      if (u.last_seen_at) last_seen_days = Math.floor((Date.now() - new Date(u.last_seen_at)) / 86400000);
+      return { ...u, status: isPremium ? 'premium' : inTrial ? 'trial' : 'expired', days_left, last_seen_days };
     });
+
+    // Filters
+    const { filter, search, sort } = req.query;
+    if (filter === 'trial')    users = users.filter(u => u.status === 'trial');
+    if (filter === 'premium')  users = users.filter(u => u.status === 'premium');
+    if (filter === 'expired')  users = users.filter(u => u.status === 'expired');
+    if (filter === 'inactive') users = users.filter(u => u.last_seen_days === null || u.last_seen_days > 7);
+    if (search) {
+      const q = search.toLowerCase();
+      users = users.filter(u => u.email.toLowerCase().includes(q) || (u.name || '').toLowerCase().includes(q));
+    }
+    if (sort === 'last_seen')  users.sort((a, b) => (a.last_seen_days ?? 999) - (b.last_seen_days ?? 999));
+    if (sort === 'tx_count')   users.sort((a, b) => b.tx_count - a.tx_count);
+    if (sort === 'created_at') users.sort((a, b) => b.created_at.localeCompare(a.created_at));
+
     res.json(users);
-  } catch (e) {
-    console.error('[Admin] users error:', e.message);
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── VUE 3: Engagement ────────────────────────────────────────────────────────
+app.get('/api/admin/engagement', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const activeToday     = stmts.getActiveToday.all().map(r => r.email);
+    const activeThisWeek  = stmts.getActiveThisWeek.all().map(r => r.email);
+    const activeThisMonth = stmts.countActiveThisMonth.get().cnt;
+    const inactive7d      = stmts.getInactive7d.all().map(r => r.email);
+    const cohorts         = stmts.getCohorts.all().map(c => ({
+      week_offset: c.week_offset,
+      signups: c.signups,
+      still_active: c.still_active,
+      retention: c.signups > 0 ? Math.round(c.still_active / c.signups * 100) : 0
+    }));
+    res.json({ activeToday, activeThisWeek, activeThisMonth, inactive7d, cohorts });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── VUE 4: Conversion ────────────────────────────────────────────────────────
+app.get('/api/admin/conversion', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const ov = stmts.getAdminOverview.get();
+    const trials  = ov.trials_active || 0;
+    const premium = ov.premium_active || 0;
+    const conversionRate = (trials + premium) > 0 ? Math.round(premium / (trials + premium) * 100) : 0;
+    const avgDays = stmts.getAvgDaysToPayment.get().avg_days;
+    const expiringSoon = stmts.getTrialsExpiringSoon.all().map(u => {
+      const daysLeft = Math.max(0, Math.ceil((new Date(u.trial_end) - Date.now()) / 86400000));
+      return { id: u.id, email: u.email, days_left: daysLeft };
+    });
+    res.json({ conversionRate, avgDaysToPayment: avgDays ? Math.round(avgDays) : null, expiringSoon });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── VUE 5: Revenue ───────────────────────────────────────────────────────────
+app.get('/api/admin/revenue', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const thisMonth = stmts.getRevenueThisMonth.get().total;
+    const lastMonth = stmts.getRevenueLastMonth.get().total;
+    const evolution = lastMonth > 0 ? Math.round((thisMonth - lastMonth) / lastMonth * 100) : (thisMonth > 0 ? 100 : 0);
+    const recentPayments = stmts.getRecentPayments.all();
+    res.json({ thisMonth, lastMonth, evolution, recentPayments });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Grant premium (with validation) ──────────────────────────────────────────
+app.post('/api/admin/grant-premium', requireAuth, requireAdmin, (req, res) => {
+  const { user_id, days } = req.body;
+  if (!user_id || !days || isNaN(days) || days < 1)
+    return res.status(400).json({ error: 'user_id et days (≥1) requis' });
+  if (days > 365)
+    return res.status(400).json({ error: 'Max 365 jours' });
+  const subEnd = dateAddDays(parseInt(days));
+  const result = stmts.grantPremiumById.run({ subEnd, id: user_id });
+  if (!result.changes) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+  const admin = stmts.getUserById.get({ id: req.userId });
+  console.log(`[ADMIN GRANT] ${admin?.email} a offert ${days}j à user ${user_id}`);
+  res.json({ ok: true, subscription_end: subEnd });
+});
+
+// ── Legacy set-premium (kept for compat) ─────────────────────────────────────
 app.post('/api/admin/set-premium', requireAuth, requireAdmin, (req, res) => {
   const { email, days } = req.body;
   if (!email || !days || isNaN(days) || days < 1)
     return res.status(400).json({ error: 'email et days (≥1) requis' });
+  if (days > 365)
+    return res.status(400).json({ error: 'Max 365 jours' });
   const subEnd = dateAddDays(parseInt(days));
   const result = stmts.activatePremiumByEmail.run({ subEnd, email: email.toLowerCase() });
   if (!result.changes) return res.status(404).json({ error: 'Utilisateur non trouvé' });
-  console.log('[Admin] set-premium email=%s until=%s', email, subEnd);
+  const admin = stmts.getUserById.get({ id: req.userId });
+  console.log(`[ADMIN GRANT] ${admin?.email} a offert ${days}j à ${email}`);
   res.json({ ok: true, subscription_end: subEnd });
 });
 
@@ -1971,6 +2058,39 @@ app.post('/api/admin/revoke-premium', requireAuth, requireAdmin, (req, res) => {
   if (!result.changes) return res.status(404).json({ error: 'Utilisateur non trouvé' });
   console.log('[Admin] revoke email=%s', email);
   res.json({ ok: true });
+});
+
+// ── Send push to all users ───────────────────────────────────────────────────
+app.post('/api/admin/send-push-all', requireAuth, requireAdmin, async (req, res) => {
+  const { title, body } = req.body;
+  if (!title || !body) return res.status(400).json({ error: 'title et body requis' });
+  try {
+    const result = await sendPushToAll({ title, body, icon: '/icon-192.png', badge: '/icon-192.png', tag: 'admin-push' });
+    const admin = stmts.getUserById.get({ id: req.userId });
+    console.log(`[ADMIN PUSH] ${admin?.email} sent push: "${title}" — ${result.sent} sent, ${result.failed} failed`);
+    res.json({ sent: result.sent, failed: result.failed });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Export users CSV ─────────────────────────────────────────────────────────
+app.get('/api/admin/export-users', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const rows = stmts.getAllUsersExport.all();
+    const headers = 'ID,Nom,Email,Plan,Trial Start,Trial End,Subscription End,Inscrit le,Dernière connexion,Devise,Langue,Nb Transactions\n';
+    const csv = headers + rows.map(u =>
+      [u.id, `"${(u.name || '').replace(/"/g, '""')}"`, u.email, u.plan, u.trial_start || '', u.trial_end || '',
+       u.subscription_end || '', u.created_at, u.last_seen_at || '', u.currency, u.language, u.tx_count].join(',')
+    ).join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=kula-users-${today()}.csv`);
+    res.send('\uFEFF' + csv); // BOM for Excel
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Legacy stats (kept for compat) ───────────────────────────────────────────
+app.get('/api/admin/stats', requireAuth, requireAdmin, (req, res) => {
+  try { res.json(stmts.getAdminStats.get()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Reset all push subscriptions (needed after VAPID key rotation)

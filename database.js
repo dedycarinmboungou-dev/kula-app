@@ -148,6 +148,7 @@ if (!userColNames.includes('subscription_end'))     db.exec("ALTER TABLE users A
 if (!userColNames.includes('moneroo_customer_id'))  db.exec("ALTER TABLE users ADD COLUMN moneroo_customer_id TEXT");
 if (!userColNames.includes('currency'))             db.exec("ALTER TABLE users ADD COLUMN currency TEXT NOT NULL DEFAULT 'XOF'");
 if (!userColNames.includes('language'))             db.exec("ALTER TABLE users ADD COLUMN language TEXT NOT NULL DEFAULT 'fr'");
+if (!userColNames.includes('last_seen_at'))         db.exec("ALTER TABLE users ADD COLUMN last_seen_at TEXT");
 
 // Migration: add columns to transactions if missing
 const cols = db.prepare('PRAGMA table_info(transactions)').all();
@@ -220,6 +221,114 @@ const stmts = {
   `),
   revokePremiumByEmail: db.prepare(`
     UPDATE users SET plan = 'free', subscription_end = NULL WHERE email = $email
+  `),
+  grantPremiumById: db.prepare(`
+    UPDATE users SET plan = 'premium', subscription_end = $subEnd WHERE id = $id
+  `),
+
+  // Last seen (throttled)
+  updateLastSeen: db.prepare(`
+    UPDATE users SET last_seen_at = $now
+    WHERE id = $id AND (last_seen_at IS NULL OR last_seen_at < $threshold)
+  `),
+
+  // Admin overview
+  getAdminOverview: db.prepare(`
+    SELECT
+      COUNT(*) AS total_users,
+      SUM(CASE WHEN plan = 'free' AND trial_end >= date('now') THEN 1 ELSE 0 END) AS trials_active,
+      SUM(CASE WHEN plan = 'premium' AND subscription_end >= date('now') THEN 1 ELSE 0 END) AS premium_active,
+      SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS signups_7d,
+      SUM(CASE WHEN last_seen_at >= date('now') THEN 1 ELSE 0 END) AS active_today
+    FROM users
+  `),
+
+  // Admin users list with tx count
+  getAdminUsersWithTx: db.prepare(`
+    SELECT u.id, u.name, u.email, u.plan, u.trial_start, u.trial_end,
+           u.subscription_end, u.created_at, u.last_seen_at, u.currency,
+           COUNT(t.id) AS tx_count
+    FROM users u
+    LEFT JOIN transactions t ON t.user_id = u.id
+    GROUP BY u.id
+    ORDER BY u.created_at DESC
+  `),
+
+  // Engagement: active users lists
+  getActiveToday: db.prepare(`
+    SELECT email FROM users WHERE last_seen_at >= date('now') ORDER BY last_seen_at DESC
+  `),
+  getActiveThisWeek: db.prepare(`
+    SELECT email FROM users WHERE last_seen_at >= date('now', '-7 days') ORDER BY last_seen_at DESC
+  `),
+  countActiveThisMonth: db.prepare(`
+    SELECT COUNT(*) AS cnt FROM users WHERE last_seen_at >= date('now', 'start of month')
+  `),
+  getInactive7d: db.prepare(`
+    SELECT email FROM users
+    WHERE (last_seen_at IS NULL OR last_seen_at < date('now', '-7 days'))
+    ORDER BY last_seen_at ASC
+  `),
+
+  // Cohorts: users by signup week
+  getCohorts: db.prepare(`
+    SELECT
+      CASE
+        WHEN created_at >= date('now', 'weekday 0', '-7 days') THEN 0
+        WHEN created_at >= date('now', 'weekday 0', '-14 days') THEN 1
+        WHEN created_at >= date('now', 'weekday 0', '-21 days') THEN 2
+        WHEN created_at >= date('now', 'weekday 0', '-28 days') THEN 3
+        ELSE 4
+      END AS week_offset,
+      COUNT(*) AS signups,
+      SUM(CASE WHEN last_seen_at >= date('now', '-7 days') THEN 1 ELSE 0 END) AS still_active
+    FROM users
+    WHERE created_at >= date('now', '-28 days')
+    GROUP BY week_offset
+    HAVING week_offset < 4
+    ORDER BY week_offset ASC
+  `),
+
+  // Conversion
+  getTrialsExpiringSoon: db.prepare(`
+    SELECT id, email, trial_end FROM users
+    WHERE plan = 'free' AND trial_end >= date('now') AND trial_end <= date('now', '+3 days')
+    ORDER BY trial_end ASC
+  `),
+  getAvgDaysToPayment: db.prepare(`
+    SELECT AVG(julianday(p.created_at) - julianday(u.created_at)) AS avg_days
+    FROM paytech_payments p
+    JOIN users u ON u.id = p.user_id
+    WHERE p.status = 'completed'
+  `),
+
+  // Revenue
+  getRevenueThisMonth: db.prepare(`
+    SELECT COALESCE(SUM(amount), 0) AS total FROM paytech_payments
+    WHERE status = 'completed' AND created_at >= date('now', 'start of month')
+  `),
+  getRevenueLastMonth: db.prepare(`
+    SELECT COALESCE(SUM(amount), 0) AS total FROM paytech_payments
+    WHERE status = 'completed'
+      AND created_at >= date('now', 'start of month', '-1 month')
+      AND created_at < date('now', 'start of month')
+  `),
+  getRecentPayments: db.prepare(`
+    SELECT p.created_at, u.email, p.amount, p.status, p.ref_command
+    FROM paytech_payments p
+    JOIN users u ON u.id = p.user_id
+    ORDER BY p.created_at DESC LIMIT 20
+  `),
+
+  // Export all users
+  getAllUsersExport: db.prepare(`
+    SELECT u.id, u.name, u.email, u.plan, u.trial_start, u.trial_end,
+           u.subscription_end, u.created_at, u.last_seen_at, u.currency, u.language,
+           COUNT(t.id) AS tx_count
+    FROM users u
+    LEFT JOIN transactions t ON t.user_id = u.id
+    GROUP BY u.id
+    ORDER BY u.created_at DESC
   `),
 
   // Budgets

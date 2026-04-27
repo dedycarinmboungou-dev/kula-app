@@ -18,16 +18,20 @@
     header {
       background: linear-gradient(135deg, #16a34a, #15803d);
       color: white;
-      padding: 16px 24px;
+      padding: 14px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
     .header-logo { font-size: 22px; }
     header h1 { font-size: 18px; font-weight: 700; }
     header p  { font-size: 12px; opacity: 0.85; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
     #admin-email-badge {
       background: rgba(255,255,255,0.2);
       padding: 4px 12px;
@@ -35,6 +39,16 @@
       font-size: 13px;
       font-weight: 600;
     }
+    #btn-logout {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    #btn-logout:hover { background: rgba(255,255,255,0.25); }
 
     /* ── Auth gate ── */
     #auth-gate {
@@ -71,65 +85,103 @@
     #auth-error { color: #ef4444; font-size: 13px; text-align: center; }
 
     /* ── Main ── */
-    #main { display: none; padding: 24px; max-width: 1100px; margin: 0 auto; }
+    #main { display: none; max-width: 1200px; margin: 0 auto; padding: 0 16px 32px; }
 
-    /* ── Stats ── */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 28px;
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 0;
+      background: white;
+      border-radius: 12px;
+      margin: 16px 0;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
-    .stat-card {
+    .tab-btn {
+      flex: 1;
+      min-width: 100px;
+      padding: 12px 8px;
+      border: none;
+      background: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6b7280;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: #16a34a; background: #f0fdf4; }
+    .tab-btn.active { color: #16a34a; border-bottom-color: #16a34a; background: #f0fdf4; }
+    .tab-icon { display: block; font-size: 18px; margin-bottom: 2px; }
+
+    /* ── Tab content ── */
+    .tab-view { display: none; animation: fadeIn 0.2s; }
+    .tab-view.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ── KPI Cards ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
       background: white;
       border-radius: 14px;
-      padding: 20px;
+      padding: 18px 16px;
       text-align: center;
       box-shadow: 0 1px 4px rgba(0,0,0,0.07);
       border-top: 4px solid #e5e7eb;
     }
-    .stat-card.green  { border-top-color: #16a34a; }
-    .stat-card.amber  { border-top-color: #f59e0b; }
-    .stat-card.blue   { border-top-color: #3b82f6; }
-    .stat-card.gray   { border-top-color: #9ca3af; }
-    .stat-num  { font-size: 36px; font-weight: 800; color: #1a2e1a; line-height: 1; }
-    .stat-label { font-size: 12px; color: #6b7280; margin-top: 4px; font-weight: 500; }
+    .kpi-card.green  { border-top-color: #16a34a; }
+    .kpi-card.amber  { border-top-color: #f59e0b; }
+    .kpi-card.blue   { border-top-color: #3b82f6; }
+    .kpi-card.red    { border-top-color: #ef4444; }
+    .kpi-card.purple { border-top-color: #8b5cf6; }
+    .kpi-num  { font-size: 32px; font-weight: 800; line-height: 1; color: #1a2e1a; }
+    .kpi-label { font-size: 11px; color: #6b7280; margin-top: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; }
 
-    /* ── Section title ── */
-    .section-title {
-      font-size: 16px;
+    /* ── Section / Card ── */
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 15px;
       font-weight: 700;
       color: #15803d;
       margin-bottom: 14px;
-      padding-bottom: 6px;
+      padding-bottom: 8px;
       border-bottom: 2px solid #dcfce7;
     }
 
-    /* ── Table ── */
-    .table-wrap {
-      background: white;
-      border-radius: 14px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-      overflow-x: auto;
-      margin-bottom: 28px;
-    }
-    table { width: 100%; border-collapse: collapse; min-width: 680px; }
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; min-width: 600px; }
     thead th {
       background: #f0fdf4;
-      padding: 12px 14px;
+      padding: 10px 12px;
       text-align: left;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       color: #15803d;
       text-transform: uppercase;
       letter-spacing: 0.04em;
+      white-space: nowrap;
     }
+    thead th.sortable { cursor: pointer; }
+    thead th.sortable:hover { color: #1a2e1a; }
     tbody tr { border-top: 1px solid #f3f4f6; transition: background 0.1s; }
     tbody tr:hover { background: #f9fafb; }
-    tbody td { padding: 12px 14px; font-size: 13px; vertical-align: middle; }
-    .td-name  { font-weight: 600; }
-    .td-email { color: #6b7280; }
+    tbody td { padding: 10px 12px; font-size: 13px; vertical-align: middle; }
 
+    /* ── Badges ── */
     .badge {
       display: inline-block;
       padding: 3px 10px;
@@ -139,9 +191,9 @@
     }
     .badge-premium { background: #dcfce7; color: #15803d; }
     .badge-trial   { background: #fef3c7; color: #d97706; }
-    .badge-free    { background: #f3f4f6; color: #6b7280; }
+    .badge-expired { background: #fee2e2; color: #dc2626; }
 
-    .action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    /* ── Buttons ── */
     .btn-sm {
       padding: 5px 10px;
       border-radius: 7px;
@@ -155,6 +207,159 @@
     .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-prem   { background: #16a34a; color: white; }
     .btn-revoke { background: #ef4444; color: white; }
+
+    .action-btns { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .days-input {
+      width: 52px;
+      padding: 4px 6px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 12px;
+      text-align: center;
+    }
+    .days-input:focus { outline: none; border-color: #16a34a; }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .filter-bar select, .filter-bar input[type="text"] {
+      padding: 8px 12px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+    .filter-bar select:focus, .filter-bar input[type="text"]:focus { border-color: #16a34a; }
+    .filter-bar input[type="text"] { flex: 1; min-width: 180px; }
+
+    /* ── Quick action ── */
+    .action-group {
+      margin-bottom: 20px;
+    }
+    .action-group h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a2e1a;
+      margin-bottom: 10px;
+    }
+    .action-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .action-row input, .action-row textarea {
+      padding: 10px 14px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      flex: 1;
+      min-width: 180px;
+    }
+    .action-row textarea { resize: vertical; min-height: 60px; }
+    .action-row input:focus, .action-row textarea:focus { border-color: #16a34a; }
+    .btn-action {
+      background: #16a34a;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-action:hover { background: #15803d; }
+    .btn-action:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-action.danger { background: #ef4444; }
+    .btn-action.danger:hover { background: #dc2626; }
+    .btn-action.secondary {
+      background: white;
+      color: #16a34a;
+      border: 1.5px solid #16a34a;
+    }
+    .btn-action.secondary:hover { background: #f0fdf4; }
+
+    /* ── Engagement list chips ── */
+    .email-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .email-chip {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      padding: 3px 10px;
+      border-radius: 16px;
+      font-size: 12px;
+      color: #15803d;
+    }
+    .email-chip.inactive {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #dc2626;
+    }
+
+    /* ── Cohort bar ── */
+    .cohort-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cohort-bar {
+      height: 20px;
+      background: #16a34a;
+      border-radius: 4px;
+      min-width: 2px;
+      transition: width 0.3s;
+    }
+    .cohort-pct { font-size: 12px; font-weight: 700; color: #1a2e1a; min-width: 40px; }
+
+    /* ── Revenue indicator ── */
+    .revenue-evo {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .revenue-evo.up   { background: #dcfce7; color: #16a34a; }
+    .revenue-evo.down { background: #fee2e2; color: #dc2626; }
+    .revenue-evo.flat { background: #f3f4f6; color: #6b7280; }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+
+    /* ── Auto-refresh indicator ── */
+    #refresh-indicator {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      background: white;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 11px;
+      color: #6b7280;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+      z-index: 99;
+    }
+    #refresh-indicator .dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #16a34a;
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
     /* ── Toast ── */
     #toast {
@@ -170,36 +375,25 @@
       transition: transform 0.3s;
       z-index: 999;
       white-space: nowrap;
+      max-width: 90%;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     #toast.show { transform: translateX(-50%) translateY(0); }
     #toast.success { background: #16a34a; }
     #toast.error   { background: #ef4444; }
 
-    /* ── Days input inline ── */
-    .days-input {
-      width: 52px;
-      padding: 4px 6px;
-      border: 1.5px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 12px;
-      text-align: center;
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      header { padding: 12px 16px; }
+      header h1 { font-size: 16px; }
+      #main { padding: 0 10px 24px; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .kpi-num { font-size: 26px; }
+      .tab-btn { padding: 10px 6px; font-size: 11px; min-width: 60px; }
+      .tab-icon { font-size: 16px; }
+      .card { padding: 14px; }
     }
-    .days-input:focus { outline: none; border-color: #16a34a; }
-
-    #refresh-btn {
-      background: white;
-      border: 1.5px solid #16a34a;
-      color: #16a34a;
-      padding: 7px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-bottom: 16px;
-    }
-    #refresh-btn:hover { background: #f0fdf4; }
-
-    .loading { text-align: center; padding: 40px; color: #9ca3af; }
   </style>
 </head>
 <body>
@@ -212,7 +406,10 @@
       <p>Tableau de bord administrateur</p>
     </div>
   </div>
-  <span id="admin-email-badge">—</span>
+  <div class="header-right">
+    <span id="admin-email-badge">—</span>
+    <button id="btn-logout" onclick="logout()">Déconnexion</button>
+  </div>
 </header>
 
 <!-- Auth gate -->
@@ -228,60 +425,289 @@
 
 <!-- Main dashboard -->
 <div id="main">
-  <div class="stats-grid">
-    <div class="stat-card blue">
-      <div class="stat-num" id="stat-total">—</div>
-      <div class="stat-label">Total utilisateurs</div>
-    </div>
-    <div class="stat-card green">
-      <div class="stat-num" id="stat-premium">—</div>
-      <div class="stat-label">Premium actifs</div>
-    </div>
-    <div class="stat-card amber">
-      <div class="stat-num" id="stat-trial">—</div>
-      <div class="stat-label">En essai</div>
-    </div>
-    <div class="stat-card gray">
-      <div class="stat-num" id="stat-free">—</div>
-      <div class="stat-label">Plan gratuit</div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="overview">
+      <span class="tab-icon">📊</span> Vue d'ensemble
+    </button>
+    <button class="tab-btn" data-tab="users">
+      <span class="tab-icon">👥</span> Utilisateurs
+    </button>
+    <button class="tab-btn" data-tab="engagement">
+      <span class="tab-icon">📈</span> Engagement
+    </button>
+    <button class="tab-btn" data-tab="conversion">
+      <span class="tab-icon">🔄</span> Conversion
+    </button>
+    <button class="tab-btn" data-tab="revenue">
+      <span class="tab-icon">💰</span> Revenus
+    </button>
+    <button class="tab-btn" data-tab="actions">
+      <span class="tab-icon">⚡</span> Actions
+    </button>
+  </div>
+
+  <!-- ═══════════════ TAB 1: Vue d'ensemble ═══════════════ -->
+  <div class="tab-view active" id="view-overview">
+    <div class="kpi-grid" id="overview-kpis">
+      <div class="kpi-card blue">
+        <div class="kpi-num" id="ov-total">—</div>
+        <div class="kpi-label">Total utilisateurs</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-num" id="ov-trials">—</div>
+        <div class="kpi-label">Essais actifs</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-num" id="ov-premium">—</div>
+        <div class="kpi-label">Premium actifs</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-num" id="ov-signups7d">—</div>
+        <div class="kpi-label">Inscrits (7j)</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-num" id="ov-active-today">—</div>
+        <div class="kpi-label">Actifs aujourd'hui</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-num" id="ov-mrr">—</div>
+        <div class="kpi-label">MRR (XOF)</div>
+      </div>
     </div>
   </div>
 
-  <div class="section-title">Utilisateurs</div>
-  <button id="refresh-btn" onclick="loadAll()">↻ Actualiser</button>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Nom</th>
-          <th>Email</th>
-          <th>Plan</th>
-          <th>Inscription</th>
-          <th>Fin abonnement</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="users-tbody">
-        <tr><td colspan="6" class="loading">Chargement…</td></tr>
-      </tbody>
-    </table>
+  <!-- ═══════════════ TAB 2: Utilisateurs ═══════════════ -->
+  <div class="tab-view" id="view-users">
+    <div class="filter-bar">
+      <select id="users-filter">
+        <option value="">Tous</option>
+        <option value="trial">Essai</option>
+        <option value="premium">Premium</option>
+        <option value="expired">Expirés</option>
+        <option value="inactive">Inactifs (+7j)</option>
+      </select>
+      <input type="text" id="users-search" placeholder="Rechercher par nom ou email…"/>
+      <select id="users-sort">
+        <option value="">Tri par défaut</option>
+        <option value="created_at">Inscription récente</option>
+        <option value="last_seen">Dernière activité</option>
+        <option value="tx_count">Nb transactions</option>
+      </select>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Email</th>
+              <th>Statut</th>
+              <th>Jours restants</th>
+              <th>Transactions</th>
+              <th>Dernière activité</th>
+              <th>Inscrit le</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="8" class="empty">Chargement…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div style="font-size:12px; color:#9ca3af;" id="users-count"></div>
   </div>
+
+  <!-- ═══════════════ TAB 3: Engagement ═══════════════ -->
+  <div class="tab-view" id="view-engagement">
+    <div class="kpi-grid">
+      <div class="kpi-card green">
+        <div class="kpi-num" id="eng-today">—</div>
+        <div class="kpi-label">Actifs aujourd'hui</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-num" id="eng-week">—</div>
+        <div class="kpi-label">Actifs cette semaine</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-num" id="eng-month">—</div>
+        <div class="kpi-label">Actifs ce mois</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-num" id="eng-inactive">—</div>
+        <div class="kpi-label">Inactifs (+7j)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Actifs aujourd'hui</div>
+      <div class="email-chips" id="eng-today-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Inactifs depuis +7 jours</div>
+      <div class="email-chips" id="eng-inactive-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Cohortes hebdomadaires (rétention)</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Semaine</th>
+              <th>Inscrits</th>
+              <th>Encore actifs</th>
+              <th>Rétention</th>
+            </tr>
+          </thead>
+          <tbody id="cohorts-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TAB 4: Conversion ═══════════════ -->
+  <div class="tab-view" id="view-conversion">
+    <div class="kpi-grid">
+      <div class="kpi-card green">
+        <div class="kpi-num" id="conv-rate">—</div>
+        <div class="kpi-label">Taux de conversion</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-num" id="conv-avg-days">—</div>
+        <div class="kpi-label">Jours moy. avant paiement</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Essais expirant bientôt (≤3 jours)</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Jours restants</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="expiring-tbody">
+            <tr><td colspan="3" class="empty">Aucun</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TAB 5: Revenus ═══════════════ -->
+  <div class="tab-view" id="view-revenue">
+    <div class="kpi-grid">
+      <div class="kpi-card green">
+        <div class="kpi-num" id="rev-this-month">—</div>
+        <div class="kpi-label">Revenus ce mois (XOF)</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-num" id="rev-last-month">—</div>
+        <div class="kpi-label">Mois précédent (XOF)</div>
+      </div>
+      <div class="kpi-card" id="rev-evo-card">
+        <div class="kpi-num" id="rev-evo">—</div>
+        <div class="kpi-label">Évolution</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Paiements récents</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Montant (XOF)</th>
+              <th>Méthode</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="payments-tbody">
+            <tr><td colspan="4" class="empty">Aucun paiement</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TAB 6: Actions ═══════════════ -->
+  <div class="tab-view" id="view-actions">
+    <div class="card">
+      <div class="card-title">Notification push à tous les utilisateurs</div>
+      <div class="action-group">
+        <div class="action-row" style="flex-direction: column; align-items: stretch;">
+          <input type="text" id="push-title" placeholder="Titre de la notification"/>
+          <textarea id="push-body" placeholder="Contenu du message…"></textarea>
+          <button class="btn-action" id="btn-send-push" onclick="sendPush()">Envoyer la notification</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Export CSV des utilisateurs</div>
+      <div class="action-group">
+        <p style="font-size:13px; color:#6b7280; margin-bottom: 10px;">
+          Téléchargez la liste complète des utilisateurs au format CSV (compatible Excel).
+        </p>
+        <button class="btn-action secondary" onclick="exportCSV()">Télécharger le CSV</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Grant Premium manuel</div>
+      <div class="action-group">
+        <div class="action-row">
+          <input type="number" id="grant-user-id" placeholder="User ID" style="max-width:120px;"/>
+          <input type="number" id="grant-days" placeholder="Nb jours (1-365)" min="1" max="365" value="30" style="max-width:160px;"/>
+          <button class="btn-action" onclick="grantPremium()">Accorder Premium</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="refresh-indicator" style="display:none;">
+  <span class="dot"></span> Auto-refresh actif
 </div>
 
 <div id="toast"></div>
 
 <script>
   let TOKEN = localStorage.getItem('kula_token') || '';
+  let refreshTimer = null;
+  let currentTab = 'overview';
 
-  // ── Toast ──
+  // ── Utils ──
+  function esc(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  function fmtMoney(n) {
+    if (n == null) return '—';
+    return Number(n).toLocaleString('fr-FR');
+  }
+
   let toastTimer;
   function toast(msg, type = 'success') {
     const el = document.getElementById('toast');
     el.textContent = msg;
-    el.className   = `show ${type}`;
+    el.className = `show ${type}`;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+    toastTimer = setTimeout(() => { el.className = ''; }, 3500);
   }
 
   // ── API helper ──
@@ -295,6 +721,19 @@
     return data;
   }
 
+  // ── Tabs ──
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.getElementById('view-' + tab).classList.add('active');
+      currentTab = tab;
+      loadTab(tab);
+    });
+  });
+
   // ── Login ──
   document.getElementById('login-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -302,18 +741,15 @@
     btn.disabled = true;
     btn.textContent = 'Connexion…';
     document.getElementById('auth-error').textContent = '';
-
     try {
       const email    = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-password').value;
       const data = await fetch('/api/auth/login', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password })
       }).then(r => r.json());
-
-      if (!data.token) throw new Error(data.error || 'Échec connexion');
-
+      if (!data.token) throw new Error(data.error || 'Connexion échouée');
       TOKEN = data.token;
       localStorage.setItem('kula_token', TOKEN);
       await initAdmin();
@@ -324,98 +760,254 @@
     }
   });
 
+  function logout() {
+    TOKEN = '';
+    localStorage.removeItem('kula_token');
+    clearInterval(refreshTimer);
+    document.getElementById('auth-gate').style.display = 'flex';
+    document.getElementById('main').style.display = 'none';
+    document.getElementById('refresh-indicator').style.display = 'none';
+  }
+
   // ── Init ──
   async function initAdmin() {
     try {
-      // Verify we are admin
       const plan = await api('/api/user/plan');
       if (!plan.is_admin) {
-        document.getElementById('auth-error').textContent = 'Accès réservé à l\'administrateur.';
+        document.getElementById('auth-error').textContent = "Accès réservé à l'administrateur.";
         return;
       }
-      // Get email for badge
       const profile = await api('/api/profile');
       document.getElementById('admin-email-badge').textContent = profile.email || '';
 
       document.getElementById('auth-gate').style.display = 'none';
       document.getElementById('main').style.display = 'block';
-      loadAll();
+      document.getElementById('refresh-indicator').style.display = 'block';
+
+      loadTab('overview');
+      // Auto-refresh every 60s
+      clearInterval(refreshTimer);
+      refreshTimer = setInterval(() => loadTab(currentTab), 60000);
     } catch {
       document.getElementById('auth-error').textContent = 'Erreur de vérification.';
     }
   }
 
-  // ── Load stats + users ──
-  async function loadAll() {
+  // ── Tab loader ──
+  async function loadTab(tab) {
     try {
-      const [stats, users] = await Promise.all([
-        api('/api/admin/stats'),
-        api('/api/admin/users')
-      ]);
-      renderStats(stats);
-      renderUsers(users);
+      if (tab === 'overview')    await loadOverview();
+      if (tab === 'users')       await loadUsers();
+      if (tab === 'engagement')  await loadEngagement();
+      if (tab === 'conversion')  await loadConversion();
+      if (tab === 'revenue')     await loadRevenue();
     } catch (err) {
       toast(err.message, 'error');
     }
   }
 
-  function renderStats(s) {
-    document.getElementById('stat-total').textContent   = s.total   ?? '—';
-    document.getElementById('stat-premium').textContent = s.premium ?? '—';
-    document.getElementById('stat-trial').textContent   = s.trial   ?? '—';
-    document.getElementById('stat-free').textContent    = s.free_expired ?? '—';
+  // ══════════════════════════════════════════════════════════
+  // TAB 1: Overview
+  // ══════════════════════════════════════════════════════════
+  async function loadOverview() {
+    const ov = await api('/api/admin/overview');
+    document.getElementById('ov-total').textContent      = ov.total_users ?? 0;
+    document.getElementById('ov-trials').textContent     = ov.trials_active ?? 0;
+    document.getElementById('ov-premium').textContent    = ov.premium_active ?? 0;
+    document.getElementById('ov-signups7d').textContent  = ov.signups_7d ?? 0;
+    document.getElementById('ov-active-today').textContent = ov.active_today ?? 0;
+    document.getElementById('ov-mrr').textContent        = fmtMoney(ov.mrr);
   }
 
-  function renderUsers(users) {
+  // ══════════════════════════════════════════════════════════
+  // TAB 2: Users
+  // ══════════════════════════════════════════════════════════
+  let usersDebounce;
+  document.getElementById('users-search').addEventListener('input', () => {
+    clearTimeout(usersDebounce);
+    usersDebounce = setTimeout(loadUsers, 300);
+  });
+  document.getElementById('users-filter').addEventListener('change', loadUsers);
+  document.getElementById('users-sort').addEventListener('change', loadUsers);
+
+  async function loadUsers() {
+    const filter = document.getElementById('users-filter').value;
+    const search = document.getElementById('users-search').value.trim();
+    const sort   = document.getElementById('users-sort').value;
+    const params = new URLSearchParams();
+    if (filter) params.set('filter', filter);
+    if (search) params.set('search', search);
+    if (sort)   params.set('sort', sort);
+
+    const users = await api('/api/admin/users?' + params.toString());
     const tbody = document.getElementById('users-tbody');
+
     if (!users.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="loading">Aucun utilisateur.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="empty">Aucun utilisateur trouvé.</td></tr>';
+      document.getElementById('users-count').textContent = '0 utilisateur(s)';
       return;
     }
 
-    const fmtDate = iso => iso
-      ? new Date(iso).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' })
-      : '—';
+    document.getElementById('users-count').textContent = users.length + ' utilisateur(s)';
 
     tbody.innerHTML = users.map(u => {
-      const plan = u.effective_plan;
-      const badgeCls = plan === 'premium' ? 'badge-premium' : plan === 'trial' ? 'badge-trial' : 'badge-free';
-      const planLabel = plan === 'premium' ? 'Premium' : plan === 'trial' ? 'Essai' : 'Gratuit';
+      const badgeCls = u.status === 'premium' ? 'badge-premium' : u.status === 'trial' ? 'badge-trial' : 'badge-expired';
+      const label    = u.status === 'premium' ? 'Premium' : u.status === 'trial' ? 'Essai' : 'Expiré';
+      const lastSeen = u.last_seen_days !== null ? (u.last_seen_days === 0 ? "Aujourd'hui" : u.last_seen_days + 'j') : '—';
 
-      return `
-        <tr>
-          <td class="td-name">${esc(u.name || '—')}</td>
-          <td class="td-email">${esc(u.email)}</td>
-          <td><span class="badge ${badgeCls}">${planLabel}</span></td>
-          <td>${fmtDate(u.created_at)}</td>
-          <td>${fmtDate(u.subscription_end)}</td>
-          <td>
-            <div class="action-btns">
-              <input class="days-input" id="days-${u.id}" type="number" value="30" min="1" max="365" title="Nombre de jours"/>
-              <button class="btn-sm btn-prem"   onclick="setPremium('${esc(u.email)}', ${u.id})">⭐ Premium</button>
-              <button class="btn-sm btn-revoke" onclick="revoke('${esc(u.email)}', ${u.id})">✕ Révoquer</button>
-            </div>
-          </td>
-        </tr>
-      `;
+      return `<tr>
+        <td style="font-weight:600;">${esc(u.name || '—')}</td>
+        <td style="color:#6b7280;">${esc(u.email)}</td>
+        <td><span class="badge ${badgeCls}">${label}</span></td>
+        <td>${u.days_left !== null ? u.days_left + 'j' : '—'}</td>
+        <td>${u.tx_count || 0}</td>
+        <td>${lastSeen}</td>
+        <td>${fmtDate(u.created_at)}</td>
+        <td>
+          <div class="action-btns">
+            <input class="days-input" id="days-${u.id}" type="number" value="30" min="1" max="365" title="Jours"/>
+            <button class="btn-sm btn-prem" onclick="setPremium('${esc(u.email)}',${u.id})">Premium</button>
+            <button class="btn-sm btn-revoke" onclick="revoke('${esc(u.email)}')">Révoquer</button>
+          </div>
+        </td>
+      </tr>`;
     }).join('');
   }
 
-  function esc(str) {
-    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // ══════════════════════════════════════════════════════════
+  // TAB 3: Engagement
+  // ══════════════════════════════════════════════════════════
+  async function loadEngagement() {
+    const data = await api('/api/admin/engagement');
+
+    document.getElementById('eng-today').textContent    = data.activeToday.length;
+    document.getElementById('eng-week').textContent     = data.activeThisWeek.length;
+    document.getElementById('eng-month').textContent    = data.activeThisMonth;
+    document.getElementById('eng-inactive').textContent = data.inactive7d.length;
+
+    // Active today chips
+    const todayEl = document.getElementById('eng-today-list');
+    todayEl.innerHTML = data.activeToday.length
+      ? data.activeToday.map(e => `<span class="email-chip">${esc(e)}</span>`).join('')
+      : '<span class="empty">Aucun utilisateur actif aujourd\'hui</span>';
+
+    // Inactive chips
+    const inactiveEl = document.getElementById('eng-inactive-list');
+    inactiveEl.innerHTML = data.inactive7d.length
+      ? data.inactive7d.map(e => `<span class="email-chip inactive">${esc(e)}</span>`).join('')
+      : '<span class="empty">Aucun utilisateur inactif</span>';
+
+    // Cohorts
+    const cohortsTbody = document.getElementById('cohorts-tbody');
+    if (!data.cohorts.length) {
+      cohortsTbody.innerHTML = '<tr><td colspan="4" class="empty">Pas encore de données</td></tr>';
+    } else {
+      cohortsTbody.innerHTML = data.cohorts.map(c => {
+        const weekLabel = c.week_offset === 0 ? 'Cette semaine' : c.week_offset === -1 ? 'Semaine -1' : `Semaine ${c.week_offset}`;
+        return `<tr>
+          <td style="font-weight:600;">${weekLabel}</td>
+          <td>${c.signups}</td>
+          <td>${c.still_active}</td>
+          <td>
+            <div class="cohort-bar-wrap">
+              <div class="cohort-bar" style="width:${c.retention}%;"></div>
+              <span class="cohort-pct">${c.retention}%</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
   }
 
-  // ── Actions ──
+  // ══════════════════════════════════════════════════════════
+  // TAB 4: Conversion
+  // ══════════════════════════════════════════════════════════
+  async function loadConversion() {
+    const data = await api('/api/admin/conversion');
+
+    document.getElementById('conv-rate').textContent     = data.conversionRate + '%';
+    document.getElementById('conv-avg-days').textContent  = data.avgDaysToPayment !== null ? data.avgDaysToPayment + 'j' : '—';
+
+    const tbody = document.getElementById('expiring-tbody');
+    if (!data.expiringSoon.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="empty">Aucun essai expirant bientôt</td></tr>';
+    } else {
+      tbody.innerHTML = data.expiringSoon.map(u => `<tr>
+        <td>${esc(u.email)}</td>
+        <td><span class="badge badge-trial">${u.days_left}j</span></td>
+        <td>
+          <div class="action-btns">
+            <input class="days-input" id="exp-days-${u.id}" type="number" value="30" min="1" max="365"/>
+            <button class="btn-sm btn-prem" onclick="grantById(${u.id}, 'exp-days-${u.id}')">Premium</button>
+          </div>
+        </td>
+      </tr>`).join('');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // TAB 5: Revenue
+  // ══════════════════════════════════════════════════════════
+  async function loadRevenue() {
+    const data = await api('/api/admin/revenue');
+
+    document.getElementById('rev-this-month').textContent = fmtMoney(data.thisMonth || 0);
+    document.getElementById('rev-last-month').textContent = fmtMoney(data.lastMonth || 0);
+
+    const evoEl = document.getElementById('rev-evo');
+    const evoCard = document.getElementById('rev-evo-card');
+    const evo = data.evolution;
+    if (evo > 0) {
+      evoEl.innerHTML = '+' + evo + '%';
+      evoCard.className = 'kpi-card green';
+    } else if (evo < 0) {
+      evoEl.innerHTML = evo + '%';
+      evoCard.className = 'kpi-card red';
+    } else {
+      evoEl.innerHTML = '0%';
+      evoCard.className = 'kpi-card';
+    }
+
+    const tbody = document.getElementById('payments-tbody');
+    if (!data.recentPayments || !data.recentPayments.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">Aucun paiement récent</td></tr>';
+    } else {
+      tbody.innerHTML = data.recentPayments.map(p => `<tr>
+        <td>${esc(p.email || '—')}</td>
+        <td style="font-weight:600;">${fmtMoney(p.amount)}</td>
+        <td>${esc(p.method || '—')}</td>
+        <td>${fmtDate(p.created_at || p.date)}</td>
+      </tr>`).join('');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // Actions
+  // ══════════════════════════════════════════════════════════
   async function setPremium(email, userId) {
     const daysEl = document.getElementById(`days-${userId}`);
-    const days   = parseInt(daysEl?.value) || 30;
+    const days = parseInt(daysEl?.value) || 30;
+    if (days < 1 || days > 365) { toast('Jours: 1-365', 'error'); return; }
     try {
-      const data = await api('/api/admin/set-premium', {
+      await api('/api/admin/set-premium', {
         method: 'POST',
-        body:   JSON.stringify({ email, days })
+        body: JSON.stringify({ email, days })
       });
-      toast(`✅ ${email} → Premium jusqu'au ${new Date(data.subscription_end).toLocaleDateString('fr-FR')}`, 'success');
-      loadAll();
+      toast(`${email} → Premium (${days}j)`, 'success');
+      loadTab(currentTab);
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function grantById(userId, inputId) {
+    const days = parseInt(document.getElementById(inputId)?.value) || 30;
+    if (days < 1 || days > 365) { toast('Jours: 1-365', 'error'); return; }
+    try {
+      await api('/api/admin/grant-premium', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, days })
+      });
+      toast(`User ${userId} → Premium (${days}j)`, 'success');
+      loadTab(currentTab);
     } catch (err) { toast(err.message, 'error'); }
   }
 
@@ -424,14 +1016,71 @@
     try {
       await api('/api/admin/revoke-premium', {
         method: 'POST',
-        body:   JSON.stringify({ email })
+        body: JSON.stringify({ email })
       });
-      toast(`🗑️ Premium révoqué pour ${email}`, 'success');
-      loadAll();
+      toast(`Premium révoqué pour ${email}`, 'success');
+      loadTab(currentTab);
     } catch (err) { toast(err.message, 'error'); }
   }
 
-  // ── Auto-login if token already stored ──
+  async function grantPremium() {
+    const userId = parseInt(document.getElementById('grant-user-id').value);
+    const days   = parseInt(document.getElementById('grant-days').value);
+    if (!userId) { toast('User ID requis', 'error'); return; }
+    if (!days || days < 1 || days > 365) { toast('Jours: 1-365', 'error'); return; }
+    try {
+      await api('/api/admin/grant-premium', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, days })
+      });
+      toast(`User ${userId} → Premium (${days}j)`, 'success');
+      document.getElementById('grant-user-id').value = '';
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  async function sendPush() {
+    const title = document.getElementById('push-title').value.trim();
+    const body  = document.getElementById('push-body').value.trim();
+    if (!title || !body) { toast('Titre et message requis', 'error'); return; }
+    if (!confirm(`Envoyer la notification à TOUS les utilisateurs ?\n\n"${title}"\n${body}`)) return;
+
+    const btn = document.getElementById('btn-send-push');
+    btn.disabled = true;
+    btn.textContent = 'Envoi en cours…';
+    try {
+      const result = await api('/api/admin/send-push-all', {
+        method: 'POST',
+        body: JSON.stringify({ title, body })
+      });
+      toast(`Push envoyé ! ${result.sent} succès, ${result.failed} échecs`, 'success');
+      document.getElementById('push-title').value = '';
+      document.getElementById('push-body').value  = '';
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Envoyer la notification';
+    }
+  }
+
+  async function exportCSV() {
+    try {
+      const res = await fetch('/api/admin/export-users', {
+        headers: { 'Authorization': `Bearer ${TOKEN}` }
+      });
+      if (!res.ok) throw new Error('Erreur export');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kula-users-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('CSV téléchargé', 'success');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+
+  // ── Auto-login ──
   if (TOKEN) initAdmin().catch(() => {});
 </script>
 </body>
