@@ -117,7 +117,7 @@ async function sendWelcomeEmail(toEmail, toName) {
             <td style="background:linear-gradient(135deg,#1a7a4a 0%,#10B981 100%);padding:40px 40px 32px;text-align:center;">
               <div style="font-size:48px;margin-bottom:8px;">🌱</div>
               <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;letter-spacing:-0.5px;">Kula</h1>
-              <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:15px;">Fais grandir ton argent</p>
+              <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:15px;">Gérez vos budgets, simplement.</p>
             </td>
           </tr>
 
@@ -129,41 +129,41 @@ async function sendWelcomeEmail(toEmail, toName) {
                 Bienvenue, ${firstName} ! 👋
               </h2>
               <p style="margin:0 0 20px;color:#374151;font-size:15px;line-height:1.7;">
-                Ton compte Kula est prêt. Tu as fait un pas important vers une meilleure
-                maîtrise de tes finances. Kula t'accompagne chaque jour pour suivre tes
-                revenus, contrôler tes dépenses et faire grandir ton argent — simplement,
-                depuis ton téléphone.
+                Votre compte Kula est prêt. Vous pouvez désormais gérer les finances de
+                vos projets personnels, associatifs ou professionnels. Créez un espace,
+                ajoutez vos dépenses en langage naturel, invitez vos collaborateurs et
+                générez des rapports détaillés en un clic.
               </p>
 
               <!-- 3 conseils -->
               <table width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0;">
                 <tr>
                   <td style="background:#f0fdf4;border-left:4px solid #1a7a4a;border-radius:0 8px 8px 0;padding:16px 18px;margin-bottom:12px;">
-                    <p style="margin:0 0 4px;color:#1a7a4a;font-weight:700;font-size:14px;">💬 1. Parle à Kula en langage naturel</p>
+                    <p style="margin:0 0 4px;color:#1a7a4a;font-weight:700;font-size:14px;">💬 1. Parlez à Kula en langage naturel</p>
                     <p style="margin:0;color:#374151;font-size:13px;line-height:1.6;">
-                      Dis simplement « J'ai dépensé 5 000 FCFA en transport » et Kula
-                      enregistre tout automatiquement — pas de formulaire, pas de prise de tête.
+                      Dites simplement « J'ai payé le traiteur 45 000 FCFA » et Kula
+                      enregistre tout automatiquement — pas de formulaire, pas de saisie manuelle.
                     </p>
                   </td>
                 </tr>
                 <tr><td style="height:10px;"></td></tr>
                 <tr>
                   <td style="background:#f0fdf4;border-left:4px solid #10B981;border-radius:0 8px 8px 0;padding:16px 18px;">
-                    <p style="margin:0 0 4px;color:#1a7a4a;font-weight:700;font-size:14px;">📊 2. Consulte ton tableau de bord chaque semaine</p>
+                    <p style="margin:0 0 4px;color:#1a7a4a;font-weight:700;font-size:14px;">📊 2. Consultez votre tableau de bord</p>
                     <p style="margin:0;color:#374151;font-size:13px;line-height:1.6;">
-                      Tes revenus, dépenses et solde s'affichent en temps réel.
-                      Identifie tes postes de dépenses et ajuste ton budget en connaissance de cause.
+                      Les revenus, dépenses et le solde de chaque projet s'affichent en temps réel.
+                      Identifiez les postes de dépenses et ajustez vos budgets en connaissance de cause.
                     </p>
                   </td>
                 </tr>
                 <tr><td style="height:10px;"></td></tr>
                 <tr>
                   <td style="background:#f0fdf4;border-left:4px solid #059669;border-radius:0 8px 8px 0;padding:16px 18px;">
-                    <p style="margin:0 0 4px;color:#1a7a4a;font-weight:700;font-size:14px;">🌟 3. Discute avec Kula Coach</p>
+                    <p style="margin:0 0 4px;color:#1a7a4a;font-weight:700;font-size:14px;">🌟 3. Générez des rapports détaillés</p>
                     <p style="margin:0;color:#374151;font-size:13px;line-height:1.6;">
-                      Ton coach personnel analyse tes habitudes et te donne des conseils
-                      personnalisés matin, après-midi et soir. L'argent se gère mieux
-                      quand on y pense chaque jour.
+                      Exportez vos rapports financiers en un clic, partagez-les avec
+                      vos collaborateurs ou vos parties prenantes. La transparence
+                      simplifie la gestion de chaque projet.
                     </p>
                   </td>
                 </tr>
@@ -184,8 +184,8 @@ async function sendWelcomeEmail(toEmail, toName) {
           <tr>
             <td style="background:#f9fafb;padding:24px 40px;text-align:center;border-top:1px solid #e5e7eb;">
               <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                Tu reçois cet email car tu viens de créer un compte sur Kula.<br>
-                © ${new Date().getFullYear()} Kula — Fais grandir ton argent 🌱
+                Vous recevez cet email car vous venez de créer un compte sur Kula.<br>
+                © ${new Date().getFullYear()} Kula — Gérez vos budgets, simplement. 🌱
               </p>
             </td>
           </tr>
@@ -206,7 +206,7 @@ async function sendWelcomeEmail(toEmail, toName) {
     apiInstance.authentications['apiKey'].apiKey = apiKey;
 
     const email = new SendSmtpEmail();
-    email.subject = 'Bienvenue sur Kula 🌱 — Fais grandir ton argent !';
+    email.subject = 'Bienvenue sur Kula 🌱 — Gérez vos budgets, simplement.';
     email.htmlContent = htmlBody;
     email.sender = { name: 'Kula 🌱', email: 'mindup05@gmail.com' };
     email.to = [{ email: toEmail, name: toName }];
@@ -874,7 +874,7 @@ app.get('/api/report/pdf', requireAuth, async (req, res) => {
 
       // App name + tagline
       doc.fontSize(22).fillColor(WHITE).font('Helvetica-Bold').text('Kula', M + 54, 34);
-      doc.fontSize(10).fillColor(GREEN_DIM).font('Helvetica').text('Fais grandir ton argent', M + 54, 61);
+      doc.fontSize(10).fillColor(GREEN_DIM).font('Helvetica').text('Gérez vos budgets, simplement.', M + 54, 61);
 
       // Right side: report label, month, date
       doc.fontSize(11).fillColor(WHITE).font('Helvetica-Bold')
@@ -1034,7 +1034,7 @@ app.get('/api/report/pdf', requireAuth, async (req, res) => {
       doc.rect(0, PAGE_H - 32, PAGE_W, 32).fill(GREEN_LIGHT);
       doc.fontSize(8).fillColor(GRAY).font('Helvetica')
          .text(
-           `Kula · Fais grandir ton argent · ${new Date().toLocaleDateString('fr-FR')} · © ${new Date().getFullYear()} Kula`,
+           `Kula · Gérez vos budgets, simplement. · ${new Date().toLocaleDateString('fr-FR')} · © ${new Date().getFullYear()} Kula`,
            0, PAGE_H - 19, { align: 'center', width: PAGE_W }
          );
 
@@ -1430,11 +1430,12 @@ FORMAT MESSAGE (conseil / analyse / clarification / résultat d'outil) :
 {"type":"message","message":"<réponse claire et structurée, max 3 paragraphes>"}
 
 EXEMPLES DE RÉPONSES ATTENDUES :
-- "Acheté du pain 500 et payé wewa 300" → 2 transactions expense
-- "Reçu salaire 200 000 et remboursé un ami 15 000" → 1 income + 1 expense
-- "J'ai reçu 5€ de ma mère" → income, amount: 3280 (5×655.957 arrondi), message mentionne la conversion
-- "Dépensé 10$ au supermarché" → expense, amount: 6550, message mentionne la conversion
-- "Comment économiser ?" → conseil structuré avec étapes concrètes
+- "J'ai payé le traiteur 45 000 et le transport 3 500" → 2 transactions expense
+- "Reçu subvention 200 000 et remboursé un fournisseur 15 000" → 1 income + 1 expense
+- "Achat de fournitures de bureau 12 000 FCFA" → 1 transaction expense
+- "J'ai reçu 50€ d'un partenaire" → income, amount: 32798 (50×655.957 arrondi), message mentionne la conversion
+- "Dépensé 100$ pour le matériel" → expense, amount: 65500, message mentionne la conversion
+- "Comment optimiser le budget de mon projet ?" → conseil structuré avec étapes concrètes
 - "Supprime la transaction 42" → utilise delete_transaction
 - "J'ai dépensé de l'argent" → demande poliment le montant et la nature
 

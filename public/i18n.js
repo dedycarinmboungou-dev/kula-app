@@ -12,7 +12,7 @@ const I18N = {
     greeting_morning:   'Bonjour',
     greeting_afternoon: 'Bon après-midi',
     greeting_evening:   'Bonsoir',
-    slogan:             'Fais grandir ton argent',
+    slogan:             'Gérez vos budgets, simplement.',
 
     // Dashboard
     total_balance:    'Solde total',
@@ -226,7 +226,7 @@ const I18N = {
 
     // Chat welcome
     chat_welcome_title: 'Kula — Coach Financier 🌱',
-    chat_welcome_body:  '👋 Bonjour ! Je suis <strong>Kula</strong>, ton coach financier 🌱<br><br>Je note tes dépenses et revenus, et je te donne des conseils personnalisés. Dis-moi simplement :<br><em>"Acheté manioc 2500 FCFA"</em><br><em>"Reçu salaire 250 000"</em><br><em>"Comment mieux épargner ?"</em>',
+    chat_welcome_body:  '👋 Bonjour ! Je suis <strong>Kula</strong>, votre assistant budget 🌱<br><br>Je note les dépenses et revenus de vos projets, et je vous fournis des analyses détaillées. Dites-moi simplement :<br><em>"J\'ai payé le traiteur 45 000 FCFA"</em><br><em>"Achat de fournitures de bureau 12 000 FCFA"</em><br><em>"Transport pour la réunion 3 500 FCFA"</em>',
 
     // Toasts / messages
     saved:            'Enregistré',
@@ -353,12 +353,12 @@ const I18N = {
 
     // Welcome popup
     welcome_title:    'Bienvenue sur Kula !',
-    welcome_sub:      'Ton assistant budget qui grandit avec toi.',
-    welcome_step1_title: 'Parle naturellement',
-    welcome_step1_sub:   '«\u00a0Acheté du pain 500 FCFA\u00a0»',
+    welcome_sub:      'Kula vous permet de gérer les finances de vos projets personnels, associatifs ou professionnels. Créez un espace, ajoutez vos dépenses en langage naturel, invitez vos collaborateurs et générez des rapports détaillés en un clic.',
+    welcome_step1_title: 'Parlez naturellement',
+    welcome_step1_sub:   '«\u00a0J\'ai payé le traiteur 45 000 FCFA\u00a0»',
     welcome_step2_title: 'L\'IA classe automatiquement',
     welcome_step2_sub:   'Catégorie, montant, date — tout est géré',
-    welcome_step3_title: 'Suis ton budget en temps réel',
+    welcome_step3_title: 'Suivez votre budget en temps réel',
     welcome_step3_sub:   'Tableau de bord, tendances, catégories',
     welcome_btn:      'C\'est parti ! 🚀',
 
@@ -379,7 +379,7 @@ const I18N = {
     greeting_morning:   'Good morning',
     greeting_afternoon: 'Good afternoon',
     greeting_evening:   'Good evening',
-    slogan:             'Grow your money',
+    slogan:             'Manage your budgets, simply.',
 
     // Dashboard
     total_balance:    'Total balance',
@@ -593,7 +593,7 @@ const I18N = {
 
     // Chat welcome
     chat_welcome_title: 'Kula — Financial Coach 🌱',
-    chat_welcome_body:  '👋 Hello! I\'m <strong>Kula</strong>, your financial coach 🌱<br><br>I track your expenses and income and give you personalized advice. Just tell me:<br><em>"Bought groceries $5"</em><br><em>"Received salary $500"</em><br><em>"How can I save more?"</em>',
+    chat_welcome_body:  '👋 Hello! I\'m <strong>Kula</strong>, your budget assistant 🌱<br><br>I track your projects\' expenses and income, and provide detailed analytics. Just tell me:<br><em>"Paid the caterer $75"</em><br><em>"Office supplies purchase $20"</em><br><em>"Transport for the meeting $6"</em>',
 
     // Toasts / messages
     saved:            'Saved',
@@ -720,9 +720,9 @@ const I18N = {
 
     // Welcome popup
     welcome_title:    'Welcome to Kula!',
-    welcome_sub:      'Your budget assistant that grows with you.',
+    welcome_sub:      'Kula helps you manage the finances of your personal, community or professional projects. Create a space, add expenses in natural language, invite collaborators and generate detailed reports in one click.',
     welcome_step1_title: 'Speak naturally',
-    welcome_step1_sub:   '"Bought bread $2"',
+    welcome_step1_sub:   '"Paid the caterer $75"',
     welcome_step2_title: 'AI categorizes automatically',
     welcome_step2_sub:   'Category, amount, date — all handled',
     welcome_step3_title: 'Track your budget in real time',

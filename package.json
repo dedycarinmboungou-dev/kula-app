@@ -1,7 +1,7 @@
 {
   "name": "kula",
   "version": "1.0.0",
-  "description": "Kula - Fais grandir ton argent",
+  "description": "Kula - Gérez vos budgets, simplement.",
   "main": "server.js",
   "scripts": {
     "build": "node -e \"const fs=require('fs'),p='public/sw.js',s=fs.readFileSync(p,'utf8');fs.writeFileSync(p,s.replace('__BUILD_TIME__',Date.now()))\"",

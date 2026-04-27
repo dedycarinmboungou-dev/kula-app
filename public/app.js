@@ -1451,7 +1451,7 @@ async function initNotifications() {
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.ready.then(reg => {
             reg.showNotification('Kula 🌱', {
-              body: "👋 Bienvenue sur Kula ! Je suis Kula, ton coach financier. Je t'enverrai des conseils et rappels pour faire grandir ton argent 🌱",
+              body: "👋 Bienvenue sur Kula ! Je suis votre assistant budget. Je vous enverrai des conseils et rappels pour gérer simplement vos projets 🌱",
               icon: '/icon-192.png',
               badge: '/icon-192.png',
               tag: 'kula-welcome'
