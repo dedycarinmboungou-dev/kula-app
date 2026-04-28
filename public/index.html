@@ -11,6 +11,9 @@
   <title>Kula 🌱</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -20,7 +23,7 @@
   <header class="app-header">
     <div class="header-top">
       <div class="logo">
-        <div class="logo-icon">🌱</div>
+        <div class="logo-icon"><i data-lucide="sprout" style="width:22px;height:22px"></i></div>
         <div class="logo-text">
           <h1>Kula</h1>
           <span data-i18n="slogan">Gérez vos budgets, simplement.</span>
@@ -42,29 +45,29 @@
     </div>
     <div class="header-bottom">
       <button class="month-picker-btn" id="month-picker-btn" aria-label="Choisir le mois">
-        📅 <span id="month-picker-label"></span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <i data-lucide="calendar-days" style="width:14px;height:14px"></i>
+        <span id="month-picker-label"></span>
+        <i data-lucide="chevron-down" style="width:12px;height:12px"></i>
       </button>
       <div class="user-greeting" id="user-greeting"></div>
     </div>
     <!-- Project selector — integrated into header, second line -->
     <button class="project-bar" id="project-bar" type="button" aria-label="Sélectionner un projet" style="display:none">
-      <span class="project-bar-icon" id="project-bar-icon">📁</span>
       <span class="project-bar-name" id="project-bar-name">—</span>
-      <svg class="project-bar-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      <i data-lucide="chevron-down" class="project-bar-caret" style="width:14px;height:14px"></i>
     </button>
   </header>
 
   <!-- ── Trial banner — shown during free trial ───────────────── -->
   <div class="trial-banner" id="trial-banner" style="display:none">
-    <span class="trial-banner-text" id="trial-banner-text">🌱 Essai gratuit — <strong>3 jours restants</strong></span>
+    <span class="trial-banner-text" id="trial-banner-text"><i data-lucide="sprout" style="width:14px;height:14px;vertical-align:-2px"></i> Essai gratuit — <strong>3 jours restants</strong></span>
     <button class="trial-upgrade-btn" id="trial-upgrade-btn" data-i18n="upgrade_premium">Passer Premium</button>
   </div>
 
   <!-- ── Paywall overlay — shown when trial expired ──────────── -->
   <div class="paywall-overlay" id="paywall-overlay" style="display:none" aria-modal="true">
     <div class="paywall-card">
-      <div class="paywall-logo">🌱</div>
+      <div class="paywall-logo"><i data-lucide="sprout" style="width:36px;height:36px"></i></div>
       <h2 class="paywall-title">Kula Premium</h2>
       <p class="paywall-subtitle" data-i18n="trial_expired">Votre essai de 3 jours est terminé</p>
 
@@ -107,7 +110,7 @@
 
   <!-- PWA Install card — floating bottom sheet -->
   <div class="install-card" id="install-prompt" style="display:none">
-    <button class="install-card-close" id="btn-install-close" aria-label="Fermer">✕</button>
+    <button class="install-card-close" id="btn-install-close" aria-label="Fermer"><i data-lucide="x" style="width:16px;height:16px"></i></button>
     <div class="install-card-body">
       <img class="install-card-icon" src="icon-192.png" alt="Kula">
       <div class="install-card-info">
@@ -156,12 +159,12 @@
     <!-- Income / Expense cards -->
     <div class="stats-row">
       <div class="stat-card">
-        <div class="stat-icon income">💰</div>
+        <div class="stat-icon income"><i data-lucide="trending-up" style="width:18px;height:18px"></i></div>
         <div class="stat-label" data-i18n="income_label">Revenus du mois</div>
         <div class="stat-amount income" id="monthly-income">—</div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon expense">💸</div>
+        <div class="stat-icon expense"><i data-lucide="trending-down" style="width:18px;height:18px"></i></div>
         <div class="stat-label" data-i18n="expense_label">Dépenses du mois</div>
         <div class="stat-amount expense" id="monthly-expense">—</div>
       </div>
@@ -230,7 +233,7 @@
           <path d="M19 12H5M12 5l-7 7 7 7"/>
         </svg>
       </button>
-      <span class="chat-topbar-title">Kula — Coach Financier 🌱</span>
+      <span class="chat-topbar-title">Kula — Coach Financier</span>
     </div>
     <div class="chat-messages" id="chat-messages">
       <!-- Welcome message -->
@@ -322,7 +325,7 @@
       </div>
       <div class="epargne-summary-right">
         <div class="epargne-summary-nb" id="epargne-nb-poches"></div>
-        <div class="epargne-summary-icon">🐷</div>
+        <div class="epargne-summary-icon"><i data-lucide="piggy-bank" style="width:20px;height:20px"></i></div>
       </div>
     </div>
 
@@ -338,7 +341,7 @@
     <!-- Poches list -->
     <div id="poches-list">
       <div class="empty-state">
-        <div class="empty-icon">🐷</div>
+        <div class="empty-icon"><i data-lucide="piggy-bank" style="width:32px;height:32px"></i></div>
         <div class="empty-text" data-i18n="no_pockets">Aucune poche d'épargne</div>
         <div class="empty-sub" data-i18n="no_pockets_sub">Crée ta première poche pour commencer !</div>
       </div>
@@ -357,7 +360,7 @@
 
     <div class="month-filter-row">
       <button class="month-picker-btn month-picker-btn-tx" id="tx-month-picker-btn" aria-label="Filtrer par mois">
-        📅 <span id="tx-month-picker-label"></span>
+        <i data-lucide="calendar-days" style="width:14px;height:14px"></i> <span id="tx-month-picker-label"></span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <button class="btn-export-pdf btn-export-pdf-sm" onclick="openExportModal()">
@@ -378,37 +381,23 @@
   <!-- ── Bottom Navigation ──────────────────────────────────────────────── -->
   <nav class="bottom-nav">
     <button class="nav-item active" data-tab="dashboard">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <rect x="3" y="3" width="7" height="7" rx="1"/>
-        <rect x="14" y="3" width="7" height="7" rx="1"/>
-        <rect x="3" y="14" width="7" height="7" rx="1"/>
-        <rect x="14" y="14" width="7" height="7" rx="1"/>
-      </svg>
+      <i data-lucide="layout-dashboard" class="nav-icon" style="width:22px;height:22px"></i>
       <span class="nav-label" data-i18n="nav_dashboard">Tableau</span>
     </button>
 
     <button class="nav-fab" data-tab="chat" id="nav-chat">
       <div class="fab-circle">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-        </svg>
+        <i data-lucide="message-circle" style="width:24px;height:24px"></i>
       </div>
     </button>
 
     <button class="nav-item" data-tab="epargne">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 8h10a5 5 0 0 1 0 10H5V8z"/>
-        <path d="M5 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
-        <line x1="19" y1="12" x2="22" y2="12"/>
-        <circle cx="9" cy="15" r="1" fill="currentColor"/>
-      </svg>
+      <i data-lucide="piggy-bank" class="nav-icon" style="width:22px;height:22px"></i>
       <span class="nav-label" data-i18n="nav_epargne">Épargne</span>
     </button>
 
     <button class="nav-item" data-tab="transactions">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-      </svg>
+      <i data-lucide="clock" class="nav-icon" style="width:22px;height:22px"></i>
       <span class="nav-label" data-i18n="nav_transactions">Historique</span>
     </button>
   </nav>
@@ -502,7 +491,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <span data-i18n="export_pdf_title">Exporter en PDF</span>
       </div>
-      <button class="pdf-modal-close" id="pdf-modal-close">✕</button>
+      <button class="pdf-modal-close" id="pdf-modal-close" aria-label="Fermer"><i data-lucide="x" style="width:18px;height:18px"></i></button>
     </div>
     <div class="pdf-modal-body">
       <label class="pdf-label" data-i18n="choose_month">Choisir le mois</label>
@@ -618,7 +607,7 @@
   <div class="profile-section">
     <div class="profile-section-title" data-i18n="currency">Devise</div>
     <div class="profile-currency-options" id="currency-options">
-      <button class="currency-btn active" data-currency="XOF" data-label="XOF (FCFA)">✓ XOF (FCFA)</button>
+      <button class="currency-btn active" data-currency="XOF" data-label="XOF (FCFA)">XOF · FCFA</button>
       <button class="currency-btn" data-currency="USD" data-label="USD ($)">USD ($)</button>
       <button class="currency-btn" data-currency="EUR" data-label="EUR (€)">EUR (€)</button>
     </div>
@@ -654,7 +643,7 @@
     <div class="profile-section-title" data-i18n="about">À propos</div>
     <div class="profile-about">
       <div class="about-header">
-        <span class="about-logo">🌱</span>
+        <span class="about-logo"><i data-lucide="sprout" style="width:24px;height:24px"></i></span>
         <div>
           <div class="about-app-name">Kula</div>
           <div class="about-version" id="about-version">v1.0.0</div>
@@ -695,9 +684,10 @@
     <!-- Header -->
     <div class="poche-modal-header">
       <div class="poche-modal-title">
-        <span>🐷</span> <span data-i18n="new_pocket_title">Nouvelle poche d'épargne</span>
+        <i data-lucide="piggy-bank" style="width:18px;height:18px"></i>
+        <span data-i18n="new_pocket_title">Nouvelle poche d'épargne</span>
       </div>
-      <button class="poche-modal-close" id="poche-modal-close">✕</button>
+      <button class="poche-modal-close" id="poche-modal-close" aria-label="Fermer"><i data-lucide="x" style="width:18px;height:18px"></i></button>
     </div>
 
     <!-- Fields -->
@@ -717,7 +707,7 @@
         <input type="date" id="poche-echeance">
       </div>
 
-      <button class="btn-create-poche" id="btn-create-poche" data-i18n="create_pocket_btn">Créer la poche 🐷</button>
+      <button class="btn-create-poche" id="btn-create-poche" data-i18n="create_pocket_btn">Créer la poche</button>
     </div>
 
   </div>
@@ -727,8 +717,8 @@
 <div class="poche-modal-overlay" id="cat-modal-overlay" style="display:none">
   <div class="poche-modal" id="cat-modal">
     <div class="poche-modal-header">
-      <div class="poche-modal-title">🏷️ <span id="cat-modal-title">Nouvelle catégorie</span></div>
-      <button class="poche-modal-close" id="cat-modal-close">✕</button>
+      <div class="poche-modal-title"><i data-lucide="tag" style="width:18px;height:18px"></i> <span id="cat-modal-title">Nouvelle catégorie</span></div>
+      <button class="poche-modal-close" id="cat-modal-close" aria-label="Fermer"><i data-lucide="x" style="width:18px;height:18px"></i></button>
     </div>
     <div class="poche-modal-body">
       <input type="hidden" id="cat-modal-id">
@@ -764,16 +754,19 @@
   <div class="poche-modal" id="alimenter-modal">
     <div class="poche-modal-header">
       <div class="poche-modal-title">
-        <span>💰</span> <span id="alimenter-modal-nom">Alimenter</span>
+        <i data-lucide="piggy-bank" style="width:18px;height:18px"></i>
+        <span id="alimenter-modal-nom">Alimenter</span>
       </div>
-      <button class="poche-modal-close" id="alimenter-modal-close">✕</button>
+      <button class="poche-modal-close" id="alimenter-modal-close" aria-label="Fermer">
+        <i data-lucide="x" style="width:18px;height:18px"></i>
+      </button>
     </div>
     <div class="poche-modal-body">
       <div class="poche-field">
         <label for="alimenter-montant"><span data-i18n="amount_to_add">Montant à ajouter</span> (<span class="currency-label">FCFA</span>)</label>
         <input type="number" id="alimenter-montant" placeholder="ex : 10 000" min="1" inputmode="numeric">
       </div>
-      <button class="btn-create-poche" id="btn-alimenter-confirm" data-i18n="add_funds_btn">Ajouter 💰</button>
+      <button class="btn-create-poche" id="btn-alimenter-confirm" data-i18n="add_funds_btn">Ajouter</button>
     </div>
   </div>
 </div>
@@ -786,7 +779,7 @@
   <span class="reminder-icon">💡</span>
   <span class="reminder-text" id="reminder-text"></span>
   <button class="reminder-action" id="reminder-action" data-i18n="reminder_add">Ajouter</button>
-  <button class="reminder-close" id="reminder-close" aria-label="Close">✕</button>
+  <button class="reminder-close" id="reminder-close" aria-label="Close"><i data-lucide="x" style="width:14px;height:14px"></i></button>
 </div>
 
 <!-- PWA Install guide modal -->
@@ -794,7 +787,7 @@
   <div class="pwa-modal">
     <div class="pwa-modal-header">
       <div class="pwa-modal-title" data-i18n="pwa_install_title">📲 Installer Kula</div>
-      <button class="pwa-modal-close" id="pwa-modal-close">✕</button>
+      <button class="pwa-modal-close" id="pwa-modal-close" aria-label="Fermer"><i data-lucide="x" style="width:18px;height:18px"></i></button>
     </div>
 
     <!-- Detected browser badge (shown when auto-detected) -->
@@ -951,13 +944,12 @@
 <!-- Currency onboarding — shown once if no kula_currency -->
 <div class="welcome-overlay" id="currency-onboarding" style="display:none">
   <div class="welcome-modal">
-    <div class="welcome-emoji">💱</div>
     <h2 class="welcome-title" data-i18n="currency_onboarding_title">Quelle devise utilisez-vous ?</h2>
     <p class="welcome-sub" data-i18n="currency_onboarding_sub">Vous pourrez la changer à tout moment dans les réglages.</p>
     <div class="currency-onboarding-options">
-      <button class="currency-onboard-btn" data-currency="XOF">🇨🇫 XOF (FCFA)</button>
-      <button class="currency-onboard-btn" data-currency="USD">🇺🇸 USD ($)</button>
-      <button class="currency-onboard-btn" data-currency="EUR">🇪🇺 EUR (€)</button>
+      <button class="currency-onboard-btn" data-currency="XOF">XOF · FCFA</button>
+      <button class="currency-onboard-btn" data-currency="USD">USD · Dollar</button>
+      <button class="currency-onboard-btn" data-currency="EUR">EUR · Euro</button>
     </div>
   </div>
 </div>
@@ -965,7 +957,7 @@
 <!-- Welcome popup -->
 <div class="welcome-overlay" id="welcome-overlay" style="display:none">
   <div class="welcome-modal">
-    <div class="welcome-emoji">🌱</div>
+    <div class="welcome-emoji"><i data-lucide="sprout" style="width:42px;height:42px"></i></div>
     <h2 class="welcome-title" data-i18n="welcome_title">Bienvenue sur Kula !</h2>
     <p class="welcome-sub" data-i18n="welcome_sub">Kula vous permet de gérer les finances de vos projets personnels, associatifs ou professionnels. Créez un espace, ajoutez vos dépenses en langage naturel, invitez vos collaborateurs et générez des rapports détaillés en un clic.</p>
     <div class="welcome-steps">
@@ -1011,15 +1003,17 @@
 <div class="poche-modal-overlay project-sheet-overlay" id="project-sheet-overlay" style="display:none">
   <div class="poche-modal project-sheet">
     <div class="poche-modal-header">
-      <div class="poche-modal-title">📁 <span data-i18n="projects">Projets</span></div>
-      <button class="poche-modal-close" id="btn-project-sheet-close" type="button">✕</button>
+      <div class="poche-modal-title"><i data-lucide="folder" style="width:18px;height:18px"></i> <span data-i18n="projects">Projets</span></div>
+      <button class="poche-modal-close" id="btn-project-sheet-close" type="button" aria-label="Fermer">
+        <i data-lucide="x" style="width:18px;height:18px"></i>
+      </button>
     </div>
 
     <!-- List section -->
     <div id="project-list-section">
       <div class="project-sheet-list" id="project-sheet-list"></div>
       <button class="btn-new-project" id="btn-new-project" type="button">
-        <span class="btn-new-project-plus">+</span>
+        <i data-lucide="plus" style="width:18px;height:18px"></i>
         <span data-i18n="new_project">Nouveau projet</span>
       </button>
     </div>
@@ -1044,22 +1038,27 @@
         <label data-i18n="project_type">Type</label>
         <div class="project-type-chips">
           <button class="project-type-chip selected" data-type="perso" type="button">
-            🏠 <span data-i18n="project_type_perso">Perso</span>
+            <i data-lucide="home" style="width:16px;height:16px"></i>
+            <span data-i18n="project_type_perso">Perso</span>
           </button>
           <button class="project-type-chip" data-type="entreprise" type="button">
-            🏢 <span data-i18n="project_type_entreprise">Entreprise</span>
+            <i data-lucide="briefcase" style="width:16px;height:16px"></i>
+            <span data-i18n="project_type_entreprise">Entreprise</span>
           </button>
           <button class="project-type-chip" data-type="asso" type="button">
-            🤝 <span data-i18n="project_type_asso">Association</span>
+            <i data-lucide="heart" style="width:16px;height:16px"></i>
+            <span data-i18n="project_type_asso">Association</span>
           </button>
           <button class="project-type-chip" data-type="event" type="button">
-            🎉 <span data-i18n="project_type_event">Événement</span>
+            <i data-lucide="calendar" style="width:16px;height:16px"></i>
+            <span data-i18n="project_type_event">Événement</span>
           </button>
         </div>
       </div>
       <div class="project-create-actions">
         <button class="btn-back-project" id="btn-back-project-list" type="button">
-          ← <span data-i18n="back">Retour</span>
+          <i data-lucide="arrow-left" style="width:16px;height:16px"></i>
+          <span data-i18n="back">Retour</span>
         </button>
         <button class="btn-create-project" id="btn-create-project" type="button" data-i18n="create">Créer</button>
       </div>
@@ -1071,34 +1070,40 @@
 <div class="poche-modal-overlay" id="project-settings-overlay" style="display:none">
   <div class="poche-modal project-settings-modal">
     <div class="poche-modal-header">
-      <div class="poche-modal-title">⚙️ <span id="project-settings-name">—</span></div>
-      <button class="poche-modal-close" id="btn-project-settings-close" type="button">✕</button>
+      <div class="poche-modal-title">
+        <i data-lucide="settings" style="width:18px;height:18px"></i>
+        <span id="project-settings-name">—</span>
+      </div>
+      <button class="poche-modal-close" id="btn-project-settings-close" type="button" aria-label="Fermer">
+        <i data-lucide="x" style="width:18px;height:18px"></i>
+      </button>
     </div>
     <div class="project-settings-body">
-      <!-- Edit name -->
-      <div class="poche-field">
-        <label data-i18n="project_name">Nom du projet</label>
-        <input id="project-edit-name" type="text" maxlength="60">
-      </div>
-      <!-- Edit type -->
-      <div class="poche-field">
-        <label data-i18n="project_type">Type</label>
-        <div class="project-type-chips" id="project-edit-type-chips">
-          <button class="project-type-chip" data-type="perso" type="button">🏠 <span data-i18n="project_type_perso">Perso</span></button>
-          <button class="project-type-chip" data-type="entreprise" type="button">🏢 <span data-i18n="project_type_entreprise">Entreprise</span></button>
-          <button class="project-type-chip" data-type="asso" type="button">🤝 <span data-i18n="project_type_asso">Association</span></button>
-          <button class="project-type-chip" data-type="event" type="button">🎉 <span data-i18n="project_type_event">Événement</span></button>
+      <!-- Section: Details -->
+      <div class="project-settings-section">
+        <div class="poche-field">
+          <label data-i18n="project_name">Nom du projet</label>
+          <input id="project-edit-name" type="text" maxlength="60">
         </div>
+        <div class="poche-field">
+          <label data-i18n="project_type">Type</label>
+          <div class="project-type-chips" id="project-edit-type-chips">
+            <button class="project-type-chip" data-type="perso" type="button"><i data-lucide="home" style="width:16px;height:16px"></i> <span data-i18n="project_type_perso">Perso</span></button>
+            <button class="project-type-chip" data-type="entreprise" type="button"><i data-lucide="briefcase" style="width:16px;height:16px"></i> <span data-i18n="project_type_entreprise">Entreprise</span></button>
+            <button class="project-type-chip" data-type="asso" type="button"><i data-lucide="heart" style="width:16px;height:16px"></i> <span data-i18n="project_type_asso">Association</span></button>
+            <button class="project-type-chip" data-type="event" type="button"><i data-lucide="calendar" style="width:16px;height:16px"></i> <span data-i18n="project_type_event">Événement</span></button>
+          </div>
+        </div>
+        <button class="btn-save-project" id="btn-save-project" type="button" data-i18n="save">Enregistrer</button>
       </div>
-      <!-- Save button -->
-      <button class="btn-save-project" id="btn-save-project" type="button" data-i18n="save">Enregistrer</button>
 
-      <!-- Members list -->
+      <!-- Section: Members -->
       <div class="project-settings-section">
         <div class="project-settings-section-title" data-i18n="project_members">Membres</div>
         <div class="project-members-list" id="project-members-list"></div>
       </div>
-      <!-- Invite member -->
+
+      <!-- Section: Invite -->
       <div class="project-settings-section">
         <div class="project-settings-section-title" data-i18n="invite_member">Inviter un membre</div>
         <div class="project-invite-row">
@@ -1109,14 +1114,19 @@
 
       <!-- Danger zone: delete (hidden if perso) -->
       <div class="project-settings-danger" id="project-settings-danger" style="display:none">
-        <button class="btn-delete-project" id="btn-delete-project" type="button" data-i18n="delete_project">🗑️ Supprimer ce projet</button>
+        <button class="btn-delete-project" id="btn-delete-project" type="button">
+          <i data-lucide="trash-2" style="width:16px;height:16px"></i>
+          <span data-i18n="delete_project_short">Supprimer ce projet</span>
+        </button>
       </div>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script src="/i18n.js"></script>
 <script src="/app.js"></script>
+<script>if (window.lucide) lucide.createIcons();</script>
 </body>
 </html>

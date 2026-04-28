@@ -53,13 +53,25 @@ const state = {
   currentProjectId: parseInt(localStorage.getItem('kula_project_id') || '0') || null,
 };
 
-// ── Project metadata (icons + labels per type) ────────────────────────────────
+// ── Project metadata (Lucide icons + labels per type) ────────────────────────
 const PROJECT_TYPES = {
-  perso:      { icon: '🏠', labelKey: 'project_type_perso' },
-  entreprise: { icon: '🏢', labelKey: 'project_type_entreprise' },
-  asso:       { icon: '🤝', labelKey: 'project_type_asso' },
-  event:      { icon: '🎉', labelKey: 'project_type_event' }
+  perso:      { lucide: 'home',      labelKey: 'project_type_perso' },
+  entreprise: { lucide: 'briefcase', labelKey: 'project_type_entreprise' },
+  asso:       { lucide: 'heart',     labelKey: 'project_type_asso' },
+  event:      { lucide: 'calendar',  labelKey: 'project_type_event' }
 };
+
+// Trigger Lucide to upgrade <i data-lucide> nodes into SVG. Call after dynamic renders.
+function refreshIcons() {
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    try { lucide.createIcons(); } catch { /* silent */ }
+  }
+}
+
+// Returns the HTML for a Lucide icon. Optional size + class.
+function icon(name, { size = 18, cls = '' } = {}) {
+  return `<i data-lucide="${name}" class="lucide-icon ${cls}" style="width:${size}px;height:${size}px"></i>`;
+}
 
 // Returns the currently-active project or null.
 function currentProject() {
@@ -520,9 +532,9 @@ function renderProjectBar() {
   const cur = currentProject();
   if (!cur) { bar.style.display = 'none'; return; }
   bar.style.display = 'inline-flex';
-  const meta = PROJECT_TYPES[cur.type] || PROJECT_TYPES.perso;
-  document.getElementById('project-bar-icon').textContent = meta.icon;
+  // Per spec: no type icon in the pill, just the project name and a chevron-down on the right
   document.getElementById('project-bar-name').textContent = cur.name;
+  refreshIcons();
   // Update the "Manage budgets" button label depending on project type
   const manageLabel = document.querySelector('#btn-budgets [data-i18n="manage_budgets"], #btn-budgets [data-i18n="manage_budget"]');
   if (manageLabel) {
@@ -569,18 +581,22 @@ function renderProjectSheet() {
     const meta = PROJECT_TYPES[p.type] || PROJECT_TYPES.perso;
     const active = p.id === state.currentProjectId ? 'active' : '';
     const isOwner = p.role === 'owner';
+    const memberBadge = !isOwner ? `<span class="project-item-badge">${icon('users', { size: 14 })}</span>` : '';
+    const checkBadge  = active ? `<span class="project-item-check">${icon('check', { size: 16 })}</span>` : '';
     const settingsBtn = isOwner
-      ? `<button class="project-settings-btn" onclick="event.stopPropagation();openProjectSettings(${p.id})" title="${t('project_manage')}" aria-label="${t('project_manage')}">⚙️</button>`
+      ? `<button class="project-icon-btn" onclick="event.stopPropagation();openProjectSettings(${p.id})" title="${t('project_manage')}" aria-label="${t('project_manage')}">${icon('settings', { size: 16 })}</button>`
       : '';
     return `
-      <button class="project-item ${active}" onclick="selectProject(${p.id})">
-        <span class="project-item-icon">${meta.icon}</span>
+      <div class="project-item ${active}" role="button" tabindex="0" onclick="selectProject(${p.id})">
+        <span class="project-item-icon">${icon(meta.lucide, { size: 18 })}</span>
         <span class="project-item-name">${escapeHtml(p.name)}</span>
-        <span class="project-item-role">${isOwner ? '' : '👥'}</span>
+        ${memberBadge}
+        ${checkBadge}
         ${settingsBtn}
-      </button>
+      </div>
     `;
   }).join('');
+  refreshIcons();
 }
 
 function openProjectCreateForm() {
@@ -732,6 +748,7 @@ async function loadProjectMembers(projectId) {
         <span class="project-member-status ${m.status}">${t('project_status_' + m.status)}</span>
       </div>
     `).join('');
+    refreshIcons();
   } catch (e) {
     list.innerHTML = `<div class="project-member-empty">${escapeHtml(e.message)}</div>`;
   }
@@ -2231,6 +2248,9 @@ async function init() {
   const urlTab = new URLSearchParams(window.location.search).get('tab');
   if (urlTab) switchTab(urlTab);
   else loadDashboard();
+
+  // Final pass to upgrade any <i data-lucide> nodes inserted during init
+  refreshIcons();
 
   // Nav buttons
   document.querySelectorAll('[data-tab]').forEach(btn => {
