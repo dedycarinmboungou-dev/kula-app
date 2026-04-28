@@ -47,8 +47,31 @@ const state = {
   charts: { category: null, trend: null },
   budgets:  {},        // {category: limite} for current month
   userCats: [],        // [{id, nom, icone, couleur, type}] loaded from API
-  recentTransactions: [] // populated by loadDashboard(), read by initNotifications()
+  recentTransactions: [], // populated by loadDashboard(), read by initNotifications()
+  // ── Multi-projects ──
+  projects: [],        // [{id, name, type, role, owner_id}]
+  currentProjectId: parseInt(localStorage.getItem('kula_project_id') || '0') || null,
 };
+
+// ── Project metadata (icons + labels per type) ────────────────────────────────
+const PROJECT_TYPES = {
+  perso:      { icon: '🏠', labelKey: 'project_type_perso' },
+  entreprise: { icon: '🏢', labelKey: 'project_type_entreprise' },
+  asso:       { icon: '🤝', labelKey: 'project_type_asso' },
+  event:      { icon: '🎉', labelKey: 'project_type_event' }
+};
+
+// Returns the currently-active project or null.
+function currentProject() {
+  return state.projects.find(p => p.id === state.currentProjectId) || null;
+}
+
+// Append project_id to API path (query string). Use for routes that need scoping.
+function withProject(path) {
+  if (!state.currentProjectId) return path;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}project_id=${state.currentProjectId}`;
+}
 
 // ── Category metadata ─────────────────────────────────────────────────────────
 const CATEGORIES = {
@@ -129,7 +152,7 @@ async function syncOfflineQueue() {
   for (const tx of q) {
     const { _queuedAt, ...txData } = tx; // eslint-disable-line no-unused-vars
     try {
-      await api('/api/transactions', { method: 'POST', body: JSON.stringify(txData) });
+      await api(withProject('/api/transactions'), { method: 'POST', body: JSON.stringify(txData) });
       synced++;
     } catch {
       remaining.push(tx);
@@ -249,7 +272,7 @@ async function downloadPDF() {
   label.textContent = t('generating');
 
   try {
-    const res = await fetch(`/api/report/pdf?month=${month}`, {
+    const res = await fetch(withProject(`/api/report/pdf?month=${month}`), {
       headers: { 'Authorization': `Bearer ${getToken()}` }
     });
 
@@ -471,10 +494,194 @@ function switchTab(tab) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// PROJECTS — multi-project selector, creation, management
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function loadProjects() {
+  try {
+    const projects = await api('/api/projects');
+    state.projects = projects || [];
+    // If currentProjectId is invalid (not in list), pick the Personnel project or first
+    if (!state.projects.find(p => p.id === state.currentProjectId)) {
+      const perso = state.projects.find(p => p.type === 'perso' && p.role === 'owner');
+      state.currentProjectId = (perso || state.projects[0])?.id || null;
+      if (state.currentProjectId) localStorage.setItem('kula_project_id', String(state.currentProjectId));
+    }
+    renderProjectBar();
+  } catch (e) {
+    console.error('[projects] load failed:', e.message);
+  }
+}
+
+function renderProjectBar() {
+  const bar = document.getElementById('project-bar');
+  if (!bar) return;
+  const cur = currentProject();
+  if (!cur) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const meta = PROJECT_TYPES[cur.type] || PROJECT_TYPES.perso;
+  document.getElementById('project-bar-icon').textContent = meta.icon;
+  document.getElementById('project-bar-name').textContent = cur.name;
+}
+
+function selectProject(id) {
+  if (id === state.currentProjectId) { closeProjectSheet(); return; }
+  state.currentProjectId = id;
+  localStorage.setItem('kula_project_id', String(id));
+  renderProjectBar();
+  closeProjectSheet();
+  // Refresh active tab data
+  if (state.currentTab === 'dashboard') loadDashboard();
+  if (state.currentTab === 'transactions') loadTransactions();
+  if (state.currentTab === 'epargne') loadPoches();
+  // Reset chat history (it's project-scoped contextually)
+  state.chatHistory = [];
+  showToast(t('project_switched'), 'success');
+}
+
+function openProjectSheet() {
+  const overlay = document.getElementById('project-sheet-overlay');
+  if (!overlay) return;
+  renderProjectSheet();
+  overlay.style.display = 'flex';
+  // Hide create-form by default
+  document.getElementById('project-create-form').style.display = 'none';
+  document.getElementById('project-list-section').style.display = 'block';
+}
+
+function closeProjectSheet() {
+  const overlay = document.getElementById('project-sheet-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function renderProjectSheet() {
+  const list = document.getElementById('project-sheet-list');
+  if (!list) return;
+  list.innerHTML = state.projects.map(p => {
+    const meta = PROJECT_TYPES[p.type] || PROJECT_TYPES.perso;
+    const active = p.id === state.currentProjectId ? 'active' : '';
+    const isOwner = p.role === 'owner';
+    const settingsBtn = isOwner
+      ? `<button class="project-settings-btn" onclick="event.stopPropagation();openProjectSettings(${p.id})" title="${t('project_manage')}" aria-label="${t('project_manage')}">⚙️</button>`
+      : '';
+    return `
+      <button class="project-item ${active}" onclick="selectProject(${p.id})">
+        <span class="project-item-icon">${meta.icon}</span>
+        <span class="project-item-name">${escapeHtml(p.name)}</span>
+        <span class="project-item-role">${isOwner ? '' : '👥'}</span>
+        ${settingsBtn}
+      </button>
+    `;
+  }).join('');
+}
+
+function openProjectCreateForm() {
+  document.getElementById('project-list-section').style.display = 'none';
+  document.getElementById('project-create-form').style.display = 'block';
+  document.getElementById('project-name-input').value = '';
+  document.getElementById('project-name-input').focus();
+  // Default-select 'perso'
+  document.querySelectorAll('.project-type-chip').forEach(c => c.classList.remove('selected'));
+  document.querySelector('.project-type-chip[data-type="perso"]')?.classList.add('selected');
+}
+
+function backToProjectList() {
+  document.getElementById('project-create-form').style.display = 'none';
+  document.getElementById('project-list-section').style.display = 'block';
+}
+
+async function submitNewProject() {
+  const name = document.getElementById('project-name-input').value.trim();
+  const type = document.querySelector('.project-type-chip.selected')?.dataset.type || 'perso';
+  if (!name) { showToast(t('project_name_required'), 'error'); return; }
+  const btn = document.getElementById('btn-create-project');
+  btn.disabled = true;
+  try {
+    const proj = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name, type }) });
+    // Append + select
+    state.projects.push({ ...proj, role: 'owner' });
+    selectProject(proj.id);
+    showToast(t('project_created'), 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function openProjectSettings(projectId) {
+  const project = state.projects.find(p => p.id === projectId);
+  if (!project) return;
+  closeProjectSheet();
+  document.getElementById('project-settings-name').textContent = project.name;
+  const meta = PROJECT_TYPES[project.type] || PROJECT_TYPES.perso;
+  document.getElementById('project-settings-type').innerHTML = `${meta.icon} <span>${t(meta.labelKey)}</span>`;
+  document.getElementById('project-settings-overlay').style.display = 'flex';
+  document.getElementById('project-settings-overlay').dataset.projectId = String(projectId);
+  document.getElementById('project-invite-email').value = '';
+  await loadProjectMembers(projectId);
+}
+
+function closeProjectSettings() {
+  document.getElementById('project-settings-overlay').style.display = 'none';
+}
+
+async function loadProjectMembers(projectId) {
+  const list = document.getElementById('project-members-list');
+  list.innerHTML = `<div class="project-member-empty">${t('loading')}</div>`;
+  try {
+    const members = await api(`/api/projects/${projectId}/members`);
+    if (!members.length) {
+      list.innerHTML = `<div class="project-member-empty">${t('project_no_members')}</div>`;
+      return;
+    }
+    list.innerHTML = members.map(m => `
+      <div class="project-member-row">
+        <div class="project-member-info">
+          <span class="project-member-email">${escapeHtml(m.email)}</span>
+          <span class="project-member-role">${m.role}</span>
+        </div>
+        <span class="project-member-status ${m.status}">${t('project_status_' + m.status)}</span>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = `<div class="project-member-empty">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function inviteProjectMember() {
+  const overlay = document.getElementById('project-settings-overlay');
+  const projectId = parseInt(overlay.dataset.projectId);
+  const email = document.getElementById('project-invite-email').value.trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast(t('invalid_email'), 'error');
+    return;
+  }
+  const btn = document.getElementById('btn-invite-member');
+  btn.disabled = true;
+  try {
+    await api(`/api/projects/${projectId}/invite`, {
+      method: 'POST', body: JSON.stringify({ email, role: 'editor' })
+    });
+    document.getElementById('project-invite-email').value = '';
+    showToast(t('project_invite_sent'), 'success');
+    await loadProjectMembers(projectId);
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 // ── Dashboard ──────────────────────────────────────────────────────────────────
 async function loadDashboard() {
   try {
-    const data = await api(`/api/dashboard?month=${state.currentMonth}`);
+    const data = await api(withProject(`/api/dashboard?month=${state.currentMonth}`));
 
     // Offline cached data — show banner
     if (data._kula_offline) {
@@ -785,7 +992,7 @@ function escapeHtml(str) {
 async function loadTransactions() {
   try {
     const params = new URLSearchParams({ month: state.txMonth });
-    let txs = await api(`/api/transactions?${params}`);
+    let txs = await api(withProject(`/api/transactions?${params}`));
 
     if (state.txFilter !== 'all') {
       txs = txs.filter(t => t.type === state.txFilter);
@@ -817,7 +1024,7 @@ async function saveTransaction(tx) {
     enqueueOffline(tx);
     return { offline: true };
   }
-  return await api('/api/transactions', {
+  return await api(withProject('/api/transactions'), {
     method: 'POST',
     body: JSON.stringify(tx)
   });
@@ -1002,7 +1209,7 @@ async function sendChatMessage() {
   showTypingIndicator();
 
   try {
-    const response = await api('/api/chat', {
+    const response = await api(withProject('/api/chat'), {
       method: 'POST',
       body: JSON.stringify({ message: text, history: state.chatHistory.slice(-10) })
     });
@@ -1504,7 +1711,7 @@ async function loadPoches() {
   const list = document.getElementById('poches-list');
   if (!list) return;
   try {
-    const poches = await api('/api/poches');
+    const poches = await api(withProject('/api/poches'));
     if (poches) renderPoches(poches);
   } catch {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">${t('error_loading')}</div></div>`;
@@ -1632,7 +1839,7 @@ function initPocheHandlers() {
     btnCreate.disabled    = true;
     btnCreate.textContent = t('creating');
     try {
-      await api('/api/poches', {
+      await api(withProject('/api/poches'), {
         method: 'POST',
         body: JSON.stringify({ nom, objectif_montant: objectif, date_echeance: echeance })
       });
@@ -1759,7 +1966,7 @@ async function initiatePayment() {
   }
 }
 
-function init() {
+async function init() {
   // Service worker — auto-reload when a new version activates
   if ('serviceWorker' in navigator) {
     // Capture BEFORE register() so first-install doesn't trigger a reload.
@@ -1888,6 +2095,30 @@ function init() {
     history.replaceState({}, '', '/');
     showToast(t('payment_cancel'), 'error');
   }
+
+  // Load projects FIRST so currentProjectId is set before any data fetch
+  await loadProjects();
+
+  // Wire up project bar + sheet
+  document.getElementById('project-bar')?.addEventListener('click', openProjectSheet);
+  document.getElementById('project-sheet-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'project-sheet-overlay') closeProjectSheet();
+  });
+  document.getElementById('btn-project-sheet-close')?.addEventListener('click', closeProjectSheet);
+  document.getElementById('btn-new-project')?.addEventListener('click', openProjectCreateForm);
+  document.getElementById('btn-back-project-list')?.addEventListener('click', backToProjectList);
+  document.getElementById('btn-create-project')?.addEventListener('click', submitNewProject);
+  document.querySelectorAll('.project-type-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.project-type-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+  document.getElementById('btn-project-settings-close')?.addEventListener('click', closeProjectSettings);
+  document.getElementById('project-settings-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'project-settings-overlay') closeProjectSettings();
+  });
+  document.getElementById('btn-invite-member')?.addEventListener('click', inviteProjectMember);
 
   // Handle manifest shortcut ?tab=chat
   const urlTab = new URLSearchParams(window.location.search).get('tab');
@@ -2148,10 +2379,10 @@ function openBudgets() {
   // Load categories then budgets + spending
   loadUserCategories().then(() => {
     renderBudgetList(state.budgets, {});
-    api(`/api/budgets?month=${month}`).then(rows => {
+    api(withProject(`/api/budgets?month=${month}`)).then(rows => {
       const map = {};
       rows.forEach(r => { map[r.category] = r.limite; });
-      api(`/api/dashboard?month=${month}`).then(data => {
+      api(withProject(`/api/dashboard?month=${month}`)).then(data => {
         const spending = {};
         (data.categories || []).filter(c => c.type === 'expense').forEach(c => { spending[c.category] = c.total; });
         renderBudgetList(map, spending);
@@ -2237,7 +2468,7 @@ async function saveBudget(input) {
   const month    = input.dataset.month;
   const limite   = parseFloat(input.value) || 0;
   try {
-    await api('/api/budgets', {
+    await api(withProject('/api/budgets'), {
       method: 'PUT',
       body: JSON.stringify({ category, limite, month })
     });
@@ -2935,7 +3166,7 @@ const addTxModal = (() => {
     spinEl().style.display = 'inline';
 
     try {
-      await api('/api/transactions', {
+      await api(withProject('/api/transactions'), {
         method: 'POST',
         body: JSON.stringify({
           type:          currentType,

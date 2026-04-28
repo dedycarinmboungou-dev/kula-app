@@ -49,6 +49,13 @@
     </div>
   </header>
 
+  <!-- ── Project selector bar ────────────────────────────────── -->
+  <button class="project-bar" id="project-bar" type="button" aria-label="Sélectionner un projet" style="display:none">
+    <span class="project-bar-icon" id="project-bar-icon">📁</span>
+    <span class="project-bar-name" id="project-bar-name">—</span>
+    <svg class="project-bar-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+  </button>
+
   <!-- ── Trial banner — shown during free trial ───────────────── -->
   <div class="trial-banner" id="trial-banner" style="display:none">
     <span class="trial-banner-text" id="trial-banner-text">🌱 Essai gratuit — <strong>3 jours restants</strong></span>
@@ -994,6 +1001,83 @@
       <button class="month-cal-arrow" id="month-cal-next">›</button>
     </div>
     <div class="month-cal-grid" id="month-cal-grid"></div>
+  </div>
+</div>
+
+<!-- ── Project selector bottom-sheet ──────────────────────────────────────── -->
+<div class="poche-modal-overlay project-sheet-overlay" id="project-sheet-overlay" style="display:none">
+  <div class="poche-modal project-sheet">
+    <div class="poche-modal-header">
+      <div class="poche-modal-title">📁 <span data-i18n="projects">Projets</span></div>
+      <button class="poche-modal-close" id="btn-project-sheet-close" type="button">✕</button>
+    </div>
+
+    <!-- List section -->
+    <div id="project-list-section">
+      <div class="project-sheet-list" id="project-sheet-list"></div>
+      <button class="btn-new-project" id="btn-new-project" type="button">
+        <span class="btn-new-project-plus">+</span>
+        <span data-i18n="new_project">Nouveau projet</span>
+      </button>
+    </div>
+
+    <!-- Create form section -->
+    <div id="project-create-form" style="display:none">
+      <div class="poche-field">
+        <label data-i18n="project_name">Nom du projet</label>
+        <input id="project-name-input" type="text" maxlength="60" data-i18n-placeholder="project_name_ph" placeholder="Ex : Mariage de Fatou">
+      </div>
+      <div class="poche-field">
+        <label data-i18n="project_type">Type</label>
+        <div class="project-type-chips">
+          <button class="project-type-chip selected" data-type="perso" type="button">
+            🏠 <span data-i18n="project_type_perso">Perso</span>
+          </button>
+          <button class="project-type-chip" data-type="entreprise" type="button">
+            🏢 <span data-i18n="project_type_entreprise">Entreprise</span>
+          </button>
+          <button class="project-type-chip" data-type="asso" type="button">
+            🤝 <span data-i18n="project_type_asso">Association</span>
+          </button>
+          <button class="project-type-chip" data-type="event" type="button">
+            🎉 <span data-i18n="project_type_event">Événement</span>
+          </button>
+        </div>
+      </div>
+      <div class="project-create-actions">
+        <button class="btn-back-project" id="btn-back-project-list" type="button">
+          ← <span data-i18n="back">Retour</span>
+        </button>
+        <button class="btn-create-project" id="btn-create-project" type="button" data-i18n="create">Créer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Project settings modal ─────────────────────────────────────────────── -->
+<div class="poche-modal-overlay" id="project-settings-overlay" style="display:none">
+  <div class="poche-modal project-settings-modal">
+    <div class="poche-modal-header">
+      <div class="poche-modal-title">⚙️ <span id="project-settings-name">—</span></div>
+      <button class="poche-modal-close" id="btn-project-settings-close" type="button">✕</button>
+    </div>
+    <div class="project-settings-body">
+      <div class="project-settings-row">
+        <span class="project-settings-label" data-i18n="project_type">Type</span>
+        <span class="project-settings-value" id="project-settings-type">—</span>
+      </div>
+      <div class="project-settings-section">
+        <div class="project-settings-section-title" data-i18n="project_members">Membres</div>
+        <div class="project-members-list" id="project-members-list"></div>
+      </div>
+      <div class="project-settings-section">
+        <div class="project-settings-section-title" data-i18n="invite_member">Inviter un membre</div>
+        <div class="project-invite-row">
+          <input type="email" id="project-invite-email" data-i18n-placeholder="enter_email" placeholder="email@exemple.com">
+          <button class="btn-invite-member" id="btn-invite-member" type="button" data-i18n="invite">Inviter</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

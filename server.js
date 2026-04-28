@@ -1459,7 +1459,7 @@ Ton rôle : conseiller financier personnel. Réponds aux questions, donne des co
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHAT (AI)
 // ═══════════════════════════════════════════════════════════════════════════════
-app.post('/api/chat', requireAuth, checkAccess, async (req, res) => {
+app.post('/api/chat', requireAuth, checkAccess, requireProjectAccess, async (req, res) => {
   try {
     const { message } = req.body;
     if (!message?.trim()) return res.status(400).json({ error: 'Message requis' });

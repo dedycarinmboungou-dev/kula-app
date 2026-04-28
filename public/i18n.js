@@ -365,7 +365,34 @@ const I18N = {
     // Goal notification
     goal_congrats_title: 'Kula 🌱 — Félicitations !',
     goal_congrats_body:  '🎉 Félicitations ! Tu as atteint ton objectif',
-    goal_toast:       '🎉 Objectif atteint !'
+    goal_toast:       '🎉 Objectif atteint !',
+
+    // Projects (multi-projet)
+    projects:              'Projets',
+    new_project:           'Nouveau projet',
+    create:                'Créer',
+    back:                  'Retour',
+    project_name:          'Nom du projet',
+    project_name_ph:       'Ex : Mariage de Fatou',
+    project_type:          'Type',
+    project_type_perso:    'Perso',
+    project_type_entreprise:'Entreprise',
+    project_type_asso:     'Association',
+    project_type_event:    'Événement',
+    project_members:       'Membres',
+    invite_member:         'Inviter un membre',
+    invite:                'Inviter',
+    enter_email:           'email@exemple.com',
+    invalid_email:         'Email invalide',
+    project_no_members:    'Aucun membre invité',
+    project_status_accepted: 'Accepté',
+    project_status_pending:  'En attente',
+    project_invite_sent:   'Invitation envoyée',
+    project_created:       'Projet créé',
+    project_switched:      'Projet sélectionné',
+    project_name_required: 'Le nom du projet est requis',
+    project_manage:        'Gérer le projet',
+    loading:               'Chargement…'
   },
 
   en: {
@@ -732,7 +759,34 @@ const I18N = {
     // Goal notification
     goal_congrats_title: 'Kula 🌱 — Congratulations!',
     goal_congrats_body:  '🎉 Congratulations! You reached your goal',
-    goal_toast:       '🎉 Goal reached!'
+    goal_toast:       '🎉 Goal reached!',
+
+    // Projects (multi-project)
+    projects:              'Projects',
+    new_project:           'New project',
+    create:                'Create',
+    back:                  'Back',
+    project_name:          'Project name',
+    project_name_ph:       'E.g. Fatou\'s Wedding',
+    project_type:          'Type',
+    project_type_perso:    'Personal',
+    project_type_entreprise:'Business',
+    project_type_asso:     'Association',
+    project_type_event:    'Event',
+    project_members:       'Members',
+    invite_member:         'Invite a member',
+    invite:                'Invite',
+    enter_email:           'email@example.com',
+    invalid_email:         'Invalid email',
+    project_no_members:    'No members invited yet',
+    project_status_accepted: 'Accepted',
+    project_status_pending:  'Pending',
+    project_invite_sent:   'Invitation sent',
+    project_created:       'Project created',
+    project_switched:      'Project switched',
+    project_name_required: 'Project name is required',
+    project_manage:        'Manage project',
+    loading:               'Loading…'
   }
 };
 
