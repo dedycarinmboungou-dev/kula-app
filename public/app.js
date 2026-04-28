@@ -519,10 +519,17 @@ function renderProjectBar() {
   if (!bar) return;
   const cur = currentProject();
   if (!cur) { bar.style.display = 'none'; return; }
-  bar.style.display = 'flex';
+  bar.style.display = 'inline-flex';
   const meta = PROJECT_TYPES[cur.type] || PROJECT_TYPES.perso;
   document.getElementById('project-bar-icon').textContent = meta.icon;
   document.getElementById('project-bar-name').textContent = cur.name;
+  // Update the "Manage budgets" button label depending on project type
+  const manageLabel = document.querySelector('#btn-budgets [data-i18n="manage_budgets"], #btn-budgets [data-i18n="manage_budget"]');
+  if (manageLabel) {
+    const key = cur.type === 'perso' ? 'manage_budgets' : 'manage_budget';
+    manageLabel.setAttribute('data-i18n', key);
+    manageLabel.textContent = t(key);
+  }
 }
 
 function selectProject(id) {
@@ -580,10 +587,19 @@ function openProjectCreateForm() {
   document.getElementById('project-list-section').style.display = 'none';
   document.getElementById('project-create-form').style.display = 'block';
   document.getElementById('project-name-input').value = '';
+  document.getElementById('project-budget-input').value = '';
+  // Reflect current user currency in the budget field label
+  const sym = getCurrencySymbol();
+  document.getElementById('project-budget-currency').textContent = sym;
   document.getElementById('project-name-input').focus();
   // Default-select 'perso'
   document.querySelectorAll('.project-type-chip').forEach(c => c.classList.remove('selected'));
   document.querySelector('.project-type-chip[data-type="perso"]')?.classList.add('selected');
+}
+
+function getCurrencySymbol() {
+  const cur = (localStorage.getItem('kula_currency') || 'XOF').toUpperCase();
+  return CURRENCY_CONFIG[cur]?.symbol || 'FCFA';
 }
 
 function backToProjectList() {
@@ -594,11 +610,17 @@ function backToProjectList() {
 async function submitNewProject() {
   const name = document.getElementById('project-name-input').value.trim();
   const type = document.querySelector('.project-type-chip.selected')?.dataset.type || 'perso';
+  // Budget is in user-display currency — convert to XOF (storage currency) before sending
+  const rawBudget = parseFloat(document.getElementById('project-budget-input').value) || 0;
+  const totalBudgetXOF = rawBudget > 0 ? Math.round(toXOF(rawBudget)) : 0;
   if (!name) { showToast(t('project_name_required'), 'error'); return; }
   const btn = document.getElementById('btn-create-project');
   btn.disabled = true;
   try {
-    const proj = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name, type }) });
+    const proj = await api('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name, type, total_budget: totalBudgetXOF })
+    });
     // Append + select
     state.projects.push({ ...proj, role: 'owner' });
     selectProject(proj.id);
@@ -696,6 +718,18 @@ async function loadDashboard() {
     balEl.className = `balance-amount${data.balance < 0 ? ' negative' : ''}`;
     document.getElementById('balance-sub').textContent =
       `${t('this_month')}: ${data.monthlyBalance >= 0 ? '+' : '−'}${formatMoney(data.monthlyBalance)}`;
+
+    // Budget alloué — visible only for non-perso projects with a positive total budget
+    const cur = currentProject();
+    const allocBox = document.getElementById('balance-allocated');
+    if (allocBox) {
+      if (cur && cur.type !== 'perso' && (cur.total_budget || 0) > 0) {
+        document.getElementById('balance-allocated-amount').textContent = formatMoney(cur.total_budget);
+        allocBox.style.display = 'block';
+      } else {
+        allocBox.style.display = 'none';
+      }
+    }
 
     // Monthly stats
     document.getElementById('monthly-income').textContent = formatMoney(data.monthlyIncome);

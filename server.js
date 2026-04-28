@@ -47,7 +47,7 @@ function migrateUsersToProjects() {
   for (const u of users) {
     let perso = stmts.getPersonalProject.get({ userId: u.id });
     if (!perso) {
-      const r = stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: u.id });
+      const r = stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: u.id , totalBudget: 0 });
       perso = { id: r.lastInsertRowid };
       createdProjects++;
     }
@@ -346,7 +346,7 @@ function resolveProjectId(req) {
   }
   let perso = stmts.getPersonalProject.get({ userId: req.userId });
   if (!perso) {
-    const r = stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: req.userId });
+    const r = stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: req.userId , totalBudget: 0 });
     perso = { id: r.lastInsertRowid };
   }
   return perso.id;
@@ -365,7 +365,7 @@ function requireProjectAccess(req, res, next) {
 function getDefaultProjectId(userId) {
   let perso = stmts.getPersonalProject.get({ userId });
   if (!perso) {
-    const r = stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: userId });
+    const r = stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: userId , totalBudget: 0 });
     perso = { id: r.lastInsertRowid };
   }
   return perso.id;
@@ -458,7 +458,7 @@ app.post('/api/auth/register', async (req, res) => {
     });
 
     // Create default Personnel project for new user
-    stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: user.id });
+    stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: user.id , totalBudget: 0 });
 
     // Auto-accept any pending project invitations matching this email
     const accepted = stmts.acceptInvitesForEmail.run({ email: user.email });
@@ -1221,13 +1221,14 @@ app.get('/api/projects', requireAuth, (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/projects { name, type? } → create
+// POST /api/projects { name, type?, total_budget? } → create
 app.post('/api/projects', requireAuth, (req, res) => {
   try {
-    const { name, type } = req.body;
+    const { name, type, total_budget } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'Le nom est requis' });
-    const projType = ['perso', 'entreprise', 'asso'].includes(type) ? type : 'perso';
-    const r = stmts.insertProject.run({ name: name.trim(), type: projType, ownerId: req.userId });
+    const projType = ['perso', 'entreprise', 'asso', 'event'].includes(type) ? type : 'perso';
+    const totalBudget = Math.max(0, parseInt(total_budget) || 0);
+    const r = stmts.insertProject.run({ name: name.trim(), type: projType, ownerId: req.userId, totalBudget });
     res.status(201).json(stmts.getProjectById.get({ id: r.lastInsertRowid }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1240,7 +1241,7 @@ app.put('/api/projects/:id', requireAuth, (req, res) => {
     if (!project) return res.status(404).json({ error: 'Projet non trouvé' });
     if (project.owner_id !== req.userId) return res.status(403).json({ error: 'Seul le propriétaire peut modifier' });
     const name = req.body.name?.trim() || project.name;
-    const type = ['perso', 'entreprise', 'asso'].includes(req.body.type) ? req.body.type : project.type;
+    const type = ['perso', 'entreprise', 'asso', 'event'].includes(req.body.type) ? req.body.type : project.type;
     stmts.updateProject.run({ id, ownerId: req.userId, name, type });
     res.json(stmts.getProjectById.get({ id }));
   } catch (e) { res.status(500).json({ error: e.message }); }

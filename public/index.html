@@ -47,14 +47,13 @@
       </button>
       <div class="user-greeting" id="user-greeting"></div>
     </div>
+    <!-- Project selector — integrated into header, second line -->
+    <button class="project-bar" id="project-bar" type="button" aria-label="Sélectionner un projet" style="display:none">
+      <span class="project-bar-icon" id="project-bar-icon">📁</span>
+      <span class="project-bar-name" id="project-bar-name">—</span>
+      <svg class="project-bar-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
   </header>
-
-  <!-- ── Project selector bar ────────────────────────────────── -->
-  <button class="project-bar" id="project-bar" type="button" aria-label="Sélectionner un projet" style="display:none">
-    <span class="project-bar-icon" id="project-bar-icon">📁</span>
-    <span class="project-bar-name" id="project-bar-name">—</span>
-    <svg class="project-bar-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-  </button>
 
   <!-- ── Trial banner — shown during free trial ───────────────── -->
   <div class="trial-banner" id="trial-banner" style="display:none">
@@ -131,6 +130,10 @@
         <span class="loading-spinner"></span>
       </div>
       <div class="balance-sub" id="balance-sub">Chargement…</div>
+      <div class="balance-allocated" id="balance-allocated" style="display:none">
+        <span data-i18n="budget_allocated">Budget alloué</span> :
+        <strong id="balance-allocated-amount">—</strong>
+      </div>
     </div>
 
     <!-- Score Kula -->
@@ -1026,6 +1029,16 @@
       <div class="poche-field">
         <label data-i18n="project_name">Nom du projet</label>
         <input id="project-name-input" type="text" maxlength="60" data-i18n-placeholder="project_name_ph" placeholder="Ex : Mariage de Fatou">
+      </div>
+      <div class="poche-field">
+        <label>
+          <span data-i18n="project_total_budget">Budget total du projet</span>
+          <span class="poche-field-optional" data-i18n="optional">(optionnel)</span>
+        </label>
+        <div class="budget-input-wrap">
+          <input id="project-budget-input" type="number" min="0" step="1" inputmode="numeric" placeholder="0">
+          <span class="budget-input-currency" id="project-budget-currency">FCFA</span>
+        </div>
       </div>
       <div class="poche-field">
         <label data-i18n="project_type">Type</label>

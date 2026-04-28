@@ -3959,27 +3959,28 @@ button, a, img, .nav-item, .nav-fab,
 }
 .tour-btn-next:hover { background: #059669; }
 
-/* ─── Project selector bar ────────────────────────────────────────────────── */
+/* ─── Project selector bar (integrated into header, second line) ──────────── */
 .project-bar {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  background: #ffffff;
-  border: none;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 10px 16px;
-  font-size: 14px;
+  gap: 6px;
+  margin-top: 6px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 18px;
+  padding: 5px 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: rgba(255,255,255,0.95);
   cursor: pointer;
   transition: background 0.15s;
+  align-self: flex-start;
 }
-.project-bar:hover { background: #f9fafb; }
-.project-bar:active { background: #f3f4f6; }
-.project-bar-icon { font-size: 16px; }
-.project-bar-name { flex: 1; text-align: left; color: #1a7a4a; font-weight: 700; }
-.project-bar-caret { color: #9ca3af; flex-shrink: 0; }
+.project-bar:hover  { background: rgba(0,0,0,0.28); }
+.project-bar:active { background: rgba(0,0,0,0.34); }
+.project-bar-icon { font-size: 14px; line-height: 1; }
+.project-bar-name { color: #ffffff; font-weight: 700; }
+.project-bar-caret { color: rgba(255,255,255,0.75); flex-shrink: 0; }
 
 /* ─── Project bottom-sheet ────────────────────────────────────────────────── */
 .project-sheet { max-width: 480px; }
@@ -4177,3 +4178,45 @@ button, a, img, .nav-item, .nav-fab,
 }
 .btn-invite-member:hover { background: #15803d; }
 .btn-invite-member:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ─── Project budget input + dashboard allocated ─────────────────────────── */
+.poche-field-optional {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 500;
+  margin-left: 6px;
+}
+.budget-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.budget-input-wrap input {
+  flex: 1;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 60px 12px 14px;
+  font-size: 15px;
+  outline: none;
+  font-weight: 600;
+}
+.budget-input-wrap input:focus { border-color: #16a34a; }
+.budget-input-currency {
+  position: absolute;
+  right: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.balance-allocated {
+  margin-top: 8px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.85);
+  font-weight: 500;
+}
+.balance-allocated strong {
+  font-weight: 700;
+  color: #ffffff;
+}

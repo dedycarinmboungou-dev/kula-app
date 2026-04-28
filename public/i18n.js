@@ -392,6 +392,10 @@ const I18N = {
     project_switched:      'Projet sélectionné',
     project_name_required: 'Le nom du projet est requis',
     project_manage:        'Gérer le projet',
+    project_total_budget:  'Budget total du projet',
+    optional:              '(optionnel)',
+    budget_allocated:      'Budget alloué',
+    manage_budget:         'Gérer le budget',
     loading:               'Chargement…'
   },
 
@@ -786,6 +790,10 @@ const I18N = {
     project_switched:      'Project switched',
     project_name_required: 'Project name is required',
     project_manage:        'Manage project',
+    project_total_budget:  'Total project budget',
+    optional:              '(optional)',
+    budget_allocated:      'Allocated budget',
+    manage_budget:         'Manage budget',
     loading:               'Loading…'
   }
 };

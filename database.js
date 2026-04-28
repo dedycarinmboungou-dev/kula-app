@@ -140,13 +140,19 @@ db.exec(`
 // ── Projects table ────────────────────────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS projects (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    name       TEXT    NOT NULL,
-    type       TEXT    NOT NULL DEFAULT 'perso',
-    owner_id   INTEGER NOT NULL REFERENCES users(id),
-    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT    NOT NULL,
+    type         TEXT    NOT NULL DEFAULT 'perso',
+    owner_id     INTEGER NOT NULL REFERENCES users(id),
+    total_budget INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
   );
 `);
+
+// Migration: add total_budget if existing projects table lacks it
+const projectCols = db.prepare('PRAGMA table_info(projects)').all();
+if (!projectCols.some(c => c.name === 'total_budget'))
+  db.exec("ALTER TABLE projects ADD COLUMN total_budget INTEGER NOT NULL DEFAULT 0");
 
 // ── Project members table ─────────────────────────────────────────────────────
 db.exec(`
@@ -566,16 +572,17 @@ const stmts = {
 
   // ── Projects ───────────────────────────────────────────────────────────────
   insertProject: db.prepare(`
-    INSERT INTO projects (name, type, owner_id) VALUES ($name, $type, $ownerId)
+    INSERT INTO projects (name, type, owner_id, total_budget)
+    VALUES ($name, $type, $ownerId, $totalBudget)
   `),
   getProjectById: db.prepare(`SELECT * FROM projects WHERE id = $id`),
   getOwnedProjects: db.prepare(`
-    SELECT id, name, type, owner_id, created_at, 'owner' AS role
+    SELECT id, name, type, owner_id, total_budget, created_at, 'owner' AS role
     FROM projects WHERE owner_id = $userId
     ORDER BY created_at ASC
   `),
   getMemberProjects: db.prepare(`
-    SELECT p.id, p.name, p.type, p.owner_id, p.created_at, m.role
+    SELECT p.id, p.name, p.type, p.owner_id, p.total_budget, p.created_at, m.role
     FROM projects p
     JOIN project_members m ON m.project_id = p.id
     WHERE m.email = $email AND m.status = 'accepted' AND p.owner_id != $userId
