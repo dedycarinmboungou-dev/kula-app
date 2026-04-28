@@ -36,7 +36,30 @@ console.log('[PUSH CONFIG]', {
   vapidPublicLength: VAPID_PUBLIC_CLEAN.length,
   hasCronSecret:     !!process.env.CRON_SECRET
 });
-const { stmts, VALID_CATEGORIES, DEFAULT_CATEGORIES } = require('./database');
+const { stmts, VALID_CATEGORIES, DEFAULT_CATEGORIES, db } = require('./database');
+
+// ── Auto-migrate users to projects (one-time per missing user) ───────────────
+// On startup, ensures every existing user has a Personnel project and that all
+// their orphan transactions/budgets/poches are attached to it.
+function migrateUsersToProjects() {
+  const users = stmts.listAllUsers.all();
+  let createdProjects = 0, attachedRows = 0;
+  for (const u of users) {
+    let perso = stmts.getPersonalProject.get({ userId: u.id });
+    if (!perso) {
+      const r = stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: u.id });
+      perso = { id: r.lastInsertRowid };
+      createdProjects++;
+    }
+    const rTx  = stmts.attachUserTxToProject.run({ projectId: perso.id, userId: u.id });
+    const rBud = stmts.attachUserBudgetsToProject.run({ projectId: perso.id, userId: u.id });
+    const rPoc = stmts.attachUserPochesToProject.run({ projectId: perso.id, userId: u.id });
+    attachedRows += rTx.changes + rBud.changes + rPoc.changes;
+  }
+  if (createdProjects || attachedRows)
+    console.log(`[MIGRATION projects] created=${createdProjects} projects, attached=${attachedRows} rows`);
+}
+try { migrateUsersToProjects(); } catch (e) { console.error('[MIGRATION projects] error:', e.message); }
 
 // Unique build ID — changes on every server restart / deploy
 const BUILD_ID = Date.now();
@@ -306,7 +329,47 @@ function requireAuth(req, res, next) {
   }
 }
 
+// ── Project access helpers ───────────────────────────────────────────────────
+// Resolves the project_id to use for a request:
+//   - if query.project_id or body.project_id is provided AND user has access → returns it
+//   - if provided but no access → returns null (caller must 403)
+//   - if not provided → returns user's Personnel project id (created on demand)
+function resolveProjectId(req) {
+  const requested = req.query?.project_id || req.body?.project_id;
+  if (requested) {
+    const pid = parseInt(requested);
+    if (!pid) return null;
+    const access = stmts.checkProjectAccess.get({
+      projectId: pid, userId: req.userId, email: req.user.email
+    });
+    return access ? pid : null;
+  }
+  let perso = stmts.getPersonalProject.get({ userId: req.userId });
+  if (!perso) {
+    const r = stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: req.userId });
+    perso = { id: r.lastInsertRowid };
+  }
+  return perso.id;
+}
 
+// Express middleware: attaches req.projectId or returns 403 if access denied.
+function requireProjectAccess(req, res, next) {
+  const pid = resolveProjectId(req);
+  if (!pid) return res.status(403).json({ error: 'Accès au projet refusé' });
+  req.projectId = pid;
+  next();
+}
+
+// Internal helper for background jobs / chat AI: returns the user's Personnel
+// project id, creating it if missing. Never throws.
+function getDefaultProjectId(userId) {
+  let perso = stmts.getPersonalProject.get({ userId });
+  if (!perso) {
+    const r = stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: userId });
+    perso = { id: r.lastInsertRowid };
+  }
+  return perso.id;
+}
 
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -394,6 +457,13 @@ app.post('/api/auth/register', async (req, res) => {
       stmts.insertCategory.run({ userId: user.id, nom: cat.nom, icone: cat.icone, couleur: cat.couleur, type: cat.type });
     });
 
+    // Create default Personnel project for new user
+    stmts.insertProject.run({ name: 'Personnel', type: 'perso', ownerId: user.id });
+
+    // Auto-accept any pending project invitations matching this email
+    const accepted = stmts.acceptInvitesForEmail.run({ email: user.email });
+    if (accepted.changes) console.log(`[REGISTER] Auto-accepted ${accepted.changes} invite(s) for ${user.email}`);
+
     // Non-blocking: send welcome email in background
     sendWelcomeEmail(user.email, user.name).catch(() => {});
 
@@ -422,6 +492,12 @@ app.post('/api/auth/login', async (req, res) => {
 
     const user = { id: userRow.id, name: userRow.name, email: userRow.email };
     const token = jwt.sign({ userId: user.id, name: user.name, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+
+    // Auto-accept any pending project invitations matching this email
+    try {
+      const accepted = stmts.acceptInvitesForEmail.run({ email: user.email });
+      if (accepted.changes) console.log(`[LOGIN] Auto-accepted ${accepted.changes} invite(s) for ${user.email}`);
+    } catch { /* non-blocking */ }
 
     res.json({ token, user });
   } catch (err) {
@@ -657,16 +733,16 @@ app.get('/api/version', (req, res) => {
 // BUDGETS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// GET /api/budgets?month=YYYY-MM  → [{category, limite}]
-app.get('/api/budgets', requireAuth, (req, res) => {
+// GET /api/budgets?month=YYYY-MM&project_id=X  → [{category, limite}]
+app.get('/api/budgets', requireAuth, requireProjectAccess, (req, res) => {
   const mois = req.query.month || new Date().toISOString().slice(0, 7);
-  const rows = stmts.getBudgets.all({ userId: req.userId, mois });
+  const rows = stmts.getBudgets.all({ userId: req.userId, projectId: req.projectId, mois });
   res.json(rows);
 });
 
-// PUT /api/budgets  body: {category, limite, month}
+// PUT /api/budgets  body: {category, limite, month, project_id?}
 // limite=0 → delete
-app.put('/api/budgets', requireAuth, (req, res) => {
+app.put('/api/budgets', requireAuth, requireProjectAccess, (req, res) => {
   try {
     const { category, limite, month } = req.body;
     const mois = month || new Date().toISOString().slice(0, 7);
@@ -676,9 +752,9 @@ app.put('/api/budgets', requireAuth, (req, res) => {
     if (isNaN(lim) || lim < 0)
       return res.status(400).json({ error: 'Limite invalide' });
     if (lim === 0) {
-      stmts.deleteBudget.run({ userId: req.userId, category, mois });
+      stmts.deleteBudget.run({ userId: req.userId, projectId: req.projectId, category, mois });
     } else {
-      stmts.upsertBudget.run({ userId: req.userId, category, limite: lim, mois });
+      stmts.upsertBudget.run({ userId: req.userId, projectId: req.projectId, category, limite: lim, mois });
     }
     res.json({ ok: true });
   } catch (e) {
@@ -689,17 +765,18 @@ app.put('/api/budgets', requireAuth, (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-app.get('/api/dashboard', requireAuth, checkAccess, (req, res) => {
+app.get('/api/dashboard', requireAuth, checkAccess, requireProjectAccess, (req, res) => {
   try {
-    const month   = req.query.month || new Date().toISOString().slice(0, 7);
-    const userId  = req.userId;
+    const month     = req.query.month || new Date().toISOString().slice(0, 7);
+    const userId    = req.userId;
+    const projectId = req.projectId;
 
-    const stats      = stmts.getDashboard.get({ userId, month });
-    const allTime    = stmts.getAllTimeDashboard.get({ userId });
-    const categories = stmts.getCategoryStats.all({ userId, month });
-    const recent     = stmts.getRecentTransactions.all({ userId, limit: 5 });
-    const trend      = stmts.getMonthlyTrend.all({ userId });
-    const budgets    = stmts.getBudgets.all({ userId, mois: month }) || [];
+    const stats      = stmts.getDashboard.get({ userId, projectId, month });
+    const allTime    = stmts.getAllTimeDashboard.get({ userId, projectId });
+    const categories = stmts.getCategoryStats.all({ userId, projectId, month });
+    const recent     = stmts.getRecentTransactions.all({ userId, projectId, limit: 5 });
+    const trend      = stmts.getMonthlyTrend.all({ userId, projectId });
+    const budgets    = stmts.getBudgets.all({ userId, projectId, mois: month }) || [];
 
     res.json({
       month,
@@ -721,13 +798,14 @@ app.get('/api/dashboard', requireAuth, checkAccess, (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TRANSACTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
-app.get('/api/transactions', requireAuth, checkAccess, (req, res) => {
+app.get('/api/transactions', requireAuth, checkAccess, requireProjectAccess, (req, res) => {
   try {
     const { month, limit = 50, offset = 0 } = req.query;
     const userId = req.userId;
+    const projectId = req.projectId;
     const txs = month
-      ? stmts.getTransactionsByMonth.all({ userId, month })
-      : stmts.getTransactions.all({ userId, limit: parseInt(limit), offset: parseInt(offset) });
+      ? stmts.getTransactionsByMonth.all({ userId, projectId, month })
+      : stmts.getTransactions.all({ userId, projectId, limit: parseInt(limit), offset: parseInt(offset) });
     res.json(txs);
   } catch (err) {
     console.error('Transactions error:', err);
@@ -744,7 +822,7 @@ app.post('/api/transactions/upload', requireAuth, checkAccess, receiptUpload.sin
   res.json({ url: dataUrl });
 });
 
-app.post('/api/transactions', requireAuth, checkAccess, (req, res) => {
+app.post('/api/transactions', requireAuth, checkAccess, requireProjectAccess, (req, res) => {
   try {
     const { type, amount, category, description, date, justificatif } = req.body;
 
@@ -760,6 +838,7 @@ app.post('/api/transactions', requireAuth, checkAccess, (req, res) => {
     const txDate  = date || new Date().toISOString().slice(0, 10);
     const result  = stmts.insertTransaction.run({
       userId:       req.userId,
+      projectId:    req.projectId,
       type,
       amount:       parseFloat(amount),
       category,
@@ -791,10 +870,11 @@ app.delete('/api/transactions/:id', requireAuth, (req, res) => {
 // PDF REPORT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-app.get('/api/report/pdf', requireAuth, async (req, res) => {
-  const month  = (req.query.month || new Date().toISOString().slice(0, 7)).trim();
-  const userId = req.userId;
-  console.log(`[PDF] Request — userId=${userId} month=${month}`);
+app.get('/api/report/pdf', requireAuth, requireProjectAccess, async (req, res) => {
+  const month     = (req.query.month || new Date().toISOString().slice(0, 7)).trim();
+  const userId    = req.userId;
+  const projectId = req.projectId;
+  console.log(`[PDF] Request — userId=${userId} projectId=${projectId} month=${month}`);
 
   try {
     // ── Validate month ──────────────────────────────────────────────────────
@@ -806,10 +886,10 @@ app.get('/api/report/pdf', requireAuth, async (req, res) => {
     console.log(`[PDF] User: ${user.name}`);
 
     // ── Fetch data ──────────────────────────────────────────────────────────
-    const stats   = stmts.getDashboard.get({ userId, month }) || { total_income: 0, total_expense: 0, balance: 0 };
-    const allTime = stmts.getAllTimeDashboard.get({ userId }) || { balance: 0 };
-    const cats    = stmts.getCategoryStats.all({ userId, month }) || [];
-    const txs     = stmts.getTransactionsByMonth.all({ userId, month }) || [];
+    const stats   = stmts.getDashboard.get({ userId, projectId, month }) || { total_income: 0, total_expense: 0, balance: 0 };
+    const allTime = stmts.getAllTimeDashboard.get({ userId, projectId }) || { balance: 0 };
+    const cats    = stmts.getCategoryStats.all({ userId, projectId, month }) || [];
+    const txs     = stmts.getTransactionsByMonth.all({ userId, projectId, month }) || [];
     console.log(`[PDF] Data: income=${stats.total_income} expense=${stats.total_expense} cats=${cats.length} txs=${txs.length}`);
 
     // toLocaleString('fr-FR') uses non-breaking space (\u00A0) which pdfkit renders as "/"
@@ -1059,19 +1139,22 @@ app.get('/api/report/pdf', requireAuth, async (req, res) => {
 // POCHES ÉPARGNE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-app.get('/api/poches', requireAuth, (req, res) => {
+app.get('/api/poches', requireAuth, requireProjectAccess, (req, res) => {
   try {
-    res.json(stmts.getPoches.all({ userId: req.userId }));
+    res.json(stmts.getPoches.all({ userId: req.userId, projectId: req.projectId }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/poches', requireAuth, (req, res) => {
+app.post('/api/poches', requireAuth, requireProjectAccess, (req, res) => {
   try {
     const { nom, objectif_montant, date_echeance } = req.body;
     if (!nom?.trim()) return res.status(400).json({ error: 'Le nom est requis' });
     const objectif = parseFloat(objectif_montant);
     if (!objectif || objectif <= 0) return res.status(400).json({ error: 'Objectif invalide' });
-    const result = stmts.insertPoche.run({ userId: req.userId, nom: nom.trim(), objectif, echeance: date_echeance || null });
+    const result = stmts.insertPoche.run({
+      userId: req.userId, projectId: req.projectId,
+      nom: nom.trim(), objectif, echeance: date_echeance || null
+    });
     res.status(201).json(stmts.getPocheById.get({ id: result.lastInsertRowid, userId: req.userId }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1108,8 +1191,10 @@ app.post('/api/poches/:id/alimenter', requireAuth, (req, res) => {
     const after = stmts.getPocheById.get({ id, userId: req.userId });
 
     // Virement : déduire le montant du solde principal (transaction négative)
+    // Attached to the same project as the poche (or Personnel by fallback)
     stmts.insertTransaction.run({
       userId:      req.userId,
+      projectId:   before.project_id || resolveProjectId(req),
       type:        'expense',
       amount:      montant,
       category:    'Autre',
@@ -1124,18 +1209,99 @@ app.post('/api/poches/:id/alimenter', requireAuth, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// PROJECTS (multi-projets)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// GET /api/projects → owned + accepted memberships
+app.get('/api/projects', requireAuth, (req, res) => {
+  try {
+    const owned   = stmts.getOwnedProjects.all({ userId: req.userId });
+    const member  = stmts.getMemberProjects.all({ userId: req.userId, email: req.user.email });
+    res.json([...owned, ...member]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/projects { name, type? } → create
+app.post('/api/projects', requireAuth, (req, res) => {
+  try {
+    const { name, type } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Le nom est requis' });
+    const projType = ['perso', 'entreprise', 'asso'].includes(type) ? type : 'perso';
+    const r = stmts.insertProject.run({ name: name.trim(), type: projType, ownerId: req.userId });
+    res.status(201).json(stmts.getProjectById.get({ id: r.lastInsertRowid }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/projects/:id { name?, type? } → update (owner only)
+app.put('/api/projects/:id', requireAuth, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const project = stmts.getProjectById.get({ id });
+    if (!project) return res.status(404).json({ error: 'Projet non trouvé' });
+    if (project.owner_id !== req.userId) return res.status(403).json({ error: 'Seul le propriétaire peut modifier' });
+    const name = req.body.name?.trim() || project.name;
+    const type = ['perso', 'entreprise', 'asso'].includes(req.body.type) ? req.body.type : project.type;
+    stmts.updateProject.run({ id, ownerId: req.userId, name, type });
+    res.json(stmts.getProjectById.get({ id }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/projects/:id → owner only, refuse type='perso'
+app.delete('/api/projects/:id', requireAuth, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const project = stmts.getProjectById.get({ id });
+    if (!project) return res.status(404).json({ error: 'Projet non trouvé' });
+    if (project.owner_id !== req.userId) return res.status(403).json({ error: 'Seul le propriétaire peut supprimer' });
+    if (project.type === 'perso') return res.status(400).json({ error: 'Le projet Personnel ne peut pas être supprimé' });
+    const r = stmts.deleteProject.run({ id, ownerId: req.userId });
+    if (!r.changes) return res.status(400).json({ error: 'Suppression refusée' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/projects/:id/invite { email, role? } → invite member (owner only)
+app.post('/api/projects/:id/invite', requireAuth, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const project = stmts.getProjectById.get({ id });
+    if (!project) return res.status(404).json({ error: 'Projet non trouvé' });
+    if (project.owner_id !== req.userId) return res.status(403).json({ error: 'Seul le propriétaire peut inviter' });
+    const email = (req.body.email || '').toLowerCase().trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return res.status(400).json({ error: 'Email invalide' });
+    const role = ['editor', 'viewer'].includes(req.body.role) ? req.body.role : 'editor';
+    // If invitee already exists as a registered user → auto-accept; else pending
+    const existing = stmts.getUserByEmail.get({ email });
+    const status = existing ? 'accepted' : 'pending';
+    stmts.insertProjectMember.run({ projectId: id, email, role, status });
+    res.status(201).json({ email, role, status });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/projects/:id/members → list members (any project member can see)
+app.get('/api/projects/:id/members', requireAuth, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const access = stmts.checkProjectAccess.get({ projectId: id, userId: req.userId, email: req.user.email });
+    if (!access) return res.status(403).json({ error: 'Accès refusé' });
+    res.json(stmts.getProjectMembers.all({ projectId: id }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // KOLA COACH
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function buildFinancialContext(userId) {
+function buildFinancialContext(userId, projectId) {
   const today   = new Date().toISOString().slice(0, 10);
   const day3ago = new Date(Date.now() - 3  * 86400000).toISOString().slice(0, 10);
   const day7ago = new Date(Date.now() - 7  * 86400000).toISOString().slice(0, 10);
   const day30ago= new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
 
-  const txToday = stmts.getTxSince.all({ userId, since: today });
-  const tx7     = stmts.getTxSince.all({ userId, since: day7ago });
-  const tx30    = stmts.getTxSince.all({ userId, since: day30ago });
+  const txToday = stmts.getTxSince.all({ userId, projectId, since: today });
+  const tx7     = stmts.getTxSince.all({ userId, projectId, since: day7ago });
+  const tx30    = stmts.getTxSince.all({ userId, projectId, since: day30ago });
 
   const sum = (txs, type) => txs.filter(t => t.type === type).reduce((s, t) => s + t.amount, 0);
 
@@ -1150,7 +1316,7 @@ function buildFinancialContext(userId) {
     .map(([cat, amt]) => `${cat}: ${Math.round(amt).toLocaleString('fr-FR')} FCFA`);
 
   // 3-day trend
-  const tx3 = stmts.getTxSince.all({ userId, since: day3ago });
+  const tx3 = stmts.getTxSince.all({ userId, projectId, since: day3ago });
 
   return {
     todayCount:    txToday.length,
@@ -1176,10 +1342,10 @@ function buildFinancialContext(userId) {
 }
 
 // GET /api/coach/analysis — daily briefing
-app.get('/api/coach/analysis', requireAuth, async (req, res) => {
+app.get('/api/coach/analysis', requireAuth, requireProjectAccess, async (req, res) => {
   try {
     const user   = stmts.getUserById.get({ id: req.userId });
-    const ctx    = buildFinancialContext(req.userId);
+    const ctx    = buildFinancialContext(req.userId, req.projectId);
     const hour   = new Date().getHours();
     const dayIdx = new Date().getDate() - 1;
     const quote  = KOLA_QUOTES[dayIdx % KOLA_QUOTES.length];
@@ -1243,13 +1409,13 @@ Sois précis avec les vrais chiffres. Max 4 phrases. Personnalise selon les donn
 });
 
 // POST /api/coach/chat — conversation with Kula
-app.post('/api/coach/chat', requireAuth, async (req, res) => {
+app.post('/api/coach/chat', requireAuth, requireProjectAccess, async (req, res) => {
   try {
     const { message, history = [] } = req.body;
     if (!message?.trim()) return res.status(400).json({ error: 'Message requis' });
 
     const user = stmts.getUserById.get({ id: req.userId });
-    const ctx  = buildFinancialContext(req.userId);
+    const ctx  = buildFinancialContext(req.userId, req.projectId);
     const fmt  = n => Math.round(n).toLocaleString('fr-FR');
     const name = user.name.split(' ')[0];
 
@@ -1312,12 +1478,12 @@ app.post('/api/chat', requireAuth, checkAccess, async (req, res) => {
     const currentMonth = today.slice(0, 7);
     const user         = stmts.getUserById.get({ id: req.userId });
     const firstName    = user?.name?.split(' ')[0] || 'toi';
-    const dashStats    = stmts.getDashboard.get({ userId: req.userId, month: currentMonth }) || {};
-    const allTime      = stmts.getAllTimeDashboard.get({ userId: req.userId }) || {};
-    const recentTx     = stmts.getRecentTransactions.all({ userId: req.userId, limit: 50 });
-    const catStats     = stmts.getCategoryStats.all({ userId: req.userId, month: currentMonth });
-    const poches       = stmts.getPoches.all({ userId: req.userId });
-    const budgets      = stmts.getBudgets.all({ userId: req.userId, mois: currentMonth });
+    const dashStats    = stmts.getDashboard.get({ userId: req.userId, projectId: req.projectId, month: currentMonth }) || {};
+    const allTime      = stmts.getAllTimeDashboard.get({ userId: req.userId, projectId: req.projectId }) || {};
+    const recentTx     = stmts.getRecentTransactions.all({ userId: req.userId, projectId: req.projectId, limit: 50 });
+    const catStats     = stmts.getCategoryStats.all({ userId: req.userId, projectId: req.projectId, month: currentMonth });
+    const poches       = stmts.getPoches.all({ userId: req.userId, projectId: req.projectId });
+    const budgets      = stmts.getBudgets.all({ userId: req.userId, projectId: req.projectId, mois: currentMonth });
     const userCatsList = stmts.getCategories.all({ userId: req.userId });
     const fmtN = n => Math.round(n || 0).toLocaleString('fr-FR');
 
@@ -1561,14 +1727,14 @@ ${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.languag
               if (poche_id) {
                 poche = stmts.getPocheById.get({ id: poche_id, userId: req.userId });
               } else if (nom_poche) {
-                poche = stmts.getPocheByNom.get({ userId: req.userId, pattern: `%${nom_poche}%` });
+                poche = stmts.getPocheByNom.get({ userId: req.userId, projectId: req.projectId, pattern: `%${nom_poche}%` });
               } else {
                 // No identifier — pick the first/only poche if there's exactly one
-                const allPoches = stmts.getPoches.all({ userId: req.userId });
+                const allPoches = stmts.getPoches.all({ userId: req.userId, projectId: req.projectId });
                 if (allPoches.length === 1) poche = allPoches[0];
               }
               if (!poche) {
-                const allPoches = stmts.getPoches.all({ userId: req.userId });
+                const allPoches = stmts.getPoches.all({ userId: req.userId, projectId: req.projectId });
                 const list = allPoches.length
                   ? allPoches.map(p => `  [ID:${p.id}] "${p.nom}"`).join('\n')
                   : '  Aucune poche';
@@ -1577,9 +1743,10 @@ ${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.languag
                 const wasComplete = poche.montant_actuel >= poche.objectif_montant;
                 const m = parseFloat(toolMontant);
                 stmts.alimenterPoche.run({ id: poche.id, userId: req.userId, montant: m });
-                // Virement : déduire du solde principal
+                // Virement : déduire du solde principal (même projet que la poche)
                 stmts.insertTransaction.run({
-                  userId: req.userId, type: 'expense', amount: m,
+                  userId: req.userId, projectId: poche.project_id || req.projectId,
+                  type: 'expense', amount: m,
                   category: 'Autre',
                   description: `💰 Épargne : ${poche.nom}`,
                   date: new Date().toISOString().slice(0, 10),
@@ -1645,7 +1812,8 @@ ${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.languag
 
           const txDate = tx.date || today;
           const result = stmts.insertTransaction.run({
-            userId: req.userId, type: tx.type,
+            userId: req.userId, projectId: req.projectId,
+            type: tx.type,
             amount: parseFloat(tx.amount), category: tx.category,
             description: tx.description.trim(), date: txDate,
             justificatif: null
@@ -1869,11 +2037,12 @@ app.post('/api/debug/test-push', requireAuth, async (req, res) => {
 // ── Widget page (lightweight, for PWA shortcut / home screen pin) ────────────
 app.get('/widget', requireAuth, (req, res) => {
   try {
-    const month   = new Date().toISOString().slice(0, 7);
-    const userId  = req.userId;
-    const stats   = stmts.getDashboard.get({ userId, month });
-    const allTime = stmts.getAllTimeDashboard.get({ userId });
-    const budgets = stmts.getBudgets.all({ userId, mois: month });
+    const month     = new Date().toISOString().slice(0, 7);
+    const userId    = req.userId;
+    const projectId = getDefaultProjectId(userId);
+    const stats   = stmts.getDashboard.get({ userId, projectId, month });
+    const allTime = stmts.getAllTimeDashboard.get({ userId, projectId });
+    const budgets = stmts.getBudgets.all({ userId, projectId, mois: month });
 
     const totalBudget  = budgets.reduce((s, b) => s + b.limite, 0);
     const expense      = stats.total_expense || 0;

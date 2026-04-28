@@ -137,6 +137,30 @@ db.exec(`
   );
 `);
 
+// ── Projects table ────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS projects (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL,
+    type       TEXT    NOT NULL DEFAULT 'perso',
+    owner_id   INTEGER NOT NULL REFERENCES users(id),
+    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+`);
+
+// ── Project members table ─────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS project_members (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    email      TEXT    NOT NULL,
+    role       TEXT    NOT NULL DEFAULT 'editor',
+    status     TEXT    NOT NULL DEFAULT 'pending',
+    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(project_id, email)
+  );
+`);
+
 // Migration: add photo + freemium columns to users if missing
 const userCols = db.prepare('PRAGMA table_info(users)').all();
 const userColNames = userCols.map(c => c.name);
@@ -154,13 +178,48 @@ if (!userColNames.includes('last_seen_at'))         db.exec("ALTER TABLE users A
 const cols = db.prepare('PRAGMA table_info(transactions)').all();
 if (!cols.some(c => c.name === 'user_id'))      db.exec('ALTER TABLE transactions ADD COLUMN user_id INTEGER REFERENCES users(id)');
 if (!cols.some(c => c.name === 'justificatif')) db.exec('ALTER TABLE transactions ADD COLUMN justificatif TEXT');
+if (!cols.some(c => c.name === 'project_id'))   db.exec('ALTER TABLE transactions ADD COLUMN project_id INTEGER REFERENCES projects(id)');
+
+// Migration: add project_id to poches_epargne if missing
+const pocheCols = db.prepare('PRAGMA table_info(poches_epargne)').all();
+if (!pocheCols.some(c => c.name === 'project_id'))
+  db.exec('ALTER TABLE poches_epargne ADD COLUMN project_id INTEGER REFERENCES projects(id)');
+
+// Migration: budgets needs project_id AND a new UNIQUE constraint including project_id.
+// Since SQLite cannot ALTER UNIQUE constraints, we use PRAGMA user_version to gate a one-time table rebuild.
+const userVersion = db.prepare('PRAGMA user_version').get().user_version;
+if (userVersion < 2) {
+  console.log('[MIGRATION] Rebuilding budgets table to include project_id in UNIQUE constraint...');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS budgets_new (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id),
+      project_id INTEGER REFERENCES projects(id),
+      category   TEXT    NOT NULL,
+      limite     REAL    NOT NULL DEFAULT 0,
+      mois       TEXT    NOT NULL,
+      UNIQUE(user_id, project_id, category, mois)
+    );
+    INSERT INTO budgets_new (id, user_id, project_id, category, limite, mois)
+      SELECT id, user_id, NULL, category, limite, mois FROM budgets;
+    DROP TABLE budgets;
+    ALTER TABLE budgets_new RENAME TO budgets;
+    PRAGMA user_version = 2;
+  `);
+  console.log('[MIGRATION] budgets table rebuilt successfully.');
+}
 
 // Indexes (after migration)
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tx_user_date     ON transactions(user_id, date);
   CREATE INDEX IF NOT EXISTS idx_tx_user_type     ON transactions(user_id, type);
   CREATE INDEX IF NOT EXISTS idx_tx_user_category ON transactions(user_id, category);
+  CREATE INDEX IF NOT EXISTS idx_tx_project       ON transactions(user_id, project_id, date);
+  CREATE INDEX IF NOT EXISTS idx_bud_project      ON budgets(user_id, project_id, mois);
+  CREATE INDEX IF NOT EXISTS idx_poche_project    ON poches_epargne(user_id, project_id);
   CREATE INDEX IF NOT EXISTS idx_chat_user        ON chat_history(user_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_proj_owner       ON projects(owner_id);
+  CREATE INDEX IF NOT EXISTS idx_pm_email         ON project_members(email, status);
 `);
 
 db.exec('PRAGMA foreign_keys = ON');
@@ -331,26 +390,33 @@ const stmts = {
     ORDER BY u.created_at DESC
   `),
 
-  // Budgets
-  getBudgets: db.prepare(`SELECT category, limite FROM budgets WHERE user_id = $userId AND mois = $mois`),
-  upsertBudget: db.prepare(`
-    INSERT INTO budgets (user_id, category, limite, mois) VALUES ($userId, $category, $limite, $mois)
-    ON CONFLICT(user_id, category, mois) DO UPDATE SET limite = excluded.limite
+  // Budgets (scoped per project)
+  getBudgets: db.prepare(`
+    SELECT category, limite FROM budgets
+    WHERE user_id = $userId AND project_id = $projectId AND mois = $mois
   `),
-  deleteBudget: db.prepare(`DELETE FROM budgets WHERE user_id = $userId AND category = $category AND mois = $mois`),
+  upsertBudget: db.prepare(`
+    INSERT INTO budgets (user_id, project_id, category, limite, mois)
+    VALUES ($userId, $projectId, $category, $limite, $mois)
+    ON CONFLICT(user_id, project_id, category, mois) DO UPDATE SET limite = excluded.limite
+  `),
+  deleteBudget: db.prepare(`
+    DELETE FROM budgets
+    WHERE user_id = $userId AND project_id = $projectId AND category = $category AND mois = $mois
+  `),
 
-  // Transactions (scoped to user_id)
+  // Transactions (scoped per project)
   insertTransaction: db.prepare(`
-    INSERT INTO transactions (user_id, type, amount, category, description, date, justificatif)
-    VALUES ($userId, $type, $amount, $category, $description, $date, $justificatif)
+    INSERT INTO transactions (user_id, project_id, type, amount, category, description, date, justificatif)
+    VALUES ($userId, $projectId, $type, $amount, $category, $description, $date, $justificatif)
   `),
   getTransactions: db.prepare(`
-    SELECT * FROM transactions WHERE user_id = $userId
+    SELECT * FROM transactions WHERE user_id = $userId AND project_id = $projectId
     ORDER BY date DESC, created_at DESC LIMIT $limit OFFSET $offset
   `),
   getTransactionsByMonth: db.prepare(`
     SELECT * FROM transactions
-    WHERE user_id = $userId AND strftime('%Y-%m', date) = $month
+    WHERE user_id = $userId AND project_id = $projectId AND strftime('%Y-%m', date) = $month
     ORDER BY date DESC, created_at DESC
   `),
   deleteTransaction: db.prepare(`
@@ -366,19 +432,21 @@ const stmts = {
     WHERE id = $id AND user_id = $userId
   `),
 
-  // Poches Épargne
+  // Poches Épargne (scoped per project)
   insertPoche: db.prepare(`
-    INSERT INTO poches_epargne (user_id, nom, objectif_montant, date_echeance)
-    VALUES ($userId, $nom, $objectif, $echeance)
+    INSERT INTO poches_epargne (user_id, project_id, nom, objectif_montant, date_echeance)
+    VALUES ($userId, $projectId, $nom, $objectif, $echeance)
   `),
   getPoches: db.prepare(`
-    SELECT * FROM poches_epargne WHERE user_id = $userId ORDER BY created_at DESC
+    SELECT * FROM poches_epargne WHERE user_id = $userId AND project_id = $projectId
+    ORDER BY created_at DESC
   `),
   getPocheById: db.prepare(`
     SELECT * FROM poches_epargne WHERE id = $id AND user_id = $userId
   `),
   getPocheByNom: db.prepare(`
-    SELECT * FROM poches_epargne WHERE user_id = $userId AND nom LIKE $pattern
+    SELECT * FROM poches_epargne
+    WHERE user_id = $userId AND project_id = $projectId AND nom LIKE $pattern
     ORDER BY created_at DESC LIMIT 1
   `),
   updatePoche: db.prepare(`
@@ -460,12 +528,13 @@ const stmts = {
       COALESCE(SUM(CASE WHEN type='income'  THEN amount ELSE 0      END), 0) AS total_income,
       COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0      END), 0) AS total_expense,
       COALESCE(SUM(CASE WHEN type='income'  THEN amount ELSE -amount END), 0) AS balance
-    FROM transactions WHERE user_id = $userId AND strftime('%Y-%m', date) = $month
+    FROM transactions
+    WHERE user_id = $userId AND project_id = $projectId AND strftime('%Y-%m', date) = $month
   `),
   getCategoryStats: db.prepare(`
     SELECT category, type, SUM(amount) AS total, COUNT(*) AS count
     FROM transactions
-    WHERE user_id = $userId AND strftime('%Y-%m', date) = $month
+    WHERE user_id = $userId AND project_id = $projectId AND strftime('%Y-%m', date) = $month
     GROUP BY category, type ORDER BY total DESC
   `),
   getAllTimeDashboard: db.prepare(`
@@ -473,15 +542,15 @@ const stmts = {
       COALESCE(SUM(CASE WHEN type='income'  THEN amount ELSE 0      END), 0) AS total_income,
       COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0      END), 0) AS total_expense,
       COALESCE(SUM(CASE WHEN type='income'  THEN amount ELSE -amount END), 0) AS balance
-    FROM transactions WHERE user_id = $userId
+    FROM transactions WHERE user_id = $userId AND project_id = $projectId
   `),
   getRecentTransactions: db.prepare(`
-    SELECT * FROM transactions WHERE user_id = $userId
+    SELECT * FROM transactions WHERE user_id = $userId AND project_id = $projectId
     ORDER BY date DESC, created_at DESC LIMIT $limit
   `),
   getTxSince: db.prepare(`
     SELECT * FROM transactions
-    WHERE user_id = $userId AND date >= $since
+    WHERE user_id = $userId AND project_id = $projectId AND date >= $since
     ORDER BY date DESC
   `),
   getMonthlyTrend: db.prepare(`
@@ -490,8 +559,78 @@ const stmts = {
       SUM(CASE WHEN type='income'  THEN amount ELSE 0 END) AS income,
       SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) AS expense
     FROM transactions
-    WHERE user_id = $userId AND date >= date('now', '-5 months', 'start of month')
+    WHERE user_id = $userId AND project_id = $projectId
+      AND date >= date('now', '-5 months', 'start of month')
     GROUP BY month ORDER BY month ASC
+  `),
+
+  // ── Projects ───────────────────────────────────────────────────────────────
+  insertProject: db.prepare(`
+    INSERT INTO projects (name, type, owner_id) VALUES ($name, $type, $ownerId)
+  `),
+  getProjectById: db.prepare(`SELECT * FROM projects WHERE id = $id`),
+  getOwnedProjects: db.prepare(`
+    SELECT id, name, type, owner_id, created_at, 'owner' AS role
+    FROM projects WHERE owner_id = $userId
+    ORDER BY created_at ASC
+  `),
+  getMemberProjects: db.prepare(`
+    SELECT p.id, p.name, p.type, p.owner_id, p.created_at, m.role
+    FROM projects p
+    JOIN project_members m ON m.project_id = p.id
+    WHERE m.email = $email AND m.status = 'accepted' AND p.owner_id != $userId
+    ORDER BY p.created_at ASC
+  `),
+  getPersonalProject: db.prepare(`
+    SELECT id FROM projects WHERE owner_id = $userId AND type = 'perso'
+    ORDER BY created_at ASC LIMIT 1
+  `),
+  updateProject: db.prepare(`
+    UPDATE projects SET name = $name, type = $type WHERE id = $id AND owner_id = $ownerId
+  `),
+  deleteProject: db.prepare(`
+    DELETE FROM projects WHERE id = $id AND owner_id = $ownerId AND type != 'perso'
+  `),
+  // Returns the project row only if user has access (owner OR accepted member)
+  checkProjectAccess: db.prepare(`
+    SELECT p.id, p.owner_id, p.type FROM projects p
+    LEFT JOIN project_members m ON m.project_id = p.id AND m.email = $email AND m.status = 'accepted'
+    WHERE p.id = $projectId AND (p.owner_id = $userId OR m.id IS NOT NULL)
+    LIMIT 1
+  `),
+
+  // ── Project members ────────────────────────────────────────────────────────
+  insertProjectMember: db.prepare(`
+    INSERT INTO project_members (project_id, email, role, status)
+    VALUES ($projectId, $email, $role, $status)
+    ON CONFLICT(project_id, email) DO UPDATE SET role = excluded.role
+  `),
+  getProjectMembers: db.prepare(`
+    SELECT id, project_id, email, role, status, created_at
+    FROM project_members WHERE project_id = $projectId
+    ORDER BY created_at ASC
+  `),
+  acceptInvitesForEmail: db.prepare(`
+    UPDATE project_members SET status = 'accepted'
+    WHERE email = $email AND status = 'pending'
+  `),
+  deleteProjectMember: db.prepare(`
+    DELETE FROM project_members WHERE id = $id AND project_id = $projectId
+  `),
+
+  // ── Project migration helpers ──────────────────────────────────────────────
+  listAllUsers: db.prepare(`SELECT id FROM users`),
+  attachUserTxToProject: db.prepare(`
+    UPDATE transactions SET project_id = $projectId
+    WHERE user_id = $userId AND project_id IS NULL
+  `),
+  attachUserBudgetsToProject: db.prepare(`
+    UPDATE budgets SET project_id = $projectId
+    WHERE user_id = $userId AND project_id IS NULL
+  `),
+  attachUserPochesToProject: db.prepare(`
+    UPDATE poches_epargne SET project_id = $projectId
+    WHERE user_id = $userId AND project_id IS NULL
   `)
 };
 
