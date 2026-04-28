@@ -1075,20 +1075,41 @@
       <button class="poche-modal-close" id="btn-project-settings-close" type="button">✕</button>
     </div>
     <div class="project-settings-body">
-      <div class="project-settings-row">
-        <span class="project-settings-label" data-i18n="project_type">Type</span>
-        <span class="project-settings-value" id="project-settings-type">—</span>
+      <!-- Edit name -->
+      <div class="poche-field">
+        <label data-i18n="project_name">Nom du projet</label>
+        <input id="project-edit-name" type="text" maxlength="60">
       </div>
+      <!-- Edit type -->
+      <div class="poche-field">
+        <label data-i18n="project_type">Type</label>
+        <div class="project-type-chips" id="project-edit-type-chips">
+          <button class="project-type-chip" data-type="perso" type="button">🏠 <span data-i18n="project_type_perso">Perso</span></button>
+          <button class="project-type-chip" data-type="entreprise" type="button">🏢 <span data-i18n="project_type_entreprise">Entreprise</span></button>
+          <button class="project-type-chip" data-type="asso" type="button">🤝 <span data-i18n="project_type_asso">Association</span></button>
+          <button class="project-type-chip" data-type="event" type="button">🎉 <span data-i18n="project_type_event">Événement</span></button>
+        </div>
+      </div>
+      <!-- Save button -->
+      <button class="btn-save-project" id="btn-save-project" type="button" data-i18n="save">Enregistrer</button>
+
+      <!-- Members list -->
       <div class="project-settings-section">
         <div class="project-settings-section-title" data-i18n="project_members">Membres</div>
         <div class="project-members-list" id="project-members-list"></div>
       </div>
+      <!-- Invite member -->
       <div class="project-settings-section">
         <div class="project-settings-section-title" data-i18n="invite_member">Inviter un membre</div>
         <div class="project-invite-row">
           <input type="email" id="project-invite-email" data-i18n-placeholder="enter_email" placeholder="email@exemple.com">
           <button class="btn-invite-member" id="btn-invite-member" type="button" data-i18n="invite">Inviter</button>
         </div>
+      </div>
+
+      <!-- Danger zone: delete (hidden if perso) -->
+      <div class="project-settings-danger" id="project-settings-danger" style="display:none">
+        <button class="btn-delete-project" id="btn-delete-project" type="button" data-i18n="delete_project">🗑️ Supprimer ce projet</button>
       </div>
     </div>
   </div>

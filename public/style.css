@@ -4220,3 +4220,39 @@ button, a, img, .nav-item, .nav-fab,
   font-weight: 700;
   color: #ffffff;
 }
+
+/* ─── Project settings — save + danger zone ──────────────────────────────── */
+.btn-save-project {
+  background: #16a34a;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  align-self: stretch;
+}
+.btn-save-project:hover { background: #15803d; }
+.btn-save-project:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.project-settings-danger {
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #fee2e2;
+}
+.btn-delete-project {
+  width: 100%;
+  background: #fff;
+  color: #dc2626;
+  border: 1.5px solid #fecaca;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-delete-project:hover { background: #fef2f2; border-color: #ef4444; }
+.btn-delete-project:disabled { opacity: 0.5; cursor: not-allowed; }

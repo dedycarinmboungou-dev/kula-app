@@ -637,12 +637,77 @@ async function openProjectSettings(projectId) {
   if (!project) return;
   closeProjectSheet();
   document.getElementById('project-settings-name').textContent = project.name;
-  const meta = PROJECT_TYPES[project.type] || PROJECT_TYPES.perso;
-  document.getElementById('project-settings-type').innerHTML = `${meta.icon} <span>${t(meta.labelKey)}</span>`;
-  document.getElementById('project-settings-overlay').style.display = 'flex';
-  document.getElementById('project-settings-overlay').dataset.projectId = String(projectId);
+  // Pre-fill editable fields
+  document.getElementById('project-edit-name').value = project.name;
+  document.querySelectorAll('#project-edit-type-chips .project-type-chip').forEach(c => {
+    c.classList.toggle('selected', c.dataset.type === project.type);
+  });
+  // Show danger zone only for non-perso projects
+  const danger = document.getElementById('project-settings-danger');
+  if (danger) danger.style.display = (project.type === 'perso') ? 'none' : 'block';
+
+  const overlay = document.getElementById('project-settings-overlay');
+  overlay.style.display = 'flex';
+  overlay.dataset.projectId = String(projectId);
   document.getElementById('project-invite-email').value = '';
   await loadProjectMembers(projectId);
+}
+
+async function saveProjectChanges() {
+  const overlay = document.getElementById('project-settings-overlay');
+  const projectId = parseInt(overlay.dataset.projectId);
+  const name = document.getElementById('project-edit-name').value.trim();
+  const type = document.querySelector('#project-edit-type-chips .project-type-chip.selected')?.dataset.type;
+  if (!name) { showToast(t('project_name_required'), 'error'); return; }
+  if (!type) { showToast(t('project_name_required'), 'error'); return; }
+  const btn = document.getElementById('btn-save-project');
+  btn.disabled = true;
+  try {
+    const updated = await api(`/api/projects/${projectId}`, {
+      method: 'PUT', body: JSON.stringify({ name, type })
+    });
+    // Update local state
+    const idx = state.projects.findIndex(p => p.id === projectId);
+    if (idx !== -1) state.projects[idx] = { ...state.projects[idx], ...updated };
+    document.getElementById('project-settings-name').textContent = updated.name;
+    renderProjectBar();
+    showToast(t('project_updated'), 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function confirmDeleteProject() {
+  const overlay = document.getElementById('project-settings-overlay');
+  const projectId = parseInt(overlay.dataset.projectId);
+  const project = state.projects.find(p => p.id === projectId);
+  if (!project) return;
+  if (!confirm(t('confirm_delete_project').replace('{name}', project.name))) return;
+  const btn = document.getElementById('btn-delete-project');
+  btn.disabled = true;
+  try {
+    await api(`/api/projects/${projectId}`, { method: 'DELETE' });
+    // Remove from local state, switch back to Personnel
+    state.projects = state.projects.filter(p => p.id !== projectId);
+    const perso = state.projects.find(p => p.type === 'perso' && p.role === 'owner');
+    closeProjectSettings();
+    if (perso) {
+      state.currentProjectId = perso.id;
+      localStorage.setItem('kula_project_id', String(perso.id));
+      renderProjectBar();
+      // Refresh current tab
+      if (state.currentTab === 'dashboard') loadDashboard();
+      if (state.currentTab === 'transactions') loadTransactions();
+      if (state.currentTab === 'epargne') loadPoches();
+      state.chatHistory = [];
+    }
+    showToast(t('project_deleted'), 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+    btn.disabled = false;
+  }
 }
 
 function closeProjectSettings() {
@@ -2153,6 +2218,14 @@ async function init() {
     if (e.target.id === 'project-settings-overlay') closeProjectSettings();
   });
   document.getElementById('btn-invite-member')?.addEventListener('click', inviteProjectMember);
+  document.getElementById('btn-save-project')?.addEventListener('click', saveProjectChanges);
+  document.getElementById('btn-delete-project')?.addEventListener('click', confirmDeleteProject);
+  document.querySelectorAll('#project-edit-type-chips .project-type-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#project-edit-type-chips .project-type-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
 
   // Handle manifest shortcut ?tab=chat
   const urlTab = new URLSearchParams(window.location.search).get('tab');

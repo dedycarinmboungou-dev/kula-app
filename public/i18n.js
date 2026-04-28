@@ -396,6 +396,11 @@ const I18N = {
     optional:              '(optionnel)',
     budget_allocated:      'Budget alloué',
     manage_budget:         'Gérer le budget',
+    save:                  'Enregistrer',
+    delete_project:        '🗑️ Supprimer ce projet',
+    confirm_delete_project:'Supprimer le projet "{name}" ? Toutes ses données seront perdues.',
+    project_updated:       'Projet mis à jour',
+    project_deleted:       'Projet supprimé',
     loading:               'Chargement…'
   },
 
@@ -794,6 +799,11 @@ const I18N = {
     optional:              '(optional)',
     budget_allocated:      'Allocated budget',
     manage_budget:         'Manage budget',
+    save:                  'Save',
+    delete_project:        '🗑️ Delete this project',
+    confirm_delete_project:'Delete project "{name}"? All its data will be lost.',
+    project_updated:       'Project updated',
+    project_deleted:       'Project deleted',
     loading:               'Loading…'
   }
 };

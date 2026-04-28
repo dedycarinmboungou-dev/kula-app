@@ -36,6 +36,17 @@ console.log('[PUSH CONFIG]', {
   vapidPublicLength: VAPID_PUBLIC_CLEAN.length,
   hasCronSecret:     !!process.env.CRON_SECRET
 });
+
+// ── Brevo config check at startup ────────────────────────────────────────────
+const BREVO_KEY_RAW = process.env.BREVO_API_KEY || '';
+console.log('[BREVO CONFIG]', {
+  hasKey:    !!BREVO_KEY_RAW,
+  keyLength: BREVO_KEY_RAW.length,
+  keyPrefix: BREVO_KEY_RAW.slice(0, 10) + (BREVO_KEY_RAW.length > 10 ? '…' : ''),
+  validFormat: /^xkeysib-/.test(BREVO_KEY_RAW)
+});
+if (!BREVO_KEY_RAW) console.warn('[BREVO CONFIG] ⚠ BREVO_API_KEY non défini — les emails ne seront PAS envoyés');
+else if (!/^xkeysib-/.test(BREVO_KEY_RAW)) console.warn('[BREVO CONFIG] ⚠ BREVO_API_KEY ne commence pas par "xkeysib-" — format suspect');
 const { stmts, VALID_CATEGORIES, DEFAULT_CATEGORIES, db } = require('./database');
 
 // ── Auto-migrate users to projects (one-time per missing user) ───────────────
@@ -241,6 +252,86 @@ async function sendWelcomeEmail(toEmail, toName) {
     const detail = err?.response?.body ? JSON.stringify(err.response.body) : (err.message || String(err));
     console.error(`  [Brevo] ❌ Erreur envoi email: ${detail}`);
   }
+}
+
+// ── Brevo — email d'invitation à un projet ──────────────────────────────────
+// Returns { ok: true, messageId } or { ok: false, error } — never throws.
+async function sendProjectInviteEmail({ toEmail, projectName, inviterName, inviteeIsRegistered }) {
+  const apiKey = process.env.BREVO_API_KEY;
+  console.log(`[INVITE EMAIL] Preparing — to=${toEmail} project="${projectName}" inviter="${inviterName}" registered=${inviteeIsRegistered}`);
+  if (!apiKey) {
+    console.warn('[INVITE EMAIL] ❌ BREVO_API_KEY non défini — email skip');
+    return { ok: false, error: 'BREVO_API_KEY missing' };
+  }
+
+  const ctaLabel = inviteeIsRegistered ? 'Ouvrir Kula' : 'Créer mon compte';
+  const introLine = inviteeIsRegistered
+    ? `Connectez-vous à Kula pour accéder au projet « <strong>${projectName}</strong> ».`
+    : `Créez votre compte Kula avec cet email pour rejoindre le projet « <strong>${projectName}</strong> ».`;
+
+  const htmlBody = `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f7f4;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f4;padding:32px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,122,74,0.10);">
+        <tr><td style="background:linear-gradient(135deg,#1a7a4a 0%,#10B981 100%);padding:32px 40px;text-align:center;">
+          <div style="font-size:42px;margin-bottom:8px;">🌱</div>
+          <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Invitation Kula</h1>
+        </td></tr>
+        <tr><td style="padding:36px 40px;">
+          <h2 style="margin:0 0 16px;color:#1a7a4a;font-size:20px;">
+            ${escapeForHtml(inviterName)} vous invite ✉️
+          </h2>
+          <p style="margin:0 0 18px;color:#374151;font-size:15px;line-height:1.7;">
+            ${introLine}
+          </p>
+          <div style="background:#f0fdf4;border-left:4px solid #1a7a4a;border-radius:0 8px 8px 0;padding:16px 18px;margin:18px 0;">
+            <p style="margin:0;color:#1a7a4a;font-weight:700;font-size:14px;">📁 Projet : ${escapeForHtml(projectName)}</p>
+            <p style="margin:6px 0 0;color:#374151;font-size:13px;">Vous pourrez ajouter, voir et suivre toutes les transactions de ce projet.</p>
+          </div>
+          <div style="text-align:center;margin:28px 0 8px;">
+            <a href="https://kula-app.onrender.com" style="display:inline-block;background:linear-gradient(135deg,#1a7a4a,#10B981);color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;padding:14px 36px;border-radius:50px;">${ctaLabel} 🌱</a>
+          </div>
+        </td></tr>
+        <tr><td style="background:#f9fafb;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
+            Vous recevez cet email parce que ${escapeForHtml(inviterName)} vous a invité sur Kula.<br>
+            © ${new Date().getFullYear()} Kula — Gérez vos budgets, simplement. 🌱
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  try {
+    console.log(`[INVITE EMAIL] Calling Brevo API…`);
+    const brevo = require('@getbrevo/brevo');
+    const { TransactionalEmailsApi, SendSmtpEmail } = brevo;
+    const apiInstance = new TransactionalEmailsApi();
+    apiInstance.authentications['apiKey'].apiKey = apiKey;
+    const email = new SendSmtpEmail();
+    email.subject = `${inviterName} vous invite sur Kula 🌱 — Projet « ${projectName} »`;
+    email.htmlContent = htmlBody;
+    email.sender = { name: 'Kula 🌱', email: 'mindup05@gmail.com' };
+    email.to = [{ email: toEmail }];
+    const result = await apiInstance.sendTransacEmail(email);
+    const messageId = result?.body?.messageId || result?.messageId || '?';
+    console.log(`[INVITE EMAIL] ✅ Envoyé à ${toEmail} — messageId=${messageId}`);
+    return { ok: true, messageId };
+  } catch (err) {
+    const status = err?.response?.statusCode || err?.statusCode;
+    const body   = err?.response?.body ? JSON.stringify(err.response.body) : null;
+    const detail = body || err.message || String(err);
+    console.error(`[INVITE EMAIL] ❌ Échec — status=${status} detail=${detail}`);
+    return { ok: false, error: detail, status };
+  }
+}
+
+function escapeForHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // ── Kula Coach — citations africaines ────────────────────────────────────────
@@ -1262,22 +1353,73 @@ app.delete('/api/projects/:id', requireAuth, (req, res) => {
 });
 
 // POST /api/projects/:id/invite { email, role? } → invite member (owner only)
-app.post('/api/projects/:id/invite', requireAuth, (req, res) => {
+app.post('/api/projects/:id/invite', requireAuth, async (req, res) => {
+  const reqId = Math.random().toString(36).slice(2, 8);
+  console.log(`[INVITE ${reqId}] === Request received ===`);
+  console.log(`[INVITE ${reqId}] params.id=${req.params.id} body=${JSON.stringify(req.body)} userId=${req.userId} userEmail=${req.user?.email}`);
   try {
     const id = parseInt(req.params.id);
+    if (!id) {
+      console.warn(`[INVITE ${reqId}] ❌ Invalid project id`);
+      return res.status(400).json({ error: 'ID projet invalide' });
+    }
     const project = stmts.getProjectById.get({ id });
+    console.log(`[INVITE ${reqId}] Project lookup:`, project ? `found "${project.name}" (owner=${project.owner_id})` : 'NOT FOUND');
     if (!project) return res.status(404).json({ error: 'Projet non trouvé' });
-    if (project.owner_id !== req.userId) return res.status(403).json({ error: 'Seul le propriétaire peut inviter' });
+    if (project.owner_id !== req.userId) {
+      console.warn(`[INVITE ${reqId}] ❌ Permission denied — owner=${project.owner_id} requester=${req.userId}`);
+      return res.status(403).json({ error: 'Seul le propriétaire peut inviter' });
+    }
     const email = (req.body.email || '').toLowerCase().trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    console.log(`[INVITE ${reqId}] Email after normalize: "${email}"`);
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      console.warn(`[INVITE ${reqId}] ❌ Email validation failed`);
       return res.status(400).json({ error: 'Email invalide' });
+    }
     const role = ['editor', 'viewer'].includes(req.body.role) ? req.body.role : 'editor';
-    // If invitee already exists as a registered user → auto-accept; else pending
     const existing = stmts.getUserByEmail.get({ email });
     const status = existing ? 'accepted' : 'pending';
-    stmts.insertProjectMember.run({ projectId: id, email, role, status });
-    res.status(201).json({ email, role, status });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    console.log(`[INVITE ${reqId}] Existing user: ${existing ? `yes (id=${existing.id})` : 'no'} → status=${status} role=${role}`);
+
+    // Insert / upsert into project_members
+    let dbResult;
+    try {
+      dbResult = stmts.insertProjectMember.run({ projectId: id, email, role, status });
+      console.log(`[INVITE ${reqId}] ✅ DB upsert OK — changes=${dbResult.changes} lastId=${dbResult.lastInsertRowid}`);
+    } catch (dbErr) {
+      console.error(`[INVITE ${reqId}] ❌ DB error:`, dbErr.message);
+      return res.status(500).json({ error: 'Erreur DB: ' + dbErr.message });
+    }
+
+    // Get inviter name for the email
+    const inviter = stmts.getUserById.get({ id: req.userId });
+    const inviterName = inviter?.name || req.user?.email || 'Un utilisateur';
+
+    // Fire-and-await email send so we can report back
+    let emailResult = null;
+    try {
+      emailResult = await sendProjectInviteEmail({
+        toEmail: email,
+        projectName: project.name,
+        inviterName,
+        inviteeIsRegistered: !!existing
+      });
+      console.log(`[INVITE ${reqId}] Email result:`, emailResult);
+    } catch (emErr) {
+      console.error(`[INVITE ${reqId}] Email function threw (should not happen):`, emErr.message);
+      emailResult = { ok: false, error: emErr.message };
+    }
+
+    console.log(`[INVITE ${reqId}] === Done ===`);
+    res.status(201).json({
+      email, role, status,
+      email_sent: !!emailResult?.ok,
+      email_error: emailResult?.ok ? null : emailResult?.error
+    });
+  } catch (e) {
+    console.error(`[INVITE ${reqId}] ❌ Unhandled error:`, e.message, e.stack);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // GET /api/projects/:id/members → list members (any project member can see)
