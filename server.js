@@ -968,255 +968,321 @@ app.get('/api/report/pdf', requireAuth, requireProjectAccess, async (req, res) =
   console.log(`[PDF] Request — userId=${userId} projectId=${projectId} month=${month}`);
 
   try {
-    // ── Validate month ──────────────────────────────────────────────────────
     if (!/^\d{4}-\d{2}$/.test(month))
       return res.status(400).json({ error: 'Paramètre month invalide (attendu YYYY-MM)' });
 
-    const user = stmts.getUserById.get({ id: userId });
-    if (!user) return res.status(404).json({ error: 'Utilisateur introuvable' });
-    console.log(`[PDF] User: ${user.name}`);
+    const user    = stmts.getUserById.get({ id: userId });
+    if (!user)    return res.status(404).json({ error: 'Utilisateur introuvable' });
+    const project = stmts.getProjectById.get({ id: projectId });
+    if (!project) return res.status(404).json({ error: 'Projet introuvable' });
 
     // ── Fetch data ──────────────────────────────────────────────────────────
     const stats   = stmts.getDashboard.get({ userId, projectId, month }) || { total_income: 0, total_expense: 0, balance: 0 };
-    const allTime = stmts.getAllTimeDashboard.get({ userId, projectId }) || { balance: 0 };
     const cats    = stmts.getCategoryStats.all({ userId, projectId, month }) || [];
     const txs     = stmts.getTransactionsByMonth.all({ userId, projectId, month }) || [];
-    console.log(`[PDF] Data: income=${stats.total_income} expense=${stats.total_expense} cats=${cats.length} txs=${txs.length}`);
+    const trend   = stmts.getMonthlyTrend.all({ userId, projectId }) || [];
+    console.log(`[PDF] Data: income=${stats.total_income} expense=${stats.total_expense} cats=${cats.length} txs=${txs.length} trendMonths=${trend.length}`);
 
-    // toLocaleString('fr-FR') uses non-breaking space (\u00A0) which pdfkit renders as "/"
     const fmt = n => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     const [year, mon] = month.split('-');
     const monthLabel = new Date(parseInt(year), parseInt(mon) - 1, 1)
       .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    const PROJECT_TYPE_LABEL = { perso: 'Personnel', entreprise: 'Entreprise', asso: 'Association', event: 'Événement' };
 
-    // ── Coach tip via Claude (non-blocking) ─────────────────────────────────
-    let coachTip = 'Continuez à suivre vos finances avec régularité — chaque transaction enregistrée est un pas vers la liberté financière.';
+    // ── Generate charts as PNG buffers (chartjs-node-canvas) ────────────────
+    const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+    const CAT_COLORS = ['#0A5C3A','#3B82F6','#F59E0B','#EF4444','#8B5CF6',
+                        '#F97316','#EC4899','#14B8A6','#6366F1','#84CC16'];
+
+    let pieBuf = null, barBuf = null;
     try {
-      const topCat = cats.filter(c => c.type === 'expense').sort((a, b) => b.total - a.total)[0];
-      const aiResp = await anthropic.messages.create({
-        model: 'claude-haiku-4-5',
-        max_tokens: 160,
-        system: (user.language === 'en' ? 'IMPORTANT: Always respond in English. ' : '') + 'Tu es Kula, conseiller financier bienveillant. Génère un seul conseil pratique en français (2-3 lignes max, pas de JSON, pas de titre).',
-        messages: [{
-          role: 'user',
-          content: `Conseil pour ${user.name.split(' ')[0]}, mois de ${monthLabel}. Revenus : ${fmt(stats.total_income)} FCFA. Dépenses : ${fmt(stats.total_expense)} FCFA.${topCat ? ` Top dépense : ${topCat.category}.` : ''}`
-        }]
-      });
-      const tip = aiResp.content[0]?.text?.trim();
-      if (tip) coachTip = tip;
-      console.log('[PDF] Coach tip generated');
-    } catch (e) {
-      console.warn('[PDF] Coach tip fallback:', e.message);
+      const expenseCats = cats.filter(c => c.type === 'expense');
+      if (expenseCats.length > 0) {
+        const totalExp = expenseCats.reduce((s, c) => s + c.total, 0);
+        const pieCanvas = new ChartJSNodeCanvas({ width: 460, height: 320, backgroundColour: '#ffffff' });
+        pieBuf = await pieCanvas.renderToBuffer({
+          type: 'pie',
+          data: {
+            labels: expenseCats.map(c => `${c.category} · ${Math.round(c.total/totalExp*100)}%`),
+            datasets: [{
+              data: expenseCats.map(c => c.total),
+              backgroundColor: expenseCats.map((_, i) => CAT_COLORS[i % CAT_COLORS.length]),
+              borderColor: '#ffffff',
+              borderWidth: 2
+            }]
+          },
+          options: {
+            plugins: {
+              legend: { position: 'right', labels: { font: { size: 11 }, color: '#0D1117', boxWidth: 12, padding: 8 } },
+              title: { display: false }
+            }
+          }
+        });
+      }
+
+      if (trend.length > 0) {
+        const labels = trend.map(t => {
+          const [y, m] = t.month.split('-');
+          return new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'short' });
+        });
+        const barCanvas = new ChartJSNodeCanvas({ width: 460, height: 320, backgroundColour: '#ffffff' });
+        barBuf = await barCanvas.renderToBuffer({
+          type: 'bar',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Revenus',  data: trend.map(t => t.income),  backgroundColor: '#0A5C3A', borderRadius: 4 },
+              { label: 'Dépenses', data: trend.map(t => t.expense), backgroundColor: '#F87171', borderRadius: 4 }
+            ]
+          },
+          options: {
+            plugins: {
+              legend: { position: 'top', labels: { font: { size: 11 }, color: '#0D1117' } },
+              title: { display: false }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { color: '#6B7280', font: { size: 10 } } },
+              y: { grid: { color: '#E8EAED' }, ticks: { color: '#6B7280', font: { size: 10 }, callback: v => Math.round(v).toLocaleString('fr-FR').replace(/ /g, ' ') } }
+            }
+          }
+        });
+      }
+    } catch (chartErr) {
+      console.error('[PDF] Chart render failed:', chartErr.message);
     }
 
-    // ── Generate PDF in memory (buffer before sending) ───────────────────────
+    // ── Generate PDF ─────────────────────────────────────────────────────────
     console.log('[PDF] Starting PDF generation…');
     const PDFDocument = require('pdfkit');
-    const doc    = new PDFDocument({ size: 'A4', margin: 0 });
+    const doc    = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true });
     const chunks = [];
-    doc.on('data',  c => chunks.push(c));
+    doc.on('data', c => chunks.push(c));
 
     await new Promise((resolve, reject) => {
       doc.on('end',   resolve);
       doc.on('error', reject);
 
-      // ── Constants ─────────────────────────────────────────────────────────
-      const GREEN       = '#1a7a4a';
-      const GREEN_MID   = '#10B981';
-      const GREEN_LIGHT = '#e8f5ee';
-      const GREEN_DIM   = '#a8d5bb';   // replaces rgba white on green bg
-      const WHITE_DIM   = '#cce8d8';   // replaces rgba(255,255,255,0.8)
-      const WHITE_FAINT = '#a0ccb5';   // replaces rgba(255,255,255,0.6)
-      const DARK        = '#111827';
-      const GRAY        = '#6B7280';
-      const WHITE       = '#FFFFFF';
-      const RED         = '#EF4444';
-      const PAGE_W      = 595.28;
-      const PAGE_H      = 841.89;
-      const M           = 40;           // margin
-      const CW          = PAGE_W - M * 2; // content width
+      // ── Tokens (mirror frontend design system) ──────────────────────────
+      const PRIMARY        = '#0A5C3A';
+      const PRIMARY_LIGHT  = '#E8F5EF';
+      const SUCCESS        = '#16A34A';
+      const DANGER         = '#DC2626';
+      const TEXT           = '#0D1117';
+      const TEXT_2         = '#6B7280';
+      const BORDER         = '#E8EAED';
+      const SURFACE_2      = '#F7F8FA';
+      const WHITE          = '#FFFFFF';
+      const PAGE_W         = 595.28;
+      const PAGE_H         = 841.89;
+      const M              = 48;
+      const CW             = PAGE_W - M * 2;
+      const FOOTER_H       = 40;
+      const CONTENT_BOTTOM = PAGE_H - FOOTER_H;
 
-      // ── HEADER ────────────────────────────────────────────────────────────
-      doc.rect(0, 0, PAGE_W, 110).fill(GREEN);
+      const ensureSpace = (y, needed) => {
+        if (y + needed > CONTENT_BOTTOM) {
+          doc.addPage({ size: 'A4', margin: 0 });
+          return M;
+        }
+        return y;
+      };
 
-      // Logo circle + K
-      doc.circle(M + 22, 55, 22).fill(GREEN_MID);
-      doc.fontSize(20).fillColor(WHITE).font('Helvetica-Bold').text('K', M + 14, 45);
+      // ─── PAGE 1: HEADER + SUMMARY ─────────────────────────────────────────
 
-      // App name + tagline
-      doc.fontSize(22).fillColor(WHITE).font('Helvetica-Bold').text('Kula', M + 54, 34);
-      doc.fontSize(10).fillColor(GREEN_DIM).font('Helvetica').text('Gérez vos budgets, simplement.', M + 54, 61);
+      // Logo "KULA" + slogan in primary green
+      doc.fontSize(26).fillColor(PRIMARY).font('Helvetica-Bold').text('KULA', M, M);
+      doc.fontSize(10).fillColor(TEXT_2).font('Helvetica')
+         .text('Gérez vos budgets, simplement.', M, M + 32);
 
-      // Right side: report label, month, date
-      doc.fontSize(11).fillColor(WHITE).font('Helvetica-Bold')
-         .text('RAPPORT FINANCIER', 0, 34, { align: 'right', width: PAGE_W - M });
-      doc.fontSize(10).fillColor(WHITE_DIM).font('Helvetica')
-         .text(monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1), 0, 53, { align: 'right', width: PAGE_W - M });
-      doc.fontSize(9).fillColor(WHITE_FAINT).font('Helvetica')
-         .text(`Généré le ${new Date().toLocaleDateString('fr-FR')}`, 0, 69, { align: 'right', width: PAGE_W - M });
+      const generatedOn = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+      doc.fontSize(9).fillColor(TEXT_2).font('Helvetica')
+         .text(`Généré le ${generatedOn}`, 0, M + 4, { align: 'right', width: PAGE_W - M });
 
-      // ── USER BANNER ───────────────────────────────────────────────────────
-      doc.rect(0, 110, PAGE_W, 36).fill(GREEN_LIGHT);
-      doc.fontSize(11).fillColor(GREEN).font('Helvetica-Bold').text(user.name, M, 121);
-      doc.fontSize(9).fillColor(GRAY).font('Helvetica').text(user.email, M, 134);
+      let y = M + 70;
 
-      let y = 166;
+      // Project title block
+      doc.fontSize(24).fillColor(TEXT).font('Helvetica-Bold').text(project.name, M, y, { width: CW });
+      y += 32;
+      const typeLabel = PROJECT_TYPE_LABEL[project.type] || project.type;
+      doc.fontSize(11).fillColor(TEXT_2).font('Helvetica')
+         .text(`${typeLabel} · ${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}`, M, y);
+      y += 26;
 
-      // ── SUMMARY CARDS ─────────────────────────────────────────────────────
-      const cardW = (CW - 16) / 3;
-      const income  = stats.total_income  || 0;
-      const expense = stats.total_expense || 0;
-      const balance = stats.balance       || 0;
+      // Separator
+      doc.moveTo(M, y).lineTo(PAGE_W - M, y).strokeColor(BORDER).lineWidth(1).stroke();
+      y += 28;
 
-      function summaryCard(x, cy, label, value, valColor, bg) {
-        doc.roundedRect(x, cy, cardW, 70, 7).fill(bg);
-        doc.fontSize(8).fillColor(GRAY).font('Helvetica').text(label, x + 12, cy + 10);
-        doc.fontSize(15).fillColor(valColor).font('Helvetica-Bold')
-           .text(fmt(value), x + 12, cy + 25, { width: cardW - 20 });
-        doc.fontSize(8).fillColor(GRAY).font('Helvetica').text('FCFA', x + 12, cy + 50);
+      // Summary cards
+      const income      = stats.total_income  || 0;
+      const expense     = stats.total_expense || 0;
+      const balance     = stats.balance       || 0;
+      const totalBudget = project.total_budget || 0;
+      const hasBudget   = totalBudget > 0;
+      const cardCount   = hasBudget ? 4 : 3;
+      const cardGap     = 12;
+      const cardW       = (CW - cardGap * (cardCount - 1)) / cardCount;
+      const cardH       = 88;
+
+      const drawCard = (x, label, value, valueColor) => {
+        doc.roundedRect(x, y, cardW, cardH, 8).fillAndStroke(WHITE, BORDER);
+        doc.fontSize(9).fillColor(TEXT_2).font('Helvetica')
+           .text(label, x + 14, y + 14, { width: cardW - 28 });
+        doc.fontSize(18).fillColor(valueColor).font('Helvetica-Bold')
+           .text(fmt(value), x + 14, y + 36, { width: cardW - 28 });
+        doc.fontSize(9).fillColor(TEXT_2).font('Helvetica')
+           .text('FCFA', x + 14, y + 64);
+      };
+
+      drawCard(M,                                     'Total revenus',  income,  SUCCESS);
+      drawCard(M + (cardW + cardGap),                 'Total dépenses', expense, DANGER);
+      drawCard(M + (cardW + cardGap) * 2,             'Solde net',      balance, balance >= 0 ? SUCCESS : DANGER);
+      if (hasBudget) drawCard(M + (cardW + cardGap) * 3, 'Budget alloué', totalBudget, PRIMARY);
+      y += cardH + 18;
+
+      // Budget progress bar
+      if (hasBudget) {
+        const consumedPct = Math.round((expense / totalBudget) * 100);
+        const overBudget  = expense > totalBudget;
+        doc.fontSize(11).fillColor(TEXT).font('Helvetica-Bold')
+           .text('Consommation du budget', M, y);
+        doc.fontSize(11).fillColor(overBudget ? DANGER : TEXT).font('Helvetica-Bold')
+           .text(`${consumedPct}%`, 0, y, { align: 'right', width: PAGE_W - M });
+        y += 18;
+        doc.roundedRect(M, y, CW, 10, 5).fill(SURFACE_2);
+        const fillW = Math.max(2, Math.min(CW, (expense / totalBudget) * CW));
+        doc.roundedRect(M, y, fillW, 10, 5).fill(overBudget ? DANGER : PRIMARY);
+        y += 18;
+        doc.fontSize(9).fillColor(TEXT_2).font('Helvetica')
+           .text(`${fmt(expense)} FCFA dépensés sur ${fmt(totalBudget)} FCFA`, M, y);
+        y += 24;
       }
 
-      summaryCard(M,               y, 'Revenus du mois',  income,  '#059669', '#f0fdf4');
-      summaryCard(M + cardW + 8,   y, 'Dépenses du mois', expense, RED,       '#fef2f2');
-      summaryCard(M + (cardW+8)*2, y, 'Solde du mois',    balance,
-        balance >= 0 ? '#059669' : RED,
-        balance >= 0 ? '#f0fdf4' : '#fef2f2');
-      y += 82;
+      // ─── CHARTS ───────────────────────────────────────────────────────────
+      if (pieBuf || barBuf) {
+        y = ensureSpace(y, 270);
 
-      // All-time balance strip
-      doc.roundedRect(M, y, CW, 32, 6).fill(GREEN);
-      doc.fontSize(9).fillColor(WHITE).font('Helvetica')
-         .text('Solde total (tous les temps) :', M + 14, y + 10);
-      doc.fontSize(11).fillColor(WHITE).font('Helvetica-Bold')
-         .text(`${fmt(allTime.balance || 0)} FCFA`, 0, y + 10, { align: 'right', width: PAGE_W - M - 14 });
-      y += 46;
+        doc.fontSize(14).fillColor(TEXT).font('Helvetica-Bold')
+           .text('Analyse visuelle', M, y);
+        y += 24;
 
-      // ── CATEGORY SECTION ──────────────────────────────────────────────────
-      const expenseCats = cats.filter(c => c.type === 'expense');
+        const chartW = (CW - 16) / 2;
+        const chartH = 220;
 
-      if (expenseCats.length > 0) {
-        doc.fontSize(12).fillColor(DARK).font('Helvetica-Bold').text('Dépenses par catégorie', M, y);
-        doc.moveTo(M, y + 18).lineTo(PAGE_W - M, y + 18).strokeColor('#E5E7EB').lineWidth(0.5).stroke();
-        y += 26;
-
-        const CAT_COLORS = ['#10B981','#3B82F6','#F59E0B','#EF4444','#8B5CF6',
-                            '#F97316','#EC4899','#14B8A6','#6366F1','#84CC16'];
-        const totalExp = expenseCats.reduce((s, c) => s + c.total, 0);
-
-        // ── Donut chart (pdfkit native path API) ───────────────────────────
-        const CX = M + 70;
-        const CY = y + 68;
-        const OR = 54;   // outer radius
-        const IR = 31;   // inner radius
-
-        let angle = -Math.PI / 2;
-        expenseCats.forEach((cat, i) => {
-          const slice = (cat.total / totalExp) * 2 * Math.PI;
-          // Avoid degenerate single-slice (full circle)
-          const end = slice >= 2 * Math.PI - 0.001 ? angle + 2 * Math.PI - 0.001 : angle + slice;
-          doc.save()
-             .moveTo(CX + OR * Math.cos(angle), CY + OR * Math.sin(angle))
-             .arc(CX, CY, OR, angle, end, false)
-             .lineTo(CX + IR * Math.cos(end), CY + IR * Math.sin(end))
-             .arc(CX, CY, IR, end, angle, true)
-             .closePath()
-             .fill(CAT_COLORS[i % CAT_COLORS.length]);
-          doc.restore();
-          angle += slice;
-        });
-        // Center white hole
-        doc.circle(CX, CY, IR - 1).fill(WHITE);
-
-        // ── Legend ─────────────────────────────────────────────────────────
-        const LX   = M + 152;
-        let   legY = y + 6;
-        expenseCats.slice(0, 9).forEach((cat, i) => {
-          const col  = CAT_COLORS[i % CAT_COLORS.length];
-          const pct  = Math.round(cat.total / totalExp * 100);
-          const barW = Math.max(3, (cat.total / totalExp) * 130);
-
-          doc.rect(LX, legY + 3, 8, 8).fill(col);
-          doc.fontSize(9).fillColor(DARK).font('Helvetica')
-             .text(cat.category, LX + 13, legY + 2, { width: 85 });
-          doc.fontSize(8).fillColor(GRAY).font('Helvetica')
-             .text(`${fmt(cat.total)} FCFA (${pct}%)`, LX + 105, legY + 2);
-          doc.rect(LX + 13, legY + 13, 130, 2).fill('#F3F4F6');
-          doc.rect(LX + 13, legY + 13, barW, 2).fill(col);
-          legY += 19;
-        });
-
-        y = Math.max(CY + OR + 14, legY + 6);
+        if (pieBuf) {
+          doc.roundedRect(M, y, chartW, chartH + 28, 8).fillAndStroke(WHITE, BORDER);
+          doc.fontSize(10).fillColor(TEXT_2).font('Helvetica-Bold')
+             .text('Dépenses par catégorie', M + 14, y + 12);
+          try { doc.image(pieBuf, M + 8, y + 30, { fit: [chartW - 16, chartH - 8], align: 'center', valign: 'center' }); } catch {}
+        }
+        if (barBuf) {
+          const x2 = M + chartW + 16;
+          doc.roundedRect(x2, y, chartW, chartH + 28, 8).fillAndStroke(WHITE, BORDER);
+          doc.fontSize(10).fillColor(TEXT_2).font('Helvetica-Bold')
+             .text('Revenus vs Dépenses · 6 mois', x2 + 14, y + 12);
+          try { doc.image(barBuf, x2 + 8, y + 30, { fit: [chartW - 16, chartH - 8], align: 'center', valign: 'center' }); } catch {}
+        }
+        y += chartH + 28 + 20;
       }
 
-      // ── TRANSACTION LIST ──────────────────────────────────────────────────
+      // ─── TRANSACTIONS TABLE ───────────────────────────────────────────────
       if (txs.length > 0) {
-        if (y > PAGE_H - 180) { doc.addPage({ margin: 0 }); y = 44; }
+        y = ensureSpace(y, 80);
 
-        doc.fontSize(12).fillColor(DARK).font('Helvetica-Bold').text('Transactions du mois', M, y);
-        doc.moveTo(M, y + 18).lineTo(PAGE_W - M, y + 18).strokeColor('#E5E7EB').lineWidth(0.5).stroke();
+        doc.fontSize(14).fillColor(TEXT).font('Helvetica-Bold')
+           .text('Transactions', M, y);
+        doc.fontSize(10).fillColor(TEXT_2).font('Helvetica')
+           .text(`${txs.length} entrée${txs.length > 1 ? 's' : ''}`, 0, y + 4, { align: 'right', width: PAGE_W - M });
         y += 26;
 
-        // Header row
-        doc.rect(M, y, CW, 19).fill(GREEN_LIGHT);
-        doc.fontSize(7.5).fillColor(GREEN).font('Helvetica-Bold')
-           .text('DATE',        M + 8,   y + 5)
-           .text('DESCRIPTION', M + 66,  y + 5)
-           .text('CATÉGORIE',   M + 268, y + 5)
-           .text('TYPE',        M + 388, y + 5)
-           .text('MONTANT',     0,        y + 5, { align: 'right', width: PAGE_W - M - 8 });
-        y += 19;
+        const COL_DATE  = M + 14;
+        const COL_DESC  = M + 80;
+        const COL_CAT   = M + 318;
+        const COL_AMT_R = PAGE_W - M - 14;
+        const ROW_H     = 24;
+
+        const drawTableHeader = () => {
+          doc.rect(M, y, CW, 26).fill(PRIMARY_LIGHT);
+          doc.fontSize(9).fillColor(PRIMARY).font('Helvetica-Bold')
+             .text('DATE',        COL_DATE, y + 9)
+             .text('DESCRIPTION', COL_DESC, y + 9)
+             .text('CATÉGORIE',   COL_CAT,  y + 9)
+             .text('MONTANT',     0,        y + 9, { align: 'right', width: COL_AMT_R });
+          y += 26;
+        };
+        drawTableHeader();
+
+        let totalIncome = 0, totalExpense = 0;
 
         txs.forEach((tx, idx) => {
-          if (y > PAGE_H - 70) { doc.addPage({ margin: 0 }); y = 44; }
-          const rowH = 17;
-          if (idx % 2 === 0) doc.rect(M, y, CW, rowH).fill('#F9FAFB');
+          if (y + ROW_H > CONTENT_BOTTOM - 32) {
+            doc.addPage({ size: 'A4', margin: 0 });
+            y = M;
+            drawTableHeader();
+          }
+          if (idx % 2 === 1) doc.rect(M, y, CW, ROW_H).fill(SURFACE_2);
 
-          const sign    = tx.type === 'income' ? '+' : '-';
-          const amtCol  = tx.type === 'income' ? '#059669' : RED;
-          const dateStr = new Date(tx.date + 'T12:00:00')
-            .toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-          const desc = tx.description.length > 28
-            ? tx.description.slice(0, 26) + '…' : tx.description;
+          const sign     = tx.type === 'income' ? '+' : '-';
+          const amtColor = tx.type === 'income' ? SUCCESS : DANGER;
+          const dateStr  = new Date(tx.date + 'T12:00:00')
+            .toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+          const desc = tx.description.length > 38
+            ? tx.description.slice(0, 36) + '...' : tx.description;
 
-          doc.fontSize(7.5).fillColor(DARK).font('Helvetica')
-             .text(dateStr,     M + 8,   y + 4, { width: 53 })
-             .text(desc,        M + 66,  y + 4, { width: 196 })
-             .text(tx.category, M + 268, y + 4, { width: 114 });
-          doc.fontSize(7.5).fillColor(tx.type === 'income' ? '#059669' : GRAY).font('Helvetica')
-             .text(tx.type === 'income' ? 'Revenu' : 'Dépense', M + 388, y + 4, { width: 52 });
-          doc.fontSize(7.5).fillColor(amtCol).font('Helvetica-Bold')
-             .text(`${sign}${fmt(tx.amount)}`, 0, y + 4, { align: 'right', width: PAGE_W - M - 8 });
-          y += rowH;
+          if (tx.type === 'income') totalIncome  += tx.amount;
+          else                      totalExpense += tx.amount;
+
+          doc.fontSize(9).fillColor(TEXT).font('Helvetica')
+             .text(dateStr, COL_DATE, y + 8, { width: 60 })
+             .text(desc,    COL_DESC, y + 8, { width: 230 })
+             .text(tx.category, COL_CAT, y + 8, { width: 130 });
+          doc.fontSize(9).fillColor(amtColor).font('Helvetica-Bold')
+             .text(`${sign}${fmt(tx.amount)}`, 0, y + 8, { align: 'right', width: COL_AMT_R });
+
+          y += ROW_H;
         });
+
+        // Total row
+        if (y + 36 > CONTENT_BOTTOM) {
+          doc.addPage({ size: 'A4', margin: 0 });
+          y = M;
+        }
+        doc.moveTo(M, y).lineTo(PAGE_W - M, y).strokeColor(BORDER).lineWidth(1.2).stroke();
+        y += 10;
+        const netTotal = totalIncome - totalExpense;
+        doc.fontSize(11).fillColor(TEXT).font('Helvetica-Bold')
+           .text('TOTAL', COL_DATE, y + 4);
+        doc.fontSize(10).fillColor(TEXT_2).font('Helvetica')
+           .text(`Revenus ${fmt(totalIncome)} · Dépenses ${fmt(totalExpense)}`, COL_DESC, y + 5);
+        doc.fontSize(12).fillColor(netTotal >= 0 ? SUCCESS : DANGER).font('Helvetica-Bold')
+           .text(`${netTotal >= 0 ? '+' : '-'}${fmt(Math.abs(netTotal))} FCFA`, 0, y + 3, { align: 'right', width: COL_AMT_R });
+        y += 28;
       }
 
-      // ── COACH TIP ─────────────────────────────────────────────────────────
-      if (y > PAGE_H - 110) { doc.addPage({ margin: 0 }); y = 44; }
-      y += 18;
-      const tipHeight = 24 + Math.ceil(coachTip.length / 90) * 14 + 16;
-      doc.roundedRect(M, y, CW, tipHeight, 8).fillAndStroke(GREEN_LIGHT, GREEN);
-      doc.fontSize(9).fillColor(GREEN).font('Helvetica-Bold')
-         .text('Conseil de Kula', M + 16, y + 12);
-      doc.fontSize(10).fillColor(DARK).font('Helvetica')
-         .text(coachTip, M + 16, y + 26, { width: CW - 32, lineGap: 3 });
-      y += tipHeight + 14;
-
-      // ── FOOTER ────────────────────────────────────────────────────────────
-      doc.rect(0, PAGE_H - 32, PAGE_W, 32).fill(GREEN_LIGHT);
-      doc.fontSize(8).fillColor(GRAY).font('Helvetica')
-         .text(
-           `Kula · Gérez vos budgets, simplement. · ${new Date().toLocaleDateString('fr-FR')} · © ${new Date().getFullYear()} Kula`,
-           0, PAGE_H - 19, { align: 'center', width: PAGE_W }
-         );
+      // ─── FOOTER ON ALL PAGES (page numbers + brand) ───────────────────────
+      const range = doc.bufferedPageRange();
+      const totalPages = range.count;
+      const footerDate = new Date().toLocaleDateString('fr-FR');
+      for (let i = range.start; i < range.start + range.count; i++) {
+        doc.switchToPage(i);
+        const pageNum = i - range.start + 1;
+        // Top divider
+        doc.moveTo(M, PAGE_H - FOOTER_H + 4).lineTo(PAGE_W - M, PAGE_H - FOOTER_H + 4)
+           .strokeColor(BORDER).lineWidth(0.5).stroke();
+        doc.fontSize(8).fillColor(TEXT_2).font('Helvetica')
+           .text(`Généré par Kula · kula-app-f10h.onrender.com · ${footerDate}`,
+                 M, PAGE_H - 24, { width: CW * 0.7 });
+        doc.fontSize(8).fillColor(TEXT_2).font('Helvetica')
+           .text(`Page ${pageNum} / ${totalPages}`,
+                 0, PAGE_H - 24, { align: 'right', width: PAGE_W - M });
+      }
 
       doc.end();
     });
 
-    // ── Send buffered PDF ────────────────────────────────────────────────────
     const buf = Buffer.concat(chunks);
     console.log(`[PDF] Done — ${buf.length} bytes`);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="kula-rapport-${month}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="kula-rapport-${project.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${month}.pdf"`);
     res.setHeader('Content-Length', buf.length);
     res.send(buf);
 
