@@ -975,6 +975,7 @@ app.get('/api/report/pdf', requireAuth, requireProjectAccess, async (req, res) =
     if (!user)    return res.status(404).json({ error: 'Utilisateur introuvable' });
     const project = stmts.getProjectById.get({ id: projectId });
     if (!project) return res.status(404).json({ error: 'Projet introuvable' });
+    console.log(`[PDF] Project resolved — id=${project.id} name="${project.name}" type="${project.type}" owner_id=${project.owner_id} total_budget=${project.total_budget}`);
 
     // ── Fetch data ──────────────────────────────────────────────────────────
     const stats   = stmts.getDashboard.get({ userId, projectId, month }) || { total_income: 0, total_expense: 0, balance: 0 };
@@ -987,12 +988,39 @@ app.get('/api/report/pdf', requireAuth, requireProjectAccess, async (req, res) =
     const [year, mon] = month.split('-');
     const monthLabel = new Date(parseInt(year), parseInt(mon) - 1, 1)
       .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-    const PROJECT_TYPE_LABEL = { perso: 'Personnel', entreprise: 'Entreprise', asso: 'Association', event: 'Événement' };
+    const PROJECT_TYPE_LABEL = { perso: 'Personnel', entreprise: 'Entreprise', asso: 'Association', event: 'Evenement' };
+
+    // Sanitize text for pdfkit (Helvetica only supports Latin-1).
+    // Strips emojis, normalizes accents to ASCII, replaces typographic punctuation.
+    const sanitize = s => {
+      if (!s) return '';
+      return String(s)
+        // Strip emoji & symbol blocks
+        .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+        .replace(/[\u{2600}-\u{27BF}]/gu, '')
+        .replace(/[\u{1F100}-\u{1F1FF}]/gu, '')
+        // Typographic punctuation → ASCII
+        .replace(/[‘’‚‛]/g, "'")
+        .replace(/[“”„‟]/g, '"')
+        .replace(/[–—]/g, '-')
+        .replace(/…/g, '...')
+        .replace(/[•‣⁃]/g, '*')
+        .replace(/ /g, ' ')
+        // Decompose accents → strip combining marks (É → E)
+        .normalize('NFKD')
+        .replace(/[̀-ͯ]/g, '')
+        // Final pass: drop anything still outside Latin-1
+        .replace(/[^\x00-\xFF]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
 
     // ── Generate charts as PNG buffers (chartjs-node-canvas) ────────────────
     const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
-    const CAT_COLORS = ['#0A5C3A','#3B82F6','#F59E0B','#EF4444','#8B5CF6',
-                        '#F97316','#EC4899','#14B8A6','#6366F1','#84CC16'];
+    // Palette monochrome verte + accents — pas de bleu
+    const CAT_COLORS = ['#0A5C3A', '#16A34A', '#4ADE80', '#BBF7D0',
+                        '#DC2626', '#F87171', '#6B7280', '#D1D5DB',
+                        '#92400E', '#FCD34D'];
 
     let pieBuf = null, barBuf = null;
     try {
@@ -1101,9 +1129,10 @@ app.get('/api/report/pdf', requireAuth, requireProjectAccess, async (req, res) =
       let y = M + 70;
 
       // Project title block
-      doc.fontSize(24).fillColor(TEXT).font('Helvetica-Bold').text(project.name, M, y, { width: CW });
+      doc.fontSize(24).fillColor(TEXT).font('Helvetica-Bold').text(sanitize(project.name), M, y, { width: CW });
       y += 32;
-      const typeLabel = PROJECT_TYPE_LABEL[project.type] || project.type;
+      // Robust type label: lookup table first, then raw type as fallback, then 'Personnel'
+      const typeLabel = PROJECT_TYPE_LABEL[project.type] || project.type || 'Personnel';
       doc.fontSize(11).fillColor(TEXT_2).font('Helvetica')
          .text(`${typeLabel} · ${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}`, M, y);
       y += 26;
@@ -1225,8 +1254,9 @@ app.get('/api/report/pdf', requireAuth, requireProjectAccess, async (req, res) =
           const amtColor = tx.type === 'income' ? SUCCESS : DANGER;
           const dateStr  = new Date(tx.date + 'T12:00:00')
             .toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-          const desc = tx.description.length > 38
-            ? tx.description.slice(0, 36) + '...' : tx.description;
+          const cleanDesc = sanitize(tx.description);
+          const desc = cleanDesc.length > 38 ? cleanDesc.slice(0, 36) + '...' : cleanDesc;
+          const cleanCat = sanitize(tx.category);
 
           if (tx.type === 'income') totalIncome  += tx.amount;
           else                      totalExpense += tx.amount;
@@ -1234,7 +1264,7 @@ app.get('/api/report/pdf', requireAuth, requireProjectAccess, async (req, res) =
           doc.fontSize(9).fillColor(TEXT).font('Helvetica')
              .text(dateStr, COL_DATE, y + 8, { width: 60 })
              .text(desc,    COL_DESC, y + 8, { width: 230 })
-             .text(tx.category, COL_CAT, y + 8, { width: 130 });
+             .text(cleanCat, COL_CAT, y + 8, { width: 130 });
           doc.fontSize(9).fillColor(amtColor).font('Helvetica-Bold')
              .text(`${sign}${fmt(tx.amount)}`, 0, y + 8, { align: 'right', width: COL_AMT_R });
 
