@@ -167,6 +167,26 @@ db.exec(`
   );
 `);
 
+// ── Contacts table (Gestion Pro: members for asso, clients for entreprise) ────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS contacts (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id   INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    contact_type TEXT    NOT NULL CHECK(contact_type IN ('member', 'client')),
+    full_name    TEXT    NOT NULL,
+    phone        TEXT,
+    email        TEXT,
+    joined_date  TEXT,
+    category     TEXT,
+    status       TEXT    NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+    notes        TEXT,
+    created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_contacts_project ON contacts(project_id);
+`);
+
 // Migration: add photo + freemium columns to users if missing
 const userCols = db.prepare('PRAGMA table_info(users)').all();
 const userColNames = userCols.map(c => c.name);
@@ -623,6 +643,41 @@ const stmts = {
   `),
   deleteProjectMember: db.prepare(`
     DELETE FROM project_members WHERE id = $id AND project_id = $projectId
+  `),
+
+  // ── Contacts (Gestion Pro) ─────────────────────────────────────────────────
+  insertContact: db.prepare(`
+    INSERT INTO contacts (project_id, user_id, contact_type, full_name, phone, email, joined_date, category, status, notes)
+    VALUES ($projectId, $userId, $contactType, $fullName, $phone, $email, $joinedDate, $category, $status, $notes)
+  `),
+  // Returns all contacts for a project, optionally filtered by search pattern.
+  // Pass $pattern = '%' to disable search filtering.
+  getContactsByProject: db.prepare(`
+    SELECT * FROM contacts
+    WHERE project_id = $projectId
+      AND (full_name LIKE $pattern OR COALESCE(phone, '') LIKE $pattern OR COALESCE(email, '') LIKE $pattern)
+    ORDER BY full_name COLLATE NOCASE ASC
+  `),
+  getContactById: db.prepare(`
+    SELECT * FROM contacts WHERE id = $id AND project_id = $projectId
+  `),
+  updateContact: db.prepare(`
+    UPDATE contacts SET
+      full_name   = $fullName,
+      phone       = $phone,
+      email       = $email,
+      joined_date = $joinedDate,
+      category    = $category,
+      status      = $status,
+      notes       = $notes,
+      updated_at  = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    WHERE id = $id AND project_id = $projectId
+  `),
+  deleteContact: db.prepare(`
+    DELETE FROM contacts WHERE id = $id AND project_id = $projectId
+  `),
+  countContactsByProject: db.prepare(`
+    SELECT COUNT(*) AS cnt FROM contacts WHERE project_id = $projectId
   `),
 
   // ── Project migration helpers ──────────────────────────────────────────────

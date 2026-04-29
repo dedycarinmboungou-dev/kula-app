@@ -51,6 +51,16 @@ const state = {
   // ── Multi-projects ──
   projects: [],        // [{id, name, type, role, owner_id}]
   currentProjectId: parseInt(localStorage.getItem('kula_project_id') || '0') || null,
+  // ── Contacts (Gestion Pro) ──
+  contacts: [],
+  editingContactId: null,
+  contactSearchTimer: null,
+};
+
+// ── Contact category options per project type ────────────────────────────────
+const CONTACT_CATEGORIES = {
+  asso:       ['Bureau', 'Membre actif', 'Membre honoraire'],
+  entreprise: ['VIP', 'Régulier', 'Prospect']
 };
 
 // ── Project metadata (Lucide icons + labels per type) ────────────────────────
@@ -497,6 +507,7 @@ function switchTab(tab) {
   if (tab === 'dashboard') loadDashboard();
   if (tab === 'transactions') loadTransactions();
   if (tab === 'epargne') loadPoches();
+  if (tab === 'contacts') loadContacts();
   if (tab === 'chat') {
     setTimeout(() => {
       const cm = document.getElementById('chat-messages');
@@ -549,11 +560,15 @@ function selectProject(id) {
   state.currentProjectId = id;
   localStorage.setItem('kula_project_id', String(id));
   renderProjectBar();
+  updateContactsTabVisibility();
   closeProjectSheet();
   // Refresh active tab data
   if (state.currentTab === 'dashboard') loadDashboard();
   if (state.currentTab === 'transactions') loadTransactions();
   if (state.currentTab === 'epargne') loadPoches();
+  if (state.currentTab === 'contacts') loadContacts();
+  // Reset contacts state — it's project-scoped
+  state.contacts = [];
   // Reset chat history (it's project-scoped contextually)
   state.chatHistory = [];
   showToast(t('project_switched'), 'success');
@@ -780,6 +795,278 @@ async function inviteProjectMember() {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONTACTS — Gestion Pro (members for asso, clients for entreprise)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Show / hide the contacts nav tab depending on current project type.
+// Also updates label between "Membres" and "Clients".
+function updateContactsTabVisibility() {
+  const cur = currentProject();
+  const navBtn = document.getElementById('nav-contacts');
+  const navLbl = document.getElementById('nav-contacts-label');
+  if (!navBtn) return;
+
+  const isProMember = cur && cur.type === 'asso';
+  const isProClient = cur && cur.type === 'entreprise';
+  const visible     = isProMember || isProClient;
+
+  if (!visible) {
+    navBtn.style.display = 'none';
+    // If user was on contacts tab, fall back to dashboard
+    if (state.currentTab === 'contacts') switchTab('dashboard');
+    return;
+  }
+  navBtn.style.display = '';
+  const labelKey = isProMember ? 'nav_members' : 'nav_clients';
+  navLbl.setAttribute('data-i18n', labelKey);
+  navLbl.textContent = t(labelKey);
+
+  // Also update page title + empty state if visible
+  const titleEl = document.getElementById('contacts-title');
+  const emptyEl = document.getElementById('contacts-empty-text');
+  if (titleEl) {
+    const k = isProMember ? 'contacts_title_members' : 'contacts_title_clients';
+    titleEl.setAttribute('data-i18n', k);
+    titleEl.textContent = t(k);
+  }
+  if (emptyEl) {
+    const k = isProMember ? 'no_contacts_members' : 'no_contacts_clients';
+    emptyEl.setAttribute('data-i18n', k);
+    emptyEl.textContent = t(k);
+  }
+}
+
+function getContactInitials(fullName) {
+  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+async function loadContacts() {
+  const search = document.getElementById('contacts-search')?.value.trim() || '';
+  const fab = document.getElementById('fab-add-contact');
+  try {
+    const url = withProject(`/api/contacts${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+    const list = await api(url);
+    state.contacts = Array.isArray(list) ? list : [];
+    renderContactsList();
+    if (fab) fab.style.display = '';
+  } catch (e) {
+    showToast(e.message, 'error');
+    if (fab) fab.style.display = 'none';
+  }
+}
+
+function renderContactsList() {
+  const container = document.getElementById('contacts-list');
+  const countEl   = document.getElementById('contacts-count');
+  if (!container) return;
+
+  const cur = currentProject();
+  const isMember = cur && cur.type === 'asso';
+  const total = state.contacts.length;
+
+  if (countEl) {
+    const labelKey = isMember
+      ? (total === 1 ? 'contacts_count_one_member' : 'contacts_count_members')
+      : (total === 1 ? 'contacts_count_one_client' : 'contacts_count_clients');
+    countEl.textContent = `${total} ${t(labelKey)}`;
+  }
+
+  if (!total) {
+    const k = isMember ? 'no_contacts_members' : 'no_contacts_clients';
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="users-round" style="width:32px;height:32px"></i></div>
+        <div class="empty-text">${escapeHtml(t(k))}</div>
+        <div class="empty-sub">${escapeHtml(t('no_contacts_sub'))}</div>
+      </div>`;
+    refreshIcons();
+    return;
+  }
+
+  container.innerHTML = state.contacts.map(c => {
+    const initials  = getContactInitials(c.full_name);
+    const status    = c.status === 'inactive' ? 'inactive' : 'active';
+    const statusKey = status === 'active' ? 'contact_status_active' : 'contact_status_inactive';
+    const sub       = [c.category, t(statusKey)].filter(Boolean).join(' · ');
+    const phoneBtn  = c.phone
+      ? `<a class="contact-call-btn" href="tel:${escapeHtml(c.phone)}" onclick="event.stopPropagation()" aria-label="${t('contact_call')}"><i data-lucide="phone" style="width:16px;height:16px"></i></a>`
+      : '';
+    return `
+      <div class="contact-card" onclick="openContactDetail(${c.id})">
+        <div class="contact-avatar">${escapeHtml(initials)}</div>
+        <div class="contact-info">
+          <div class="contact-name">${escapeHtml(c.full_name)}</div>
+          <div class="contact-sub">
+            <span class="contact-sub-text">${escapeHtml(sub)}</span>
+            <span class="contact-status-badge ${status}">${t(statusKey)}</span>
+          </div>
+          ${c.phone ? `<div class="contact-phone-line">${escapeHtml(c.phone)}</div>` : ''}
+        </div>
+        ${phoneBtn}
+      </div>
+    `;
+  }).join('');
+  refreshIcons();
+}
+
+function openContactForm(contact = null) {
+  const cur = currentProject();
+  if (!cur || (cur.type !== 'asso' && cur.type !== 'entreprise')) return;
+
+  state.editingContactId = contact?.id || null;
+  document.getElementById('contact-form-title').textContent =
+    contact ? t('contact_edit_title') : t('contact_new');
+
+  // Reset / pre-fill fields
+  document.getElementById('contact-input-name').value   = contact?.full_name || '';
+  document.getElementById('contact-input-phone').value  = contact?.phone || '';
+  document.getElementById('contact-input-email').value  = contact?.email || '';
+  document.getElementById('contact-input-joined').value = contact?.joined_date || new Date().toISOString().slice(0, 10);
+  document.getElementById('contact-input-notes').value  = contact?.notes || '';
+
+  // Render category chips
+  const cats = CONTACT_CATEGORIES[cur.type] || [];
+  const chipsContainer = document.getElementById('contact-cat-chips');
+  const selectedCat = contact?.category || cats[0];
+  chipsContainer.innerHTML = cats.map(cat => `
+    <button type="button" class="contact-cat-chip ${cat === selectedCat ? 'selected' : ''}" data-cat="${escapeHtml(cat)}">${escapeHtml(cat)}</button>
+  `).join('');
+  chipsContainer.querySelectorAll('.contact-cat-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chipsContainer.querySelectorAll('.contact-cat-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+
+  // Status
+  const statusVal = contact?.status === 'inactive' ? 'inactive' : 'active';
+  document.querySelectorAll('.contact-status-chip').forEach(c => {
+    c.classList.toggle('selected', c.dataset.status === statusVal);
+  });
+
+  document.getElementById('contact-form-overlay').style.display = 'flex';
+  refreshIcons();
+  setTimeout(() => document.getElementById('contact-input-name').focus(), 100);
+}
+
+function closeContactForm() {
+  document.getElementById('contact-form-overlay').style.display = 'none';
+  state.editingContactId = null;
+}
+
+async function saveContact() {
+  const name  = document.getElementById('contact-input-name').value.trim();
+  if (!name) { showToast(t('contact_name_required'), 'error'); return; }
+  const phone = document.getElementById('contact-input-phone').value.trim();
+  const email = document.getElementById('contact-input-email').value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast(t('contact_invalid_email'), 'error');
+    return;
+  }
+  const joinedDate = document.getElementById('contact-input-joined').value || null;
+  const category   = document.querySelector('.contact-cat-chip.selected')?.dataset.cat || null;
+  const status     = document.querySelector('.contact-status-chip.selected')?.dataset.status || 'active';
+  const notes      = document.getElementById('contact-input-notes').value.trim();
+
+  const body = {
+    full_name: name,
+    phone: phone || null,
+    email: email || null,
+    joined_date: joinedDate,
+    category,
+    status,
+    notes: notes || null
+  };
+
+  const btn = document.getElementById('contact-form-save');
+  btn.disabled = true;
+  try {
+    if (state.editingContactId) {
+      await api(withProject(`/api/contacts/${state.editingContactId}`), {
+        method: 'PUT', body: JSON.stringify(body)
+      });
+      showToast(t('contact_updated'), 'success');
+    } else {
+      await api(withProject('/api/contacts'), {
+        method: 'POST', body: JSON.stringify(body)
+      });
+      showToast(t('contact_created'), 'success');
+    }
+    closeContactForm();
+    loadContacts();
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function openContactDetail(id) {
+  try {
+    const c = await api(withProject(`/api/contacts/${id}`));
+    const overlay = document.getElementById('contact-detail-overlay');
+    overlay.dataset.contactId = String(id);
+    document.getElementById('contact-detail-name').textContent = c.full_name;
+
+    const status    = c.status === 'inactive' ? 'inactive' : 'active';
+    const statusKey = status === 'active' ? 'contact_status_active' : 'contact_status_inactive';
+    const fmtDate   = iso => iso ? new Date(iso + 'T12:00:00').toLocaleDateString(getLocale(), { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+
+    const row = (label, value, action = '') => `
+      <div class="contact-detail-row">
+        <span class="contact-detail-label">${escapeHtml(label)}</span>
+        <span class="contact-detail-value">${value}</span>
+        ${action}
+      </div>`;
+
+    const phoneAction = c.phone ? `<a class="contact-detail-action" href="tel:${escapeHtml(c.phone)}"><i data-lucide="phone" style="width:14px;height:14px"></i></a>` : '';
+    const emailAction = c.email ? `<a class="contact-detail-action" href="mailto:${escapeHtml(c.email)}"><i data-lucide="mail" style="width:14px;height:14px"></i></a>` : '';
+
+    document.getElementById('contact-detail-body').innerHTML = `
+      ${row(t('contact_phone'),       c.phone ? escapeHtml(c.phone) : '<span class="muted">—</span>', phoneAction)}
+      ${row(t('contact_email'),       c.email ? escapeHtml(c.email) : '<span class="muted">—</span>', emailAction)}
+      ${row(t('contact_joined_date'), escapeHtml(fmtDate(c.joined_date)))}
+      ${row(t('contact_category'),    c.category ? escapeHtml(c.category) : '<span class="muted">—</span>')}
+      ${row(t('contact_status'),      `<span class="contact-status-badge ${status}">${t(statusKey)}</span>`)}
+      ${c.notes ? `<div class="contact-detail-notes"><span class="contact-detail-label">${t('contact_notes')}</span><div>${escapeHtml(c.notes)}</div></div>` : ''}
+    `;
+
+    overlay.style.display = 'flex';
+    refreshIcons();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function closeContactDetail() {
+  document.getElementById('contact-detail-overlay').style.display = 'none';
+}
+
+async function editContactFromDetail() {
+  const id = parseInt(document.getElementById('contact-detail-overlay').dataset.contactId);
+  try {
+    const c = await api(withProject(`/api/contacts/${id}`));
+    closeContactDetail();
+    openContactForm(c);
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function deleteContactFromDetail() {
+  const id = parseInt(document.getElementById('contact-detail-overlay').dataset.contactId);
+  const c  = state.contacts.find(x => x.id === id);
+  if (!confirm(t('confirm_delete_contact').replace('{name}', c?.full_name || ''))) return;
+  try {
+    await api(withProject(`/api/contacts/${id}`), { method: 'DELETE' });
+    closeContactDetail();
+    showToast(t('contact_deleted'), 'success');
+    loadContacts();
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 // ── Dashboard ──────────────────────────────────────────────────────────────────
@@ -2214,6 +2501,32 @@ async function init() {
 
   // Load projects FIRST so currentProjectId is set before any data fetch
   await loadProjects();
+  updateContactsTabVisibility();
+
+  // ── Contacts wiring ──
+  document.getElementById('fab-add-contact')?.addEventListener('click', () => openContactForm());
+  document.getElementById('contact-form-close')?.addEventListener('click', closeContactForm);
+  document.getElementById('contact-form-cancel')?.addEventListener('click', closeContactForm);
+  document.getElementById('contact-form-save')?.addEventListener('click', saveContact);
+  document.getElementById('contact-form-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'contact-form-overlay') closeContactForm();
+  });
+  document.getElementById('contact-detail-close')?.addEventListener('click', closeContactDetail);
+  document.getElementById('contact-detail-edit')?.addEventListener('click', editContactFromDetail);
+  document.getElementById('contact-detail-delete')?.addEventListener('click', deleteContactFromDetail);
+  document.getElementById('contact-detail-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'contact-detail-overlay') closeContactDetail();
+  });
+  document.querySelectorAll('.contact-status-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.contact-status-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+    });
+  });
+  document.getElementById('contacts-search')?.addEventListener('input', () => {
+    clearTimeout(state.contactSearchTimer);
+    state.contactSearchTimer = setTimeout(loadContacts, 300);
+  });
 
   // Wire up project bar + sheet
   document.getElementById('project-bar')?.addEventListener('click', openProjectSheet);

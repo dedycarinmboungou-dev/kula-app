@@ -1529,6 +1529,140 @@ app.get('/api/projects/:id/members', requireAuth, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CONTACTS — Gestion Pro (members for asso, clients for entreprise)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const CONTACT_CATEGORIES = {
+  asso:       ['Bureau', 'Membre actif', 'Membre honoraire'],
+  entreprise: ['VIP', 'Régulier', 'Prospect']
+};
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Returns { ok: true, contact_type } or { ok: false, status, error }
+function validateContactProject(project) {
+  if (!project) return { ok: false, status: 404, error: 'Projet introuvable' };
+  if (project.type !== 'asso' && project.type !== 'entreprise')
+    return { ok: false, status: 400, error: 'Les contacts ne sont disponibles que pour les projets Association ou Entreprise' };
+  return { ok: true, contact_type: project.type === 'asso' ? 'member' : 'client' };
+}
+
+function sanitizeContactBody(body, projectType) {
+  const fullName = (body.full_name || '').trim();
+  if (!fullName) return { error: 'Le nom complet est requis' };
+  if (fullName.length > 120) return { error: 'Nom trop long (max 120 caractères)' };
+
+  const email = (body.email || '').trim().toLowerCase() || null;
+  if (email && !EMAIL_RE.test(email)) return { error: 'Email invalide' };
+
+  const phone = (body.phone || '').trim() || null;
+  if (phone && phone.length > 40) return { error: 'Téléphone trop long' };
+
+  const joinedDate = (body.joined_date || '').trim() || null;
+  if (joinedDate && !/^\d{4}-\d{2}-\d{2}$/.test(joinedDate))
+    return { error: 'Date d\'adhésion invalide (attendu YYYY-MM-DD)' };
+
+  const allowedCats = CONTACT_CATEGORIES[projectType] || [];
+  const category = (body.category || '').trim() || null;
+  if (category && !allowedCats.includes(category))
+    return { error: `Catégorie invalide. Valeurs autorisées: ${allowedCats.join(', ')}` };
+
+  const status = body.status === 'inactive' ? 'inactive' : 'active';
+  const notes = (body.notes || '').trim() || null;
+  if (notes && notes.length > 2000) return { error: 'Notes trop longues (max 2000)' };
+
+  return { fullName, phone, email, joinedDate, category, status, notes };
+}
+
+// GET /api/contacts?project_id=X&search=Y → list
+app.get('/api/contacts', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const project = stmts.getProjectById.get({ id: req.projectId });
+    const check = validateContactProject(project);
+    if (!check.ok) return res.status(check.status).json({ error: check.error });
+    const search = (req.query.search || '').trim();
+    const pattern = search ? `%${search}%` : '%';
+    const contacts = stmts.getContactsByProject.all({ projectId: req.projectId, pattern });
+    res.json(contacts);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/contacts → create
+app.post('/api/contacts', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const project = stmts.getProjectById.get({ id: req.projectId });
+    const check = validateContactProject(project);
+    if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+    const v = sanitizeContactBody(req.body, project.type);
+    if (v.error) return res.status(400).json({ error: v.error });
+
+    const r = stmts.insertContact.run({
+      projectId:   req.projectId,
+      userId:      req.userId,
+      contactType: check.contact_type,
+      fullName:    v.fullName,
+      phone:       v.phone,
+      email:       v.email,
+      joinedDate:  v.joinedDate,
+      category:    v.category,
+      status:      v.status,
+      notes:       v.notes
+    });
+    const contact = stmts.getContactById.get({ id: r.lastInsertRowid, projectId: req.projectId });
+    console.log(`[CONTACT] Created id=${contact.id} project=${req.projectId} type=${check.contact_type} name="${v.fullName}"`);
+    res.status(201).json(contact);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/contacts/:id → detail (project_id required to scope)
+app.get('/api/contacts/:id', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const contact = stmts.getContactById.get({ id, projectId: req.projectId });
+    if (!contact) return res.status(404).json({ error: 'Contact introuvable' });
+    res.json(contact);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/contacts/:id → update
+app.put('/api/contacts/:id', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const project = stmts.getProjectById.get({ id: req.projectId });
+    const check = validateContactProject(project);
+    if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+    const existing = stmts.getContactById.get({ id, projectId: req.projectId });
+    if (!existing) return res.status(404).json({ error: 'Contact introuvable' });
+
+    const v = sanitizeContactBody(req.body, project.type);
+    if (v.error) return res.status(400).json({ error: v.error });
+
+    stmts.updateContact.run({
+      id, projectId: req.projectId,
+      fullName:   v.fullName,
+      phone:      v.phone,
+      email:      v.email,
+      joinedDate: v.joinedDate,
+      category:   v.category,
+      status:     v.status,
+      notes:      v.notes
+    });
+    res.json(stmts.getContactById.get({ id, projectId: req.projectId }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/contacts/:id → delete
+app.delete('/api/contacts/:id', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const r = stmts.deleteContact.run({ id, projectId: req.projectId });
+    if (!r.changes) return res.status(404).json({ error: 'Contact introuvable' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // KOLA COACH
 // ═══════════════════════════════════════════════════════════════════════════════
 

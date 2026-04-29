@@ -349,6 +349,35 @@
 
   </section>
 
+  <!-- ── Tab: Contacts (Members / Clients) ──────────────────────────────── -->
+  <section class="tab-panel" id="tab-contacts">
+
+    <div class="contacts-header">
+      <div>
+        <h2 class="contacts-title" id="contacts-title" data-i18n="contacts_title_members">Membres</h2>
+        <span class="contacts-count" id="contacts-count">—</span>
+      </div>
+    </div>
+
+    <div class="contacts-search-wrap">
+      <i data-lucide="search" class="contacts-search-icon" style="width:16px;height:16px"></i>
+      <input type="search" id="contacts-search" class="contacts-search-input" data-i18n-placeholder="contact_search_ph" placeholder="Rechercher par nom, téléphone ou email…">
+    </div>
+
+    <div id="contacts-list">
+      <div class="empty-state">
+        <div class="empty-icon"><i data-lucide="users-round" style="width:32px;height:32px"></i></div>
+        <div class="empty-text" id="contacts-empty-text" data-i18n="no_contacts_members">Aucun membre pour l'instant</div>
+        <div class="empty-sub" data-i18n="no_contacts_sub">Ajoute ton premier contact en cliquant sur le bouton ci-dessous.</div>
+      </div>
+    </div>
+
+    <button class="fab-add-tx" id="fab-add-contact" type="button" aria-label="Ajouter un contact" style="display:none">
+      <i data-lucide="plus" style="width:22px;height:22px"></i>
+    </button>
+
+  </section>
+
   <!-- ── Tab: Transactions ──────────────────────────────────────────────── -->
   <section class="tab-panel" id="tab-transactions">
 
@@ -394,6 +423,11 @@
     <button class="nav-item" data-tab="epargne">
       <i data-lucide="piggy-bank" class="nav-icon" style="width:22px;height:22px"></i>
       <span class="nav-label" data-i18n="nav_epargne">Épargne</span>
+    </button>
+
+    <button class="nav-item" data-tab="contacts" id="nav-contacts" style="display:none">
+      <i data-lucide="users" class="nav-icon" style="width:22px;height:22px"></i>
+      <span class="nav-label" id="nav-contacts-label" data-i18n="nav_members">Membres</span>
     </button>
 
     <button class="nav-item" data-tab="transactions">
@@ -1119,6 +1153,86 @@
           <span data-i18n="delete_project_short">Supprimer ce projet</span>
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Contact form modal (add / edit) ──────────────────────────────────── -->
+<div class="poche-modal-overlay" id="contact-form-overlay" style="display:none">
+  <div class="poche-modal contact-form-modal">
+    <div class="poche-modal-header">
+      <div class="poche-modal-title">
+        <i data-lucide="user-plus" style="width:18px;height:18px"></i>
+        <span id="contact-form-title" data-i18n="contact_new">Nouveau contact</span>
+      </div>
+      <button class="poche-modal-close" id="contact-form-close" type="button" aria-label="Fermer">
+        <i data-lucide="x" style="width:18px;height:18px"></i>
+      </button>
+    </div>
+    <div class="poche-modal-body">
+      <div class="poche-field">
+        <label data-i18n="contact_full_name">Nom complet *</label>
+        <input id="contact-input-name" type="text" maxlength="120" autocomplete="off">
+      </div>
+      <div class="poche-field">
+        <label data-i18n="contact_phone">Téléphone</label>
+        <input id="contact-input-phone" type="tel" maxlength="40" autocomplete="off">
+      </div>
+      <div class="poche-field">
+        <label data-i18n="contact_email">Email</label>
+        <input id="contact-input-email" type="email" autocomplete="off">
+      </div>
+      <div class="poche-field">
+        <label data-i18n="contact_joined_date">Date d'adhésion</label>
+        <input id="contact-input-joined" type="date">
+      </div>
+      <div class="poche-field">
+        <label data-i18n="contact_category">Catégorie</label>
+        <div class="contact-cat-chips" id="contact-cat-chips"></div>
+      </div>
+      <div class="poche-field">
+        <label data-i18n="contact_status">Statut</label>
+        <div class="contact-status-chips">
+          <button type="button" class="contact-status-chip selected" data-status="active" data-i18n="contact_status_active">Actif</button>
+          <button type="button" class="contact-status-chip" data-status="inactive" data-i18n="contact_status_inactive">Inactif</button>
+        </div>
+      </div>
+      <div class="poche-field">
+        <label data-i18n="contact_notes">Notes</label>
+        <textarea id="contact-input-notes" rows="3" maxlength="2000"></textarea>
+      </div>
+      <div class="contact-form-actions">
+        <button class="btn-back-project" id="contact-form-cancel" type="button" data-i18n="contact_cancel">Annuler</button>
+        <button class="btn-create-project" id="contact-form-save" type="button" data-i18n="contact_save">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Contact detail modal ─────────────────────────────────────────────── -->
+<div class="poche-modal-overlay" id="contact-detail-overlay" style="display:none">
+  <div class="poche-modal contact-detail-modal">
+    <div class="poche-modal-header">
+      <div class="poche-modal-title">
+        <i data-lucide="user" style="width:18px;height:18px"></i>
+        <span id="contact-detail-name">—</span>
+      </div>
+      <button class="poche-modal-close" id="contact-detail-close" type="button" aria-label="Fermer">
+        <i data-lucide="x" style="width:18px;height:18px"></i>
+      </button>
+    </div>
+    <div class="poche-modal-body" id="contact-detail-body">
+      <!-- populated dynamically -->
+    </div>
+    <div class="contact-detail-actions">
+      <button class="btn-back-project" id="contact-detail-edit" type="button">
+        <i data-lucide="pencil" style="width:14px;height:14px"></i>
+        <span data-i18n="contact_edit">Modifier</span>
+      </button>
+      <button class="btn-delete-project" id="contact-detail-delete" type="button">
+        <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+        <span data-i18n="contact_delete">Supprimer</span>
+      </button>
     </div>
   </div>
 </div>
