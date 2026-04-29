@@ -1436,16 +1436,34 @@ app.put('/api/projects/:id', requireAuth, (req, res) => {
 
 // DELETE /api/projects/:id → owner only, refuse type='perso'
 app.delete('/api/projects/:id', requireAuth, (req, res) => {
+  const reqId = Math.random().toString(36).slice(2, 8);
+  console.log(`[DELETE-PROJECT ${reqId}] === Request received === id=${req.params.id} userId=${req.userId} email=${req.user?.email}`);
   try {
     const id = parseInt(req.params.id);
+    if (!id) {
+      console.warn(`[DELETE-PROJECT ${reqId}] ❌ Invalid id`);
+      return res.status(400).json({ error: 'ID projet invalide' });
+    }
     const project = stmts.getProjectById.get({ id });
+    console.log(`[DELETE-PROJECT ${reqId}] Project lookup:`, project ? `found "${project.name}" (owner=${project.owner_id} type=${project.type})` : 'NOT FOUND');
     if (!project) return res.status(404).json({ error: 'Projet non trouvé' });
-    if (project.owner_id !== req.userId) return res.status(403).json({ error: 'Seul le propriétaire peut supprimer' });
-    if (project.type === 'perso') return res.status(400).json({ error: 'Le projet Personnel ne peut pas être supprimé' });
+    if (project.owner_id !== req.userId) {
+      console.warn(`[DELETE-PROJECT ${reqId}] ❌ Permission denied — owner=${project.owner_id} requester=${req.userId}`);
+      return res.status(403).json({ error: 'Seul le propriétaire peut supprimer' });
+    }
+    if (project.type === 'perso') {
+      console.warn(`[DELETE-PROJECT ${reqId}] ❌ Refusing perso project deletion`);
+      return res.status(400).json({ error: 'Le projet Personnel ne peut pas être supprimé' });
+    }
     const r = stmts.deleteProject.run({ id, ownerId: req.userId });
+    console.log(`[DELETE-PROJECT ${reqId}] DB delete changes=${r.changes}`);
     if (!r.changes) return res.status(400).json({ error: 'Suppression refusée' });
+    console.log(`[DELETE-PROJECT ${reqId}] ✅ Done`);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    console.error(`[DELETE-PROJECT ${reqId}] ❌ Unhandled error:`, e.message, e.stack);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // POST /api/projects/:id/invite { email, role? } → invite member (owner only)

@@ -711,33 +711,48 @@ async function saveProjectChanges() {
 }
 
 async function confirmDeleteProject() {
+  console.log('[delete-project] handler fired');
   const overlay = document.getElementById('project-settings-overlay');
-  const projectId = parseInt(overlay.dataset.projectId);
+  const projectId = parseInt(overlay?.dataset.projectId);
+  console.log('[delete-project] resolved projectId=', projectId);
+  if (!projectId) { console.warn('[delete-project] no projectId in overlay dataset'); return; }
   const project = state.projects.find(p => p.id === projectId);
-  if (!project) return;
-  if (!confirm(t('confirm_delete_project').replace('{name}', project.name))) return;
+  console.log('[delete-project] project lookup:', project);
+  if (!project) { showToast('Projet introuvable', 'error'); return; }
+
+  const ok = confirm(t('confirm_delete_project').replace('{name}', project.name));
+  console.log('[delete-project] confirm() returned:', ok);
+  if (!ok) return;
+
   const btn = document.getElementById('btn-delete-project');
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
   try {
-    await api(`/api/projects/${projectId}`, { method: 'DELETE' });
+    console.log('[delete-project] sending DELETE /api/projects/' + projectId);
+    const res = await api(`/api/projects/${projectId}`, { method: 'DELETE' });
+    console.log('[delete-project] DELETE response:', res);
     // Remove from local state, switch back to Personnel
     state.projects = state.projects.filter(p => p.id !== projectId);
     const perso = state.projects.find(p => p.type === 'perso' && p.role === 'owner');
     closeProjectSettings();
     if (perso) {
+      console.log('[delete-project] switching to Personnel project id=', perso.id);
       state.currentProjectId = perso.id;
       localStorage.setItem('kula_project_id', String(perso.id));
       renderProjectBar();
+      updateContactsTabVisibility();
       // Refresh current tab
       if (state.currentTab === 'dashboard') loadDashboard();
       if (state.currentTab === 'transactions') loadTransactions();
       if (state.currentTab === 'epargne') loadPoches();
+      if (state.currentTab === 'contacts') loadContacts();
+      state.contacts = [];
       state.chatHistory = [];
     }
     showToast(t('project_deleted'), 'success');
   } catch (e) {
-    showToast(e.message, 'error');
-    btn.disabled = false;
+    console.error('[delete-project] DELETE failed:', e.message);
+    showToast(e.message || 'Erreur lors de la suppression', 'error');
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -802,29 +817,41 @@ function escapeHtml(s) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // Show / hide the contacts nav tab depending on current project type.
-// Also updates label between "Membres" and "Clients".
+// STRICT rule: visible ONLY for asso (label "Membres") or entreprise (label "Clients").
+// For perso and event: always hidden. If user was on contacts tab, fallback to dashboard.
 function updateContactsTabVisibility() {
   const cur = currentProject();
   const navBtn = document.getElementById('nav-contacts');
   const navLbl = document.getElementById('nav-contacts-label');
   if (!navBtn) return;
 
-  const isProMember = cur && cur.type === 'asso';
-  const isProClient = cur && cur.type === 'entreprise';
+  const type = cur?.type || null;
+  const isProMember = type === 'asso';
+  const isProClient = type === 'entreprise';
   const visible     = isProMember || isProClient;
+
+  console.log(`[contacts-tab] project type="${type}" visible=${visible}`);
 
   if (!visible) {
     navBtn.style.display = 'none';
-    // If user was on contacts tab, fall back to dashboard
-    if (state.currentTab === 'contacts') switchTab('dashboard');
+    // Failsafe: also hide via attribute in case display:none gets overridden
+    navBtn.setAttribute('aria-hidden', 'true');
+    // If user was on contacts tab, switch back to dashboard
+    if (state.currentTab === 'contacts') {
+      console.log('[contacts-tab] auto-switching to dashboard (project type does not allow contacts)');
+      switchTab('dashboard');
+    }
     return;
   }
-  navBtn.style.display = '';
+
+  // Force display:flex explicitly to bypass any potential inline-style overrides
+  navBtn.style.display = 'flex';
+  navBtn.removeAttribute('aria-hidden');
+
   const labelKey = isProMember ? 'nav_members' : 'nav_clients';
   navLbl.setAttribute('data-i18n', labelKey);
   navLbl.textContent = t(labelKey);
 
-  // Also update page title + empty state if visible
   const titleEl = document.getElementById('contacts-title');
   const emptyEl = document.getElementById('contacts-empty-text');
   if (titleEl) {
@@ -1961,6 +1988,20 @@ function getReminderMessage(daysSince) {
   return REMINDER_MESSAGES[REMINDER_MESSAGES.length - 1];
 }
 
+// Shared close-banner helper: hides the reminder banner cleanly.
+// Cancels any pending auto-dismiss timer if present.
+function closeReminderBanner() {
+  const banner = document.getElementById('reminder-banner');
+  if (!banner) return;
+  banner.classList.remove('visible');
+  if (state.reminderAutoDismissTimer) {
+    clearTimeout(state.reminderAutoDismissTimer);
+    state.reminderAutoDismissTimer = null;
+  }
+  // Match CSS transition: hide via display:none after fade-out
+  setTimeout(() => { banner.style.display = 'none'; }, 250);
+}
+
 function showReminderBanner(daysSince) {
   const banner  = document.getElementById('reminder-banner');
   const textEl  = document.getElementById('reminder-text');
@@ -1971,13 +2012,19 @@ function showReminderBanner(daysSince) {
   setTimeout(() => banner.classList.add('visible'), 50);
 
   document.getElementById('reminder-action').onclick = () => {
-    banner.classList.remove('visible');
+    closeReminderBanner();
     switchTab('chat');
   };
   document.getElementById('reminder-close').onclick = () => {
-    banner.classList.remove('visible');
+    closeReminderBanner();
     localStorage.setItem('kula_reminder_dismissed', Date.now().toString());
   };
+
+  // Auto-dismiss after 4 seconds
+  if (state.reminderAutoDismissTimer) clearTimeout(state.reminderAutoDismissTimer);
+  state.reminderAutoDismissTimer = setTimeout(() => {
+    closeReminderBanner();
+  }, 4000);
 }
 
 function sendBrowserNotification(daysSince) {
@@ -2549,7 +2596,13 @@ async function init() {
   });
   document.getElementById('btn-invite-member')?.addEventListener('click', inviteProjectMember);
   document.getElementById('btn-save-project')?.addEventListener('click', saveProjectChanges);
-  document.getElementById('btn-delete-project')?.addEventListener('click', confirmDeleteProject);
+  const deleteBtn = document.getElementById('btn-delete-project');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', confirmDeleteProject);
+    console.log('[init] btn-delete-project listener attached');
+  } else {
+    console.warn('[init] btn-delete-project NOT FOUND in DOM at init time');
+  }
   document.querySelectorAll('#project-edit-type-chips .project-type-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       document.querySelectorAll('#project-edit-type-chips .project-type-chip').forEach(c => c.classList.remove('selected'));
