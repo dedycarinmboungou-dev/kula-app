@@ -1732,6 +1732,16 @@ function buildFinancialContext(userId, projectId) {
   };
 }
 
+// GET /api/coach/history — return last 50 messages for current (user, project)
+// Returned in chronological order (oldest first), ready to render in UI.
+app.get('/api/coach/history', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const rows = stmts.getChatHistory.all({ userId: req.userId, projectId: req.projectId, limit: 50 });
+    rows.reverse(); // DESC → ASC
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/coach/analysis — daily briefing
 app.get('/api/coach/analysis', requireAuth, requireProjectAccess, async (req, res) => {
   try {
@@ -1862,7 +1872,7 @@ app.post('/api/chat', requireAuth, checkAccess, requireProjectAccess, async (req
     const today = new Date().toISOString().slice(0, 10);
 
     // ── Load conversation history from DB (last 20 messages, chronological) ──
-    const dbHistory = stmts.getChatHistory.all({ userId: req.userId, limit: 20 });
+    const dbHistory = stmts.getChatHistory.all({ userId: req.userId, projectId: req.projectId, limit: 20 });
     dbHistory.reverse(); // DESC → ASC
 
     // ── Fetch live financial context ──────────────────────────────────────────
@@ -2044,7 +2054,7 @@ ${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.languag
     ];
 
     // ── Save user message to DB ───────────────────────────────────────────────
-    stmts.insertChatMessage.run({ userId: req.userId, role: 'user', content: message.trim() });
+    stmts.insertChatMessage.run({ userId: req.userId, projectId: req.projectId, role: 'user', content: message.trim() });
 
     let goalReachedPoche = null; // set when add_to_poche reaches the goal
 
@@ -2226,8 +2236,11 @@ ${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.languag
     // ── Save assistant response to DB ─────────────────────────────────────────
     const assistantContent = parsed.message || raw;
     if (assistantContent) {
-      stmts.insertChatMessage.run({ userId: req.userId, role: 'assistant', content: String(assistantContent) });
+      stmts.insertChatMessage.run({ userId: req.userId, projectId: req.projectId, role: 'assistant', content: String(assistantContent) });
     }
+
+    // Trim to keep only the latest 100 messages per (user, project)
+    try { stmts.trimChatMessages.run({ userId: req.userId, projectId: req.projectId }); } catch { /* silent */ }
 
     res.json(parsed);
   } catch (err) {

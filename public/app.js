@@ -509,11 +509,12 @@ function switchTab(tab) {
   if (tab === 'epargne') loadPoches();
   if (tab === 'contacts') loadContacts();
   if (tab === 'chat') {
+    loadChatHistory();
     setTimeout(() => {
       const cm = document.getElementById('chat-messages');
       cm.scrollTop = cm.scrollHeight;
       document.getElementById('chat-input').focus();
-    }, 100);
+    }, 200);
   }
 }
 
@@ -562,15 +563,15 @@ function selectProject(id) {
   renderProjectBar();
   updateContactsTabVisibility();
   closeProjectSheet();
+  // Reset project-scoped in-memory state BEFORE refreshing the active tab
+  state.contacts = [];
+  state.chatHistory = [];
   // Refresh active tab data
   if (state.currentTab === 'dashboard') loadDashboard();
   if (state.currentTab === 'transactions') loadTransactions();
   if (state.currentTab === 'epargne') loadPoches();
   if (state.currentTab === 'contacts') loadContacts();
-  // Reset contacts state — it's project-scoped
-  state.contacts = [];
-  // Reset chat history (it's project-scoped contextually)
-  state.chatHistory = [];
+  if (state.currentTab === 'chat') loadChatHistory();
   showToast(t('project_switched'), 'success');
 }
 
@@ -1500,6 +1501,37 @@ function formatBotContent(text) {
 function applyInline(text) {
   // **bold**
   return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+// Loads conversation history for the current project from the server and
+// renders it into the chat tab. Welcome bubble is hidden when history exists.
+async function loadChatHistory() {
+  const messagesEl = document.getElementById('chat-messages');
+  if (!messagesEl) return;
+  // Save reference to welcome bubble (the only msg.bot pre-rendered in HTML)
+  const welcomeBubble = messagesEl.querySelector('.msg.bot');
+
+  // Clear any previously rendered dynamic messages, keep only the welcome bubble for now
+  messagesEl.innerHTML = '';
+  if (welcomeBubble) messagesEl.appendChild(welcomeBubble);
+
+  try {
+    const history = await api(withProject('/api/coach/history'));
+    if (!Array.isArray(history) || !history.length) {
+      // Empty history — keep welcome bubble visible
+      if (welcomeBubble) welcomeBubble.style.display = '';
+      state.chatHistory = [];
+      return;
+    }
+    // Hide welcome bubble when there's real history
+    if (welcomeBubble) welcomeBubble.style.display = 'none';
+    history.forEach(m => addChatMessage(m.role === 'user' ? 'user' : 'bot', m.content));
+    // Sync in-memory chatHistory for context — last 10 only since we only send those to Claude
+    state.chatHistory = history.slice(-10).map(m => ({ role: m.role, content: m.content }));
+  } catch (e) {
+    console.warn('[chat] failed to load history:', e.message);
+    if (welcomeBubble) welcomeBubble.style.display = '';
+  }
 }
 
 function addChatMessage(role, content) {

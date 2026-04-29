@@ -215,7 +215,7 @@ if (!pocheCols.some(c => c.name === 'project_id'))
 // Since SQLite cannot ALTER UNIQUE constraints, we use PRAGMA user_version to gate a one-time table rebuild.
 const userVersion = db.prepare('PRAGMA user_version').get().user_version;
 if (userVersion < 2) {
-  console.log('[MIGRATION] Rebuilding budgets table to include project_id in UNIQUE constraint...');
+  console.log('[MIGRATION v2] Rebuilding budgets table to include project_id in UNIQUE constraint...');
   db.exec(`
     CREATE TABLE IF NOT EXISTS budgets_new (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -232,8 +232,86 @@ if (userVersion < 2) {
     ALTER TABLE budgets_new RENAME TO budgets;
     PRAGMA user_version = 2;
   `);
-  console.log('[MIGRATION] budgets table rebuilt successfully.');
+  console.log('[MIGRATION v2] budgets table rebuilt successfully.');
 }
+
+// Migration v3: rebuild transactions / budgets / poches_epargne with
+// ON DELETE CASCADE on project_id so that deleting a project cleans up its
+// scoped data automatically (instead of FOREIGN KEY constraint failing).
+if (userVersion < 3) {
+  console.log('[MIGRATION v3] Adding ON DELETE CASCADE to project_id FKs...');
+  // FK must be off during table swap (SQLite refuses INSERT into temp table otherwise)
+  db.exec('PRAGMA foreign_keys = OFF');
+
+  // Read original schemas to preserve the column shape
+  db.exec(`
+    CREATE TABLE transactions_v3 (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id      INTEGER REFERENCES users(id),
+      project_id   INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+      type         TEXT    NOT NULL CHECK(type IN ('income', 'expense')),
+      amount       REAL    NOT NULL CHECK(amount > 0),
+      category     TEXT    NOT NULL,
+      description  TEXT    NOT NULL,
+      date         TEXT    NOT NULL,
+      created_at   TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      justificatif TEXT
+    );
+    INSERT INTO transactions_v3 (id, user_id, project_id, type, amount, category, description, date, created_at, justificatif)
+      SELECT id, user_id, project_id, type, amount, category, description, date, created_at, justificatif FROM transactions;
+    DROP TABLE transactions;
+    ALTER TABLE transactions_v3 RENAME TO transactions;
+  `);
+
+  db.exec(`
+    CREATE TABLE budgets_v3 (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id    INTEGER NOT NULL REFERENCES users(id),
+      project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+      category   TEXT    NOT NULL,
+      limite     REAL    NOT NULL DEFAULT 0,
+      mois       TEXT    NOT NULL,
+      UNIQUE(user_id, project_id, category, mois)
+    );
+    INSERT INTO budgets_v3 (id, user_id, project_id, category, limite, mois)
+      SELECT id, user_id, project_id, category, limite, mois FROM budgets;
+    DROP TABLE budgets;
+    ALTER TABLE budgets_v3 RENAME TO budgets;
+  `);
+
+  db.exec(`
+    CREATE TABLE poches_epargne_v3 (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id          INTEGER NOT NULL REFERENCES users(id),
+      project_id       INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+      nom              TEXT    NOT NULL,
+      objectif_montant REAL    NOT NULL CHECK(objectif_montant > 0),
+      montant_actuel   REAL    NOT NULL DEFAULT 0,
+      date_echeance    TEXT,
+      created_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    );
+    INSERT INTO poches_epargne_v3 (id, user_id, project_id, nom, objectif_montant, montant_actuel, date_echeance, created_at)
+      SELECT id, user_id, project_id, nom, objectif_montant, montant_actuel, date_echeance, created_at FROM poches_epargne;
+    DROP TABLE poches_epargne;
+    ALTER TABLE poches_epargne_v3 RENAME TO poches_epargne;
+  `);
+
+  db.exec('PRAGMA user_version = 3');
+  console.log('[MIGRATION v3] Done — CASCADE applied to transactions/budgets/poches_epargne.');
+}
+
+// ── Chat messages table (project-scoped, replaces legacy chat_history) ────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    role       TEXT    NOT NULL CHECK(role IN ('user', 'assistant')),
+    content    TEXT    NOT NULL,
+    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_project ON chat_messages(user_id, project_id, created_at);
+`);
 
 // Indexes (after migration)
 db.exec(`
@@ -541,13 +619,25 @@ const stmts = {
     UPDATE paytech_payments SET status = $status WHERE ref_command = $ref_command
   `),
 
-  // Chat history
+  // Chat messages — project-scoped (replaces legacy chat_history)
   insertChatMessage: db.prepare(`
-    INSERT INTO chat_history (user_id, role, content) VALUES ($userId, $role, $content)
+    INSERT INTO chat_messages (user_id, project_id, role, content)
+    VALUES ($userId, $projectId, $role, $content)
   `),
   getChatHistory: db.prepare(`
-    SELECT role, content FROM chat_history
-    WHERE user_id = $userId ORDER BY created_at DESC LIMIT $limit
+    SELECT role, content, created_at FROM chat_messages
+    WHERE user_id = $userId AND project_id = $projectId
+    ORDER BY created_at DESC LIMIT $limit
+  `),
+  // Keep only the most recent 100 messages per (user, project)
+  trimChatMessages: db.prepare(`
+    DELETE FROM chat_messages
+    WHERE user_id = $userId AND project_id = $projectId
+      AND id NOT IN (
+        SELECT id FROM chat_messages
+        WHERE user_id = $userId AND project_id = $projectId
+        ORDER BY created_at DESC LIMIT 100
+      )
   `),
   getDashboard: db.prepare(`
     SELECT
