@@ -364,6 +364,27 @@
       <input type="search" id="contacts-search" class="contacts-search-input" data-i18n-placeholder="contact_search_ph" placeholder="Rechercher par nom, téléphone ou email…">
     </div>
 
+    <!-- Contributions summary + filter -->
+    <div class="contributions-summary" id="contributions-summary" style="display:none">
+      <span class="contributions-stat ok">
+        <strong id="contributions-ok-count">0</strong>
+        <span data-i18n="contributions_up_to_date">à jour</span>
+      </span>
+      <span class="contributions-stat late">
+        <strong id="contributions-late-count">0</strong>
+        <span data-i18n="contributions_late">en retard</span>
+      </span>
+      <span class="contributions-stat total">
+        <span data-i18n="contributions_total_collected">Total collecté</span>
+        <strong id="contributions-total">0</strong>
+      </span>
+    </div>
+    <div class="contributions-filter" id="contributions-filter" style="display:none">
+      <button class="contributions-filter-btn active" data-status-filter="all" type="button" data-i18n="filter_all">Tous</button>
+      <button class="contributions-filter-btn" data-status-filter="ok" type="button" data-i18n="filter_ok">À jour</button>
+      <button class="contributions-filter-btn" data-status-filter="late" type="button" data-i18n="filter_late">En retard</button>
+    </div>
+
     <div id="contacts-list">
       <div class="empty-state">
         <div class="empty-icon"><i data-lucide="users-round" style="width:32px;height:32px"></i></div>
@@ -1112,46 +1133,72 @@
         <i data-lucide="x" style="width:18px;height:18px"></i>
       </button>
     </div>
+    <!-- Tabs: Général / Cotisations -->
+    <div class="settings-tabs">
+      <button class="settings-tab active" data-settings-tab="general" type="button">
+        <i data-lucide="settings" style="width:14px;height:14px"></i>
+        <span data-i18n="settings_tab_general">Général</span>
+      </button>
+      <button class="settings-tab" data-settings-tab="contributions" id="settings-tab-contributions" type="button" style="display:none">
+        <i data-lucide="wallet" style="width:14px;height:14px"></i>
+        <span data-i18n="settings_tab_contributions">Cotisations</span>
+      </button>
+    </div>
+
     <div class="project-settings-body">
-      <!-- Section: Details -->
-      <div class="project-settings-section">
-        <div class="poche-field">
-          <label data-i18n="project_name">Nom du projet</label>
-          <input id="project-edit-name" type="text" maxlength="60">
+      <!-- ── Tab content: GÉNÉRAL ── -->
+      <div class="settings-tab-panel active" id="settings-panel-general">
+        <!-- Section: Details -->
+        <div class="project-settings-section">
+          <div class="poche-field">
+            <label data-i18n="project_name">Nom du projet</label>
+            <input id="project-edit-name" type="text" maxlength="60">
+          </div>
+          <div class="poche-field">
+            <label data-i18n="project_type">Type</label>
+            <div class="project-type-chips" id="project-edit-type-chips">
+              <button class="project-type-chip" data-type="perso" type="button"><i data-lucide="home" style="width:16px;height:16px"></i> <span data-i18n="project_type_perso">Perso</span></button>
+              <button class="project-type-chip" data-type="entreprise" type="button"><i data-lucide="briefcase" style="width:16px;height:16px"></i> <span data-i18n="project_type_entreprise">Entreprise</span></button>
+              <button class="project-type-chip" data-type="asso" type="button"><i data-lucide="heart" style="width:16px;height:16px"></i> <span data-i18n="project_type_asso">Association</span></button>
+              <button class="project-type-chip" data-type="event" type="button"><i data-lucide="calendar" style="width:16px;height:16px"></i> <span data-i18n="project_type_event">Événement</span></button>
+            </div>
+          </div>
+          <button class="btn-save-project" id="btn-save-project" type="button" data-i18n="save">Enregistrer</button>
         </div>
-        <div class="poche-field">
-          <label data-i18n="project_type">Type</label>
-          <div class="project-type-chips" id="project-edit-type-chips">
-            <button class="project-type-chip" data-type="perso" type="button"><i data-lucide="home" style="width:16px;height:16px"></i> <span data-i18n="project_type_perso">Perso</span></button>
-            <button class="project-type-chip" data-type="entreprise" type="button"><i data-lucide="briefcase" style="width:16px;height:16px"></i> <span data-i18n="project_type_entreprise">Entreprise</span></button>
-            <button class="project-type-chip" data-type="asso" type="button"><i data-lucide="heart" style="width:16px;height:16px"></i> <span data-i18n="project_type_asso">Association</span></button>
-            <button class="project-type-chip" data-type="event" type="button"><i data-lucide="calendar" style="width:16px;height:16px"></i> <span data-i18n="project_type_event">Événement</span></button>
+
+        <!-- Section: Members -->
+        <div class="project-settings-section">
+          <div class="project-settings-section-title" data-i18n="project_members">Membres</div>
+          <div class="project-members-list" id="project-members-list"></div>
+        </div>
+
+        <!-- Section: Invite -->
+        <div class="project-settings-section">
+          <div class="project-settings-section-title" data-i18n="invite_member">Inviter un membre</div>
+          <div class="project-invite-row">
+            <input type="email" id="project-invite-email" data-i18n-placeholder="enter_email" placeholder="email@exemple.com">
+            <button class="btn-invite-member" id="btn-invite-member" type="button" data-i18n="invite">Inviter</button>
           </div>
         </div>
-        <button class="btn-save-project" id="btn-save-project" type="button" data-i18n="save">Enregistrer</button>
-      </div>
 
-      <!-- Section: Members -->
-      <div class="project-settings-section">
-        <div class="project-settings-section-title" data-i18n="project_members">Membres</div>
-        <div class="project-members-list" id="project-members-list"></div>
-      </div>
-
-      <!-- Section: Invite -->
-      <div class="project-settings-section">
-        <div class="project-settings-section-title" data-i18n="invite_member">Inviter un membre</div>
-        <div class="project-invite-row">
-          <input type="email" id="project-invite-email" data-i18n-placeholder="enter_email" placeholder="email@exemple.com">
-          <button class="btn-invite-member" id="btn-invite-member" type="button" data-i18n="invite">Inviter</button>
+        <!-- Danger zone: delete (hidden if perso) -->
+        <div class="project-settings-danger" id="project-settings-danger" style="display:none">
+          <button class="btn-delete-project" id="btn-delete-project" type="button">
+            <i data-lucide="trash-2" style="width:16px;height:16px"></i>
+            <span data-i18n="delete_project_short">Supprimer ce projet</span>
+          </button>
         </div>
       </div>
 
-      <!-- Danger zone: delete (hidden if perso) -->
-      <div class="project-settings-danger" id="project-settings-danger" style="display:none">
-        <button class="btn-delete-project" id="btn-delete-project" type="button">
-          <i data-lucide="trash-2" style="width:16px;height:16px"></i>
-          <span data-i18n="delete_project_short">Supprimer ce projet</span>
-        </button>
+      <!-- ── Tab content: COTISATIONS ── -->
+      <div class="settings-tab-panel" id="settings-panel-contributions" style="display:none">
+        <div class="project-settings-section">
+          <div class="project-settings-section-title" data-i18n="contribution_rule_section_title">Règles de cotisation</div>
+          <p class="contribution-rule-hint" data-i18n="contribution_rule_hint">Définis le montant et la fréquence pour chaque catégorie. Les membres seront automatiquement classés "à jour" ou "en retard" selon leurs paiements.</p>
+          <div id="contribution-rules-list">
+            <!-- generated by JS -->
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1224,6 +1271,18 @@
     <div class="poche-modal-body" id="contact-detail-body">
       <!-- populated dynamically -->
     </div>
+
+    <!-- Contributions section (rule + payments history + record button) -->
+    <div class="contact-contribution-section" id="contact-contribution-section" style="display:none">
+      <div class="project-settings-section-title" data-i18n="member_contribution_section">Cotisations</div>
+      <div class="contact-contribution-rule" id="contact-contribution-rule"></div>
+      <div class="contact-payments-list" id="contact-payments-list"></div>
+      <button class="btn-record-payment" id="btn-record-payment" type="button">
+        <i data-lucide="circle-check-big" style="width:16px;height:16px"></i>
+        <span data-i18n="record_payment">Enregistrer un paiement</span>
+      </button>
+    </div>
+
     <div class="contact-detail-actions">
       <button class="btn-back-project" id="contact-detail-edit" type="button">
         <i data-lucide="pencil" style="width:14px;height:14px"></i>
@@ -1233,6 +1292,40 @@
         <i data-lucide="trash-2" style="width:14px;height:14px"></i>
         <span data-i18n="contact_delete">Supprimer</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Payment form modal ──────────────────────────────────────────────── -->
+<div class="poche-modal-overlay" id="payment-form-overlay" style="display:none">
+  <div class="poche-modal payment-form-modal">
+    <div class="poche-modal-header">
+      <div class="poche-modal-title">
+        <i data-lucide="circle-check-big" style="width:18px;height:18px"></i>
+        <span data-i18n="record_payment_title">Enregistrer un paiement</span>
+      </div>
+      <button class="poche-modal-close" id="payment-form-close" type="button" aria-label="Fermer">
+        <i data-lucide="x" style="width:18px;height:18px"></i>
+      </button>
+    </div>
+    <div class="poche-modal-body">
+      <div class="payment-form-target" id="payment-form-target"></div>
+      <div class="poche-field">
+        <label data-i18n="payment_amount">Montant (FCFA)</label>
+        <input id="payment-input-amount" type="number" min="1" inputmode="numeric">
+      </div>
+      <div class="poche-field">
+        <label data-i18n="payment_period">Période</label>
+        <input id="payment-input-period" type="text" data-i18n-placeholder="payment_period_ph" placeholder="2026-04">
+      </div>
+      <div class="poche-field">
+        <label data-i18n="payment_note">Note (optionnel)</label>
+        <textarea id="payment-input-note" rows="2" maxlength="500"></textarea>
+      </div>
+      <div class="contact-form-actions">
+        <button class="btn-back-project" id="payment-form-cancel" type="button" data-i18n="contact_cancel">Annuler</button>
+        <button class="btn-create-project" id="payment-form-confirm" type="button" data-i18n="payment_confirm">Confirmer le paiement</button>
+      </div>
     </div>
   </div>
 </div>

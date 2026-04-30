@@ -55,6 +55,12 @@ const state = {
   contacts: [],
   editingContactId: null,
   contactSearchTimer: null,
+  // ── Contributions (Gestion Pro étape 2) ──
+  contributionRules: [],          // [{id, category, amount, frequency}]
+  allProjectPayments: [],         // payments for current project (used for status calc)
+  contactPayments: [],            // payments shown in detail modal
+  contactsStatusFilter: 'all',    // 'all' | 'ok' | 'late'
+  recordingPaymentForContactId: null,
 };
 
 // ── Contact category options per project type ────────────────────────────────
@@ -678,6 +684,14 @@ async function openProjectSettings(projectId) {
   const danger = document.getElementById('project-settings-danger');
   if (danger) danger.style.display = (project.type === 'perso') ? 'none' : 'block';
 
+  // Show contributions tab only for asso / entreprise
+  const contribTab = document.getElementById('settings-tab-contributions');
+  if (contribTab) {
+    contribTab.style.display = (project.type === 'asso' || project.type === 'entreprise') ? '' : 'none';
+  }
+  // Always start on the General tab when opening settings
+  switchSettingsTab('general');
+
   const overlay = document.getElementById('project-settings-overlay');
   overlay.style.display = 'flex';
   overlay.dataset.projectId = String(projectId);
@@ -883,6 +897,8 @@ async function loadContacts() {
     state.contacts = Array.isArray(list) ? list : [];
     renderContactsList();
     if (fab) fab.style.display = '';
+    // Load contributions dashboard summary in parallel (non-blocking)
+    loadContributionsDashboard();
   } catch (e) {
     showToast(e.message, 'error');
     if (fab) fab.style.display = 'none';
@@ -926,7 +942,7 @@ function renderContactsList() {
       ? `<a class="contact-call-btn" href="tel:${escapeHtml(c.phone)}" onclick="event.stopPropagation()" aria-label="${t('contact_call')}"><i data-lucide="phone" style="width:16px;height:16px"></i></a>`
       : '';
     return `
-      <div class="contact-card" onclick="openContactDetail(${c.id})">
+      <div class="contact-card" data-contact-id="${c.id}" onclick="openContactDetail(${c.id})">
         <div class="contact-avatar">${escapeHtml(initials)}</div>
         <div class="contact-info">
           <div class="contact-name">${escapeHtml(c.full_name)}</div>
@@ -1067,6 +1083,8 @@ async function openContactDetail(id) {
 
     overlay.style.display = 'flex';
     refreshIcons();
+    // Load contribution rule + payment history (only for asso/entreprise)
+    loadContactContributions(id);
   } catch (e) {
     showToast(e.message, 'error');
   }
@@ -1095,6 +1113,305 @@ async function deleteContactFromDetail() {
     showToast(t('contact_deleted'), 'success');
     loadContacts();
   } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONTRIBUTIONS — règles + paiements (Gestion Pro étape 2)
+// ══════════════════════════════════════════════════════════════════════════════
+
+const FREQUENCY_LABELS = {
+  mensuelle:     'freq_mensuelle',
+  trimestrielle: 'freq_trimestrielle',
+  annuelle:      'freq_annuelle',
+  ponctuelle:    'freq_ponctuelle'
+};
+
+// Returns the expected period label for "today" given a frequency.
+// Used to determine if a contact's last payment matches the current period.
+function expectedCurrentPeriod(frequency) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  if (frequency === 'mensuelle')     return `${y}-${String(m).padStart(2, '0')}`;
+  if (frequency === 'trimestrielle') return `${y}-Q${Math.ceil(m / 3)}`;
+  if (frequency === 'annuelle')      return String(y);
+  return null; // ponctuelle: no expected period
+}
+
+// Returns 'ok' | 'late' | 'na' for a given contact, based on their category rule
+// and recorded payments. 'na' = no rule applicable (e.g. ponctuelle or no rule).
+function computeContactStatus(contact, rules, payments) {
+  if (!contact || contact.status === 'inactive') return 'na';
+  const rule = rules.find(r => r.category === contact.category);
+  if (!rule || rule.amount <= 0) return 'na';
+  if (rule.frequency === 'ponctuelle') return 'ok';
+  const expected = expectedCurrentPeriod(rule.frequency);
+  const matched = payments.some(p => p.contact_id === contact.id && p.period === expected);
+  return matched ? 'ok' : 'late';
+}
+
+// ── Settings tabs (Général / Cotisations) ────────────────────────────────────
+function switchSettingsTab(tab) {
+  document.querySelectorAll('.settings-tab').forEach(b => b.classList.toggle('active', b.dataset.settingsTab === tab));
+  const general = document.getElementById('settings-panel-general');
+  const contrib = document.getElementById('settings-panel-contributions');
+  if (general) general.style.display = tab === 'general' ? '' : 'none';
+  if (contrib) contrib.style.display = tab === 'contributions' ? '' : 'none';
+  if (general) general.classList.toggle('active', tab === 'general');
+  if (contrib) contrib.classList.toggle('active', tab === 'contributions');
+  if (tab === 'contributions') loadContributionRulesPanel();
+  refreshIcons();
+}
+
+async function loadContributionRulesPanel() {
+  const overlay = document.getElementById('project-settings-overlay');
+  const projectId = parseInt(overlay?.dataset.projectId);
+  const project = state.projects.find(p => p.id === projectId);
+  if (!project || (project.type !== 'asso' && project.type !== 'entreprise')) return;
+
+  try {
+    const rules = await api(withProject('/api/contribution-rules'));
+    state.contributionRules = Array.isArray(rules) ? rules : [];
+    renderContributionRulesPanel(project.type);
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function renderContributionRulesPanel(projectType) {
+  const list = document.getElementById('contribution-rules-list');
+  const cats = CONTACT_CATEGORIES[projectType] || [];
+  const rules = state.contributionRules || [];
+  list.innerHTML = cats.map(cat => {
+    const rule = rules.find(r => r.category === cat);
+    const amount = rule ? rule.amount : 0;
+    const freq = rule ? rule.frequency : 'mensuelle';
+    const safeId = cat.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    return `
+      <div class="contribution-rule-row" data-category="${escapeHtml(cat)}">
+        <div class="contribution-rule-cat">${escapeHtml(cat)}</div>
+        <div class="contribution-rule-fields">
+          <input class="contribution-rule-amount" id="rule-amount-${safeId}" type="number" min="0" inputmode="numeric" value="${amount}" placeholder="0">
+          <select class="contribution-rule-freq" id="rule-freq-${safeId}">
+            <option value="mensuelle"     ${freq==='mensuelle'?'selected':''}>${t('freq_mensuelle')}</option>
+            <option value="trimestrielle" ${freq==='trimestrielle'?'selected':''}>${t('freq_trimestrielle')}</option>
+            <option value="annuelle"      ${freq==='annuelle'?'selected':''}>${t('freq_annuelle')}</option>
+            <option value="ponctuelle"    ${freq==='ponctuelle'?'selected':''}>${t('freq_ponctuelle')}</option>
+          </select>
+        </div>
+        <button class="btn-rule-save" data-cat="${escapeHtml(cat)}" type="button" data-i18n="contribution_rule_save">Enregistrer</button>
+      </div>
+    `;
+  }).join('');
+  // Wire save buttons
+  list.querySelectorAll('.btn-rule-save').forEach(btn => {
+    btn.addEventListener('click', () => saveContributionRule(btn.dataset.cat));
+  });
+}
+
+async function saveContributionRule(category) {
+  const safeId = category.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const amount = parseInt(document.getElementById(`rule-amount-${safeId}`).value) || 0;
+  const frequency = document.getElementById(`rule-freq-${safeId}`).value;
+  try {
+    const rule = await api(withProject('/api/contribution-rules'), {
+      method: 'POST',
+      body: JSON.stringify({ category, amount, frequency })
+    });
+    // Update local state
+    const idx = state.contributionRules.findIndex(r => r.category === category);
+    if (idx >= 0) state.contributionRules[idx] = rule;
+    else state.contributionRules.push(rule);
+    showToast(t('contribution_rule_saved'), 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+// ── Contributions dashboard summary on Members/Clients tab ───────────────────
+async function loadContributionsDashboard() {
+  const cur = currentProject();
+  const summary = document.getElementById('contributions-summary');
+  const filter = document.getElementById('contributions-filter');
+  if (!cur || (cur.type !== 'asso' && cur.type !== 'entreprise')) {
+    if (summary) summary.style.display = 'none';
+    if (filter) filter.style.display = 'none';
+    return;
+  }
+  try {
+    const [rules, payments] = await Promise.all([
+      api(withProject('/api/contribution-rules')),
+      api(withProject('/api/payments'))
+    ]);
+    state.contributionRules = Array.isArray(rules) ? rules : [];
+    state.allProjectPayments = Array.isArray(payments) ? payments : [];
+
+    let okCount = 0, lateCount = 0, totalCollected = 0;
+    state.contacts.forEach(c => {
+      const s = computeContactStatus(c, state.contributionRules, state.allProjectPayments);
+      if (s === 'ok')   okCount++;
+      if (s === 'late') lateCount++;
+    });
+    state.allProjectPayments.forEach(p => { totalCollected += p.amount || 0; });
+
+    document.getElementById('contributions-ok-count').textContent   = okCount;
+    document.getElementById('contributions-late-count').textContent = lateCount;
+    document.getElementById('contributions-total').textContent      = formatMoney(totalCollected);
+    if (summary) summary.style.display = '';
+    if (filter)  filter.style.display  = '';
+
+    applyContactsStatusFilter();
+  } catch (e) {
+    console.warn('[contributions] failed to load dashboard:', e.message);
+    if (summary) summary.style.display = 'none';
+    if (filter) filter.style.display = 'none';
+  }
+}
+
+function applyContactsStatusFilter() {
+  const filter = state.contactsStatusFilter;
+  const cards = document.querySelectorAll('#contacts-list .contact-card');
+  cards.forEach(card => {
+    const id = parseInt(card.dataset.contactId);
+    const c = state.contacts.find(x => x.id === id);
+    if (!c) return;
+    const status = computeContactStatus(c, state.contributionRules, state.allProjectPayments);
+    let visible = true;
+    if (filter === 'ok')   visible = status === 'ok';
+    if (filter === 'late') visible = status === 'late';
+    card.style.display = visible ? '' : 'none';
+  });
+}
+
+// ── Contact detail enrichment: rule + payments history + record button ──────
+async function loadContactContributions(contactId) {
+  const section = document.getElementById('contact-contribution-section');
+  const cur = currentProject();
+  if (!section || !cur || (cur.type !== 'asso' && cur.type !== 'entreprise')) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  const ruleEl = document.getElementById('contact-contribution-rule');
+  const listEl = document.getElementById('contact-payments-list');
+  ruleEl.innerHTML = `<span class="muted">${t('loading')}</span>`;
+  listEl.innerHTML = '';
+
+  try {
+    const [rules, payments] = await Promise.all([
+      api(withProject('/api/contribution-rules')),
+      api(withProject(`/api/payments?contact_id=${contactId}`))
+    ]);
+    state.contributionRules = Array.isArray(rules) ? rules : [];
+    state.contactPayments = Array.isArray(payments) ? payments : [];
+
+    const contact = state.contacts.find(c => c.id === contactId);
+    const rule = contact?.category ? rules.find(r => r.category === contact.category) : null;
+
+    if (rule && rule.amount > 0) {
+      const freqLabel = t('contribution_rule_per_' + rule.frequency);
+      ruleEl.innerHTML = `
+        <span class="contact-contribution-rule-cat">${escapeHtml(rule.category)}</span>
+        <span class="contact-contribution-rule-amount">${formatMoney(rule.amount)} <span class="muted">${freqLabel}</span></span>
+      `;
+    } else {
+      ruleEl.innerHTML = `<span class="muted">${t('member_no_rule')}</span>`;
+    }
+
+    if (!payments.length) {
+      listEl.innerHTML = `<div class="contact-payments-empty">${t('member_no_payments')}</div>`;
+    } else {
+      listEl.innerHTML = payments.map(p => `
+        <div class="contact-payment-item">
+          <div class="contact-payment-info">
+            <div class="contact-payment-period">${escapeHtml(p.period || '—')}</div>
+            <div class="contact-payment-meta">
+              ${formatDate(p.paid_at)} ${p.note ? '· ' + escapeHtml(p.note) : ''}
+            </div>
+          </div>
+          <div class="contact-payment-amount">${formatMoney(p.amount)}</div>
+          <button class="contact-payment-delete" data-id="${p.id}" aria-label="Supprimer ce paiement">
+            <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+          </button>
+        </div>
+      `).join('');
+      listEl.querySelectorAll('.contact-payment-delete').forEach(btn => {
+        btn.addEventListener('click', () => deletePayment(parseInt(btn.dataset.id), contactId));
+      });
+    }
+    refreshIcons();
+  } catch (e) {
+    ruleEl.innerHTML = `<span class="muted">${escapeHtml(e.message)}</span>`;
+  }
+}
+
+function openPaymentForm(contactId) {
+  const contact = state.contacts.find(c => c.id === contactId);
+  if (!contact) return;
+  state.recordingPaymentForContactId = contactId;
+  const rule = contact.category ? state.contributionRules.find(r => r.category === contact.category) : null;
+  const amount = rule?.amount || 0;
+  const freq = rule?.frequency || 'mensuelle';
+  const period = expectedCurrentPeriod(freq) || '';
+
+  document.getElementById('payment-form-target').innerHTML = `
+    <div class="payment-form-target-name">${escapeHtml(contact.full_name)}</div>
+    ${contact.category ? `<div class="payment-form-target-cat muted">${escapeHtml(contact.category)}</div>` : ''}
+  `;
+  document.getElementById('payment-input-amount').value = amount > 0 ? amount : '';
+  document.getElementById('payment-input-period').value = period;
+  document.getElementById('payment-input-note').value = '';
+  document.getElementById('payment-form-overlay').style.display = 'flex';
+  refreshIcons();
+  setTimeout(() => document.getElementById('payment-input-amount').focus(), 100);
+}
+
+function closePaymentForm() {
+  document.getElementById('payment-form-overlay').style.display = 'none';
+  state.recordingPaymentForContactId = null;
+}
+
+async function submitPayment() {
+  const contactId = state.recordingPaymentForContactId;
+  if (!contactId) return;
+  const amount = parseInt(document.getElementById('payment-input-amount').value);
+  const period = document.getElementById('payment-input-period').value.trim() || null;
+  const note   = document.getElementById('payment-input-note').value.trim() || null;
+  if (!amount || amount <= 0) { showToast(t('payment_amount_required'), 'error'); return; }
+
+  const btn = document.getElementById('payment-form-confirm');
+  btn.disabled = true;
+  try {
+    await api(withProject('/api/payments'), {
+      method: 'POST',
+      body: JSON.stringify({ contact_id: contactId, amount, period, note })
+    });
+    showToast(t('payment_recorded'), 'success');
+    closePaymentForm();
+    // Refresh contact detail + dashboard
+    await loadContactContributions(contactId);
+    if (state.currentTab === 'contacts') loadContributionsDashboard();
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deletePayment(paymentId, contactId) {
+  if (!confirm(t('confirm_delete_payment'))) return;
+  try {
+    await api(withProject(`/api/payments/${paymentId}`), { method: 'DELETE' });
+    showToast(t('payment_deleted'), 'success');
+    await loadContactContributions(contactId);
+    if (state.currentTab === 'contacts') loadContributionsDashboard();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleDateString(getLocale(), { day: '2-digit', month: 'short', year: 'numeric' }); }
+  catch { return iso; }
 }
 
 // ── Dashboard ──────────────────────────────────────────────────────────────────
@@ -2605,6 +2922,29 @@ async function init() {
   document.getElementById('contacts-search')?.addEventListener('input', () => {
     clearTimeout(state.contactSearchTimer);
     state.contactSearchTimer = setTimeout(loadContacts, 300);
+  });
+
+  // ── Contributions wiring (Gestion Pro étape 2) ──
+  document.querySelectorAll('.settings-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchSettingsTab(btn.dataset.settingsTab));
+  });
+  document.getElementById('btn-record-payment')?.addEventListener('click', () => {
+    const id = parseInt(document.getElementById('contact-detail-overlay').dataset.contactId);
+    if (id) openPaymentForm(id);
+  });
+  document.getElementById('payment-form-close')?.addEventListener('click', closePaymentForm);
+  document.getElementById('payment-form-cancel')?.addEventListener('click', closePaymentForm);
+  document.getElementById('payment-form-confirm')?.addEventListener('click', submitPayment);
+  document.getElementById('payment-form-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'payment-form-overlay') closePaymentForm();
+  });
+  document.querySelectorAll('.contributions-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.contributions-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.contactsStatusFilter = btn.dataset.statusFilter;
+      applyContactsStatusFilter();
+    });
   });
 
   // Wire up project bar + sheet

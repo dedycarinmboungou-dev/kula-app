@@ -1681,6 +1681,173 @@ app.delete('/api/contacts/:id', requireAuth, requireProjectAccess, (req, res) =>
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CONTRIBUTIONS — règles de cotisation par catégorie + paiements
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const VALID_FREQUENCIES = ['mensuelle', 'trimestrielle', 'annuelle', 'ponctuelle'];
+
+// GET /api/contribution-rules?project_id=X → list
+app.get('/api/contribution-rules', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const project = stmts.getProjectById.get({ id: req.projectId });
+    const check = validateContactProject(project);
+    if (!check.ok) return res.status(check.status).json({ error: check.error });
+    res.json(stmts.getContributionRules.all({ projectId: req.projectId }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/contribution-rules → upsert
+app.post('/api/contribution-rules', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const project = stmts.getProjectById.get({ id: req.projectId });
+    const check = validateContactProject(project);
+    if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+    const { category, amount, frequency } = req.body;
+    if (!category || !CONTACT_CATEGORIES[project.type].includes(category))
+      return res.status(400).json({ error: `Catégorie invalide pour ce type de projet` });
+    const amt = Math.max(0, parseInt(amount) || 0);
+    const freq = VALID_FREQUENCIES.includes(frequency) ? frequency : 'mensuelle';
+
+    stmts.insertContributionRule.run({ projectId: req.projectId, category, amount: amt, frequency: freq });
+    const rule = stmts.getRuleByCategory.get({ projectId: req.projectId, category });
+    res.status(201).json(rule);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/contribution-rules/:id → delete
+app.delete('/api/contribution-rules/:id', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const r = stmts.deleteContributionRule.run({ id, projectId: req.projectId });
+    if (!r.changes) return res.status(404).json({ error: 'Règle introuvable' });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/payments?project_id=X&contact_id=Y&period=Z → filtered list
+app.get('/api/payments', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const project = stmts.getProjectById.get({ id: req.projectId });
+    const check = validateContactProject(project);
+    if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+    const contactId = req.query.contact_id ? parseInt(req.query.contact_id) || null : null;
+    const period    = req.query.period ? String(req.query.period).trim() || null : null;
+    res.json(stmts.getPaymentsByProject.all({ projectId: req.projectId, contactId, period }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Sanitize — same logic as PDF (strip emoji, normalize Latin-1)
+function sanitizeForTx(s) {
+  return String(s || '')
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')
+    .replace(/[\u{1F100}-\u{1F1FF}]/gu, '')
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+// Portable transaction wrapper (works for both better-sqlite3 and node:sqlite)
+function runInTransaction(fn) {
+  if (typeof db.transaction === 'function') {
+    return db.transaction(fn)();
+  }
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch { /* nested */ }
+    throw err;
+  }
+}
+
+// POST /api/payments → create (atomic: payment + transaction)
+app.post('/api/payments', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const project = stmts.getProjectById.get({ id: req.projectId });
+    const check = validateContactProject(project);
+    if (!check.ok) return res.status(check.status).json({ error: check.error });
+
+    const { contact_id, amount, period, note } = req.body;
+    const contactId = parseInt(contact_id);
+    if (!contactId) return res.status(400).json({ error: 'contact_id requis' });
+    const contact = stmts.getContactById.get({ id: contactId, projectId: req.projectId });
+    if (!contact) return res.status(404).json({ error: 'Contact introuvable dans ce projet' });
+
+    const amt = parseInt(amount);
+    if (!amt || amt <= 0) return res.status(400).json({ error: 'Montant positif requis' });
+    const periodVal = period ? String(period).trim().slice(0, 32) || null : null;
+    const noteVal   = note   ? String(note).trim().slice(0, 500) || null : null;
+
+    // Auto-create "Cotisation" category for this user if missing
+    stmts.insertCategory.run({
+      userId: req.userId, nom: 'Cotisation',
+      icone: '💰', couleur: '#0A5C3A', type: 'income'
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const description = sanitizeForTx(`Cotisation — ${contact.full_name}`);
+
+    // Atomic: insert transaction + payment in one DB transaction
+    const result = runInTransaction(() => {
+      const txResult = stmts.insertTransaction.run({
+        userId:       req.userId,
+        projectId:    req.projectId,
+        type:         'income',
+        amount:       amt,
+        category:     'Cotisation',
+        description,
+        date:         today,
+        justificatif: null
+      });
+      const transactionId = txResult.lastInsertRowid;
+      const payResult = stmts.insertPayment.run({
+        projectId:     req.projectId,
+        contactId,
+        amount:        amt,
+        period:        periodVal,
+        note:          noteVal,
+        transactionId
+      });
+      return { paymentId: payResult.lastInsertRowid, transactionId };
+    });
+
+    const payment     = stmts.getPaymentById.get({ id: result.paymentId, projectId: req.projectId });
+    const transaction = stmts.getTransactionById.get({ id: result.transactionId, userId: req.userId });
+    console.log(`[PAYMENT] Created id=${payment.id} contact=${contactId} amount=${amt} → tx=${result.transactionId}`);
+    res.status(201).json({ payment, transaction });
+  } catch (e) {
+    console.error('[PAYMENT] insert failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/payments/:id → delete payment AND its linked transaction
+app.delete('/api/payments/:id', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const payment = stmts.getPaymentById.get({ id, projectId: req.projectId });
+    if (!payment) return res.status(404).json({ error: 'Paiement introuvable' });
+
+    runInTransaction(() => {
+      if (payment.transaction_id) {
+        stmts.deleteTransaction.run({ id: payment.transaction_id, userId: req.userId });
+      }
+      stmts.deletePayment.run({ id, projectId: req.projectId });
+    });
+
+    console.log(`[PAYMENT] Deleted id=${id} (tx=${payment.transaction_id || 'none'})`);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[PAYMENT] delete failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // KOLA COACH
 // ═══════════════════════════════════════════════════════════════════════════════
 

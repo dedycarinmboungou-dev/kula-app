@@ -187,6 +187,36 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_contacts_project ON contacts(project_id);
 `);
 
+// ── Contribution rules (Gestion Pro étape 2: règles de cotisation par catégorie)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS contribution_rules (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    category   TEXT    NOT NULL,
+    amount     INTEGER NOT NULL DEFAULT 0,
+    frequency  TEXT    NOT NULL DEFAULT 'mensuelle'
+               CHECK(frequency IN ('mensuelle','trimestrielle','annuelle','ponctuelle')),
+    created_at TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(project_id, category)
+  );
+`);
+
+// ── Payments (Gestion Pro étape 2: historique des paiements de cotisations) ───
+db.exec(`
+  CREATE TABLE IF NOT EXISTS payments (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id     INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    contact_id     INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+    amount         INTEGER NOT NULL,
+    period         TEXT,
+    note           TEXT,
+    paid_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_payments_contact ON payments(contact_id);
+  CREATE INDEX IF NOT EXISTS idx_payments_project ON payments(project_id, paid_at);
+`);
+
 // Migration: add photo + freemium columns to users if missing
 const userCols = db.prepare('PRAGMA table_info(users)').all();
 const userColNames = userCols.map(c => c.name);
@@ -768,6 +798,54 @@ const stmts = {
   `),
   countContactsByProject: db.prepare(`
     SELECT COUNT(*) AS cnt FROM contacts WHERE project_id = $projectId
+  `),
+
+  // ── Contribution rules ─────────────────────────────────────────────────────
+  insertContributionRule: db.prepare(`
+    INSERT INTO contribution_rules (project_id, category, amount, frequency)
+    VALUES ($projectId, $category, $amount, $frequency)
+    ON CONFLICT(project_id, category) DO UPDATE SET
+      amount    = excluded.amount,
+      frequency = excluded.frequency
+  `),
+  getContributionRules: db.prepare(`
+    SELECT * FROM contribution_rules
+    WHERE project_id = $projectId
+    ORDER BY category ASC
+  `),
+  getRuleByCategory: db.prepare(`
+    SELECT * FROM contribution_rules
+    WHERE project_id = $projectId AND category = $category
+    LIMIT 1
+  `),
+  deleteContributionRule: db.prepare(`
+    DELETE FROM contribution_rules WHERE id = $id AND project_id = $projectId
+  `),
+
+  // ── Payments ───────────────────────────────────────────────────────────────
+  insertPayment: db.prepare(`
+    INSERT INTO payments (project_id, contact_id, amount, period, note, transaction_id)
+    VALUES ($projectId, $contactId, $amount, $period, $note, $transactionId)
+  `),
+  getPaymentById: db.prepare(`
+    SELECT * FROM payments WHERE id = $id AND project_id = $projectId
+  `),
+  getPaymentsByContact: db.prepare(`
+    SELECT * FROM payments
+    WHERE contact_id = $contactId AND project_id = $projectId
+    ORDER BY paid_at DESC
+  `),
+  getPaymentsByProject: db.prepare(`
+    SELECT p.*, c.full_name AS contact_name, c.category AS contact_category
+    FROM payments p
+    JOIN contacts c ON c.id = p.contact_id
+    WHERE p.project_id = $projectId
+      AND ($contactId IS NULL OR p.contact_id = $contactId)
+      AND ($period IS NULL OR p.period = $period)
+    ORDER BY p.paid_at DESC
+  `),
+  deletePayment: db.prepare(`
+    DELETE FROM payments WHERE id = $id AND project_id = $projectId
   `),
 
   // ── Project migration helpers ──────────────────────────────────────────────
