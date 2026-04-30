@@ -2072,8 +2072,9 @@ ${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.languag
     let goalReachedPoche = null; // set when add_to_poche reaches the goal
 
     // ── Agentic loop (handles tool_use rounds) ────────────────────────────────
+    // Strip created_at and any other fields — Anthropic API only accepts {role, content}
     const messages = [
-      ...dbHistory,
+      ...dbHistory.map(m => ({ role: m.role, content: m.content })),
       { role: 'user', content: message.trim() }
     ];
 
