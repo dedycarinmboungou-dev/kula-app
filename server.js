@@ -1429,8 +1429,34 @@ app.put('/api/projects/:id', requireAuth, (req, res) => {
     if (project.owner_id !== req.userId) return res.status(403).json({ error: 'Seul le propriétaire peut modifier' });
     const name = req.body.name?.trim() || project.name;
     const type = ['perso', 'entreprise', 'asso', 'event'].includes(req.body.type) ? req.body.type : project.type;
-    stmts.updateProject.run({ id, ownerId: req.userId, name, type });
+
+    // Org info (Gestion Pro étape 3) — merge: undefined = keep, null/'' = clear
+    const has = (k) => Object.prototype.hasOwnProperty.call(req.body, k);
+    let orgEmail      = has('org_email')        ? (String(req.body.org_email || '').trim() || null) : project.org_email;
+    let orgPhone      = has('org_phone')        ? (String(req.body.org_phone || '').trim() || null) : project.org_phone;
+    let orgLogoBase64 = has('org_logo_base64')  ? (req.body.org_logo_base64 || null)                : project.org_logo_base64;
+
+    if (orgEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orgEmail))
+      return res.status(400).json({ error: 'Email de structure invalide' });
+    if (orgPhone && orgPhone.length > 40)
+      return res.status(400).json({ error: 'Téléphone trop long' });
+    if (orgLogoBase64 && typeof orgLogoBase64 === 'string' && orgLogoBase64.length > 500 * 1024)
+      return res.status(400).json({ error: 'Logo trop volumineux (max 500 Ko)' });
+
+    stmts.updateProject.run({ id, ownerId: req.userId, name, type, orgEmail, orgPhone, orgLogoBase64 });
     res.json(stmts.getProjectById.get({ id }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/projects/:id → full project (incl. org_logo_base64) for owner / member
+app.get('/api/projects/:id', requireAuth, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const access = stmts.checkProjectAccess.get({ projectId: id, userId: req.userId, email: req.user.email });
+    if (!access) return res.status(403).json({ error: 'Accès refusé' });
+    const project = stmts.getProjectById.get({ id });
+    if (!project) return res.status(404).json({ error: 'Projet non trouvé' });
+    res.json(project);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1844,6 +1870,175 @@ app.delete('/api/payments/:id', requireAuth, requireProjectAccess, (req, res) =>
   } catch (e) {
     console.error('[PAYMENT] delete failed:', e.message);
     res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/payments/:id/receipt → A4 PDF receipt
+app.get('/api/payments/:id/receipt', requireAuth, requireProjectAccess, (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const payment = stmts.getPaymentById.get({ id, projectId: req.projectId });
+    if (!payment) return res.status(404).json({ error: 'Paiement introuvable' });
+
+    const project = stmts.getProjectById.get({ id: req.projectId });
+    const contact = stmts.getContactById.get({ id: payment.contact_id, projectId: req.projectId });
+    if (!project || !contact) return res.status(404).json({ error: 'Données associées introuvables' });
+
+    const rule = contact.category
+      ? stmts.getRuleByCategory.get({ projectId: req.projectId, category: contact.category })
+      : null;
+
+    // Helpers
+    const fmt = n => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const formatFrenchDate = (iso) => {
+      try {
+        return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      } catch { return String(iso || ''); }
+    };
+    const sanitize = (s) => String(s || '')
+      .replace(/[\u{1F000}-\u{1FFFF}]/gu, '').replace(/[\u{2600}-\u{27BF}]/gu, '').replace(/[\u{1F100}-\u{1F1FF}]/gu, '')
+      .replace(/[‘’‚‛]/g, "'").replace(/[“”„‟]/g, '"').replace(/[–—]/g, '-').replace(/…/g, '...')
+      .replace(/ /g, ' ').normalize('NFKD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^\x00-\xFF]/g, '').replace(/\s+/g, ' ').trim();
+
+    const FREQ_LABEL = { mensuelle: 'Mensuelle', trimestrielle: 'Trimestrielle', annuelle: 'Annuelle', ponctuelle: 'Ponctuelle' };
+    const TYPE_LABEL = { perso: 'Personnel', entreprise: 'Entreprise', asso: 'Association', event: 'Evenement' };
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ size: 'A4', margin: 0 });
+    const chunks = [];
+    doc.on('data', c => chunks.push(c));
+    doc.on('end', () => {
+      const buf = Buffer.concat(chunks);
+      const slug = sanitize(contact.full_name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'membre';
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="recu-${slug}-${id}.pdf"`);
+      res.setHeader('Content-Length', buf.length);
+      res.send(buf);
+    });
+
+    // Tokens
+    const PRIMARY        = '#0A5C3A';
+    const PRIMARY_LIGHT  = '#E8F5EF';
+    const TEXT           = '#0D1117';
+    const TEXT_2         = '#6B7280';
+    const BORDER         = '#E8EAED';
+    const SURFACE_2      = '#F7F8FA';
+    const PAGE_W         = 595.28;
+    const PAGE_H         = 841.89;
+    const M              = 48;
+    const CW             = PAGE_W - M * 2;
+
+    // ── HEADER LEFT: logo + org info ─────────────────────────────────────
+    let textX = M;
+    if (project.org_logo_base64) {
+      try {
+        const raw = String(project.org_logo_base64).replace(/^data:image\/[a-z+]+;base64,/i, '');
+        const buf = Buffer.from(raw, 'base64');
+        doc.image(buf, M, M, { fit: [70, 70] });
+        textX = M + 84;
+      } catch (e) {
+        console.warn('[receipt] invalid logo, skipping:', e.message);
+      }
+    }
+
+    doc.fontSize(16).fillColor(PRIMARY).font('Helvetica-Bold')
+       .text(sanitize(project.name), textX, M, { width: CW * 0.55 });
+    doc.fontSize(10).fillColor(TEXT_2).font('Helvetica')
+       .text(TYPE_LABEL[project.type] || project.type, textX, M + 22);
+    let infoY = M + 38;
+    if (project.org_email) {
+      doc.fontSize(9).fillColor(TEXT_2).font('Helvetica').text(sanitize(project.org_email), textX, infoY);
+      infoY += 12;
+    }
+    if (project.org_phone) {
+      doc.fontSize(9).fillColor(TEXT_2).font('Helvetica').text(sanitize(project.org_phone), textX, infoY);
+    }
+
+    // ── HEADER RIGHT: receipt label + number + date ──────────────────────
+    doc.fontSize(11).fillColor(PRIMARY).font('Helvetica-Bold')
+       .text('REÇU DE PAIEMENT', 0, M, { align: 'right', width: PAGE_W - M, characterSpacing: 0.5 });
+    const year = new Date(payment.paid_at).getFullYear();
+    const receiptNo = `REC-${payment.id}-${year}`;
+    doc.fontSize(10).fillColor(TEXT_2).font('Helvetica')
+       .text(receiptNo, 0, M + 18, { align: 'right', width: PAGE_W - M });
+    doc.fontSize(9).fillColor(TEXT_2).font('Helvetica')
+       .text(`Emis le ${formatFrenchDate(new Date())}`, 0, M + 32, { align: 'right', width: PAGE_W - M });
+
+    // ── SEPARATOR ─────────────────────────────────────────────────────────
+    let y = M + 100;
+    doc.moveTo(M, y).lineTo(PAGE_W - M, y).strokeColor(BORDER).lineWidth(1).stroke();
+    y += 28;
+
+    // ── "REÇU DE" BLOCK ──────────────────────────────────────────────────
+    doc.fontSize(9).fillColor(TEXT_2).font('Helvetica')
+       .text('REÇU DE', M, y, { characterSpacing: 0.4 });
+    y += 14;
+    doc.fontSize(13).fillColor(TEXT).font('Helvetica-Bold')
+       .text(sanitize(contact.full_name), M, y, { width: CW });
+    y += 18;
+    doc.fontSize(10).fillColor(TEXT_2).font('Helvetica')
+       .text(sanitize(contact.category || '—'), M, y);
+    y += 14;
+    if (contact.email) {
+      doc.fontSize(9).fillColor(TEXT_2).font('Helvetica').text(sanitize(contact.email), M, y);
+      y += 12;
+    }
+    if (contact.phone) {
+      doc.fontSize(9).fillColor(TEXT_2).font('Helvetica').text(sanitize(contact.phone), M, y);
+      y += 12;
+    }
+    y += 16;
+
+    // ── DETAIL BLOCK (table 2 columns) ───────────────────────────────────
+    doc.fontSize(9).fillColor(TEXT_2).font('Helvetica')
+       .text('DETAIL DU PAIEMENT', M, y, { characterSpacing: 0.4 });
+    y += 16;
+
+    const rows = [
+      ['Objet',           payment.note || `Cotisation - ${payment.period || 'paiement'}`],
+      ['Frequence',       rule ? FREQ_LABEL[rule.frequency] || rule.frequency : '-'],
+      ['Periode',         payment.period || '-'],
+      ['Date de paiement', formatFrenchDate(payment.paid_at)]
+    ];
+    const ROW_H = 28;
+    rows.forEach(([label, value], i) => {
+      if (i % 2 === 0) doc.rect(M, y, CW, ROW_H).fill(SURFACE_2);
+      doc.fontSize(10).fillColor(TEXT_2).font('Helvetica').text(label, M + 14, y + 9);
+      doc.fontSize(11).fillColor(TEXT).font('Helvetica-Bold')
+         .text(sanitize(String(value)), 0, y + 8, { align: 'right', width: PAGE_W - M - 14 });
+      y += ROW_H;
+    });
+    y += 24;
+
+    // ── AMOUNT BLOCK ──────────────────────────────────────────────────────
+    const amtBoxH = 100;
+    doc.roundedRect(M, y, CW, amtBoxH, 12).lineWidth(1.5).fillAndStroke(PRIMARY_LIGHT, PRIMARY);
+    doc.fontSize(9).fillColor(TEXT_2).font('Helvetica-Bold')
+       .text('MONTANT REÇU', M, y + 18, { align: 'center', width: CW, characterSpacing: 0.6 });
+    doc.fontSize(28).fillColor(PRIMARY).font('Helvetica-Bold')
+       .text(fmt(payment.amount), M, y + 38, { align: 'center', width: CW });
+    doc.fontSize(14).fillColor(PRIMARY).font('Helvetica')
+       .text('FCFA', M, y + 76, { align: 'center', width: CW });
+    y += amtBoxH + 24;
+
+    // ── FOOTER (signature + branding) ────────────────────────────────────
+    const sigY = PAGE_H - 90;
+    doc.dash(2, { space: 2 })
+       .moveTo(PAGE_W - M - 200, sigY).lineTo(PAGE_W - M, sigY)
+       .strokeColor(TEXT_2).lineWidth(0.8).stroke()
+       .undash();
+    doc.fontSize(8).fillColor(TEXT_2).font('Helvetica')
+       .text('Signature et cachet', PAGE_W - M - 200, sigY + 6, { align: 'center', width: 200 });
+
+    doc.fontSize(8).fillColor(TEXT_2).font('Helvetica')
+       .text('Ce reçu a été généré par Kula · kula-app-f10h.onrender.com',
+             M, PAGE_H - 30, { align: 'center', width: CW });
+
+    doc.end();
+  } catch (err) {
+    console.error('[receipt] error:', err.message, err.stack);
+    if (!res.headersSent) res.status(500).json({ error: 'Erreur génération du reçu' });
   }
 });
 

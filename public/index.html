@@ -1166,6 +1166,39 @@
           <button class="btn-save-project" id="btn-save-project" type="button" data-i18n="save">Enregistrer</button>
         </div>
 
+        <!-- Section: Org info (asso/entreprise only) -->
+        <div class="project-settings-section" id="org-info-section" style="display:none">
+          <div class="project-settings-section-title" data-i18n="org_info_section">Informations de la structure</div>
+          <div class="poche-field">
+            <label data-i18n="org_email">Email de la structure</label>
+            <input id="org-email-input" type="email" autocomplete="off">
+          </div>
+          <div class="poche-field">
+            <label data-i18n="org_phone">Téléphone de la structure</label>
+            <input id="org-phone-input" type="tel" maxlength="40">
+          </div>
+          <div class="poche-field">
+            <label data-i18n="org_logo">Logo</label>
+            <div class="org-logo-row">
+              <div class="org-logo-preview" id="org-logo-preview">
+                <i data-lucide="image" style="width:24px;height:24px"></i>
+              </div>
+              <div class="org-logo-actions">
+                <input type="file" id="org-logo-input" accept="image/*" style="display:none">
+                <button class="btn-back-project" type="button" id="org-logo-pick">
+                  <i data-lucide="upload" style="width:14px;height:14px"></i>
+                  <span data-i18n="org_logo_pick">Choisir un fichier</span>
+                </button>
+                <button class="btn-back-project org-logo-remove" type="button" id="org-logo-remove" style="display:none" aria-label="Retirer le logo">
+                  <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+                </button>
+              </div>
+            </div>
+            <small class="poche-field-hint" data-i18n="org_logo_hint">Format recommandé : carré, PNG ou JPG, max 500KB</small>
+          </div>
+          <button class="btn-save-project" id="btn-save-org-info" type="button" data-i18n="org_info_save">Enregistrer les informations</button>
+        </div>
+
         <!-- Section: Members -->
         <div class="project-settings-section">
           <div class="project-settings-section-title" data-i18n="project_members">Membres</div>

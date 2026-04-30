@@ -61,6 +61,9 @@ const state = {
   contactPayments: [],            // payments shown in detail modal
   contactsStatusFilter: 'all',    // 'all' | 'ok' | 'late'
   recordingPaymentForContactId: null,
+  // ── Org info upload state (Gestion Pro étape 3) ──
+  orgLogoPendingBase64: null,
+  orgLogoExisting: null,  // tracks if a logo is currently saved on the project
 };
 
 // ── Contact category options per project type ────────────────────────────────
@@ -689,6 +692,11 @@ async function openProjectSettings(projectId) {
   if (contribTab) {
     contribTab.style.display = (project.type === 'asso' || project.type === 'entreprise') ? '' : 'none';
   }
+  // Org info section: only asso / entreprise
+  const orgSection = document.getElementById('org-info-section');
+  if (orgSection) {
+    orgSection.style.display = (project.type === 'asso' || project.type === 'entreprise') ? '' : 'none';
+  }
   // Always start on the General tab when opening settings
   switchSettingsTab('general');
 
@@ -697,6 +705,127 @@ async function openProjectSettings(projectId) {
   overlay.dataset.projectId = String(projectId);
   document.getElementById('project-invite-email').value = '';
   await loadProjectMembers(projectId);
+  // Fetch full project (incl. org_logo_base64) and pre-fill org info
+  if (project.type === 'asso' || project.type === 'entreprise') {
+    loadOrgInfo(projectId);
+  }
+}
+
+// ── Org info (Gestion Pro étape 3) ───────────────────────────────────────────
+async function loadOrgInfo(projectId) {
+  try {
+    const full = await api(`/api/projects/${projectId}`);
+    document.getElementById('org-email-input').value = full.org_email || '';
+    document.getElementById('org-phone-input').value = full.org_phone || '';
+    state.orgLogoPendingBase64 = null;
+    state.orgLogoExisting      = full.org_logo_base64 || null;
+    renderOrgLogoPreview(full.org_logo_base64 || null);
+  } catch (e) {
+    console.warn('[org-info] load failed:', e.message);
+  }
+}
+
+function renderOrgLogoPreview(base64) {
+  const preview = document.getElementById('org-logo-preview');
+  const removeBtn = document.getElementById('org-logo-remove');
+  if (!preview) return;
+  if (base64) {
+    const src = base64.startsWith('data:') ? base64 : `data:image/png;base64,${base64}`;
+    preview.innerHTML = `<img src="${src}" alt="logo">`;
+    if (removeBtn) removeBtn.style.display = '';
+  } else {
+    preview.innerHTML = '<i data-lucide="image" style="width:24px;height:24px"></i>';
+    if (removeBtn) removeBtn.style.display = 'none';
+    refreshIcons();
+  }
+}
+
+function pickOrgLogo() {
+  const fileInput = document.getElementById('org-logo-input');
+  const file = fileInput?.files?.[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type)) {
+    showToast(t('org_logo_invalid_type'), 'error');
+    return;
+  }
+  if (file.size > 500 * 1024) {
+    showToast(t('org_logo_too_large'), 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = String(reader.result || '');
+    if (dataUrl.length > 500 * 1024) {
+      showToast(t('org_logo_too_large'), 'error');
+      return;
+    }
+    state.orgLogoPendingBase64 = dataUrl;
+    renderOrgLogoPreview(dataUrl);
+  };
+  reader.onerror = () => showToast(t('org_logo_read_error'), 'error');
+  reader.readAsDataURL(file);
+}
+
+function removeOrgLogo() {
+  state.orgLogoPendingBase64 = '';   // empty string = explicit clear
+  state.orgLogoExisting = null;
+  document.getElementById('org-logo-input').value = '';
+  renderOrgLogoPreview(null);
+}
+
+async function saveOrgInfo() {
+  const overlay = document.getElementById('project-settings-overlay');
+  const projectId = parseInt(overlay?.dataset.projectId);
+  if (!projectId) return;
+  const orgEmail = document.getElementById('org-email-input').value.trim();
+  const orgPhone = document.getElementById('org-phone-input').value.trim();
+  if (orgEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(orgEmail)) {
+    showToast(t('contact_invalid_email'), 'error');
+    return;
+  }
+  // Logo: pending (string) overrides existing; null/empty pending means no change
+  const body = { org_email: orgEmail || null, org_phone: orgPhone || null };
+  if (state.orgLogoPendingBase64 !== null) {
+    body.org_logo_base64 = state.orgLogoPendingBase64 || null;
+  }
+  const btn = document.getElementById('btn-save-org-info');
+  btn.disabled = true;
+  try {
+    await api(`/api/projects/${projectId}`, { method: 'PUT', body: JSON.stringify(body) });
+    state.orgLogoPendingBase64 = null;
+    showToast(t('org_info_saved'), 'success');
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Receipt download (auth via Bearer + blob) ───────────────────────────────
+async function downloadReceipt(paymentId) {
+  try {
+    const res = await fetch(withProject(`/api/payments/${paymentId}/receipt`), {
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    // Open in new tab — mobile browsers will offer to save
+    const w = window.open(url, '_blank');
+    if (!w) {
+      // Popup blocked — fallback to anchor download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recu-${paymentId}.pdf`;
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast(e.message || t('receipt_error'), 'error');
+  }
 }
 
 async function saveProjectChanges() {
@@ -1330,11 +1459,17 @@ async function loadContactContributions(contactId) {
             </div>
           </div>
           <div class="contact-payment-amount">${formatMoney(p.amount)}</div>
+          <button class="contact-payment-receipt" data-id="${p.id}" title="${t('receipt_download')}" aria-label="${t('receipt_download')}">
+            <i data-lucide="file-text" style="width:14px;height:14px"></i>
+          </button>
           <button class="contact-payment-delete" data-id="${p.id}" aria-label="Supprimer ce paiement">
             <i data-lucide="trash-2" style="width:14px;height:14px"></i>
           </button>
         </div>
       `).join('');
+      listEl.querySelectorAll('.contact-payment-receipt').forEach(btn => {
+        btn.addEventListener('click', () => downloadReceipt(parseInt(btn.dataset.id)));
+      });
       listEl.querySelectorAll('.contact-payment-delete').forEach(btn => {
         btn.addEventListener('click', () => deletePayment(parseInt(btn.dataset.id), contactId));
       });
@@ -2946,6 +3081,14 @@ async function init() {
       applyContactsStatusFilter();
     });
   });
+
+  // ── Org info wiring (Gestion Pro étape 3) ──
+  document.getElementById('org-logo-pick')?.addEventListener('click', () => {
+    document.getElementById('org-logo-input')?.click();
+  });
+  document.getElementById('org-logo-input')?.addEventListener('change', pickOrgLogo);
+  document.getElementById('org-logo-remove')?.addEventListener('click', removeOrgLogo);
+  document.getElementById('btn-save-org-info')?.addEventListener('click', saveOrgInfo);
 
   // Wire up project bar + sheet
   document.getElementById('project-bar')?.addEventListener('click', openProjectSheet);

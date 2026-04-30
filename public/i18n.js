@@ -475,6 +475,21 @@ const I18N = {
     filter_ok:                      'À jour',
     filter_late:                    'En retard',
 
+    // Org info + receipt (Gestion Pro étape 3)
+    org_info_section:    'Informations de la structure',
+    org_email:           'Email de la structure',
+    org_phone:           'Téléphone de la structure',
+    org_logo:            'Logo',
+    org_logo_pick:       'Choisir un fichier',
+    org_logo_hint:       'Format recommandé : carré, PNG ou JPG, max 500KB',
+    org_logo_too_large:  'Logo trop volumineux (max 500 Ko)',
+    org_logo_invalid_type:'Le fichier doit être une image',
+    org_logo_read_error: 'Impossible de lire le fichier',
+    org_info_save:       'Enregistrer les informations',
+    org_info_saved:      'Informations enregistrées',
+    receipt_download:    'Télécharger le reçu',
+    receipt_error:       'Erreur lors du téléchargement du reçu',
+
     loading:               'Chargement…'
   },
 
@@ -951,6 +966,21 @@ const I18N = {
     filter_all:                     'All',
     filter_ok:                      'Up to date',
     filter_late:                    'Late',
+
+    // Org info + receipt (Gestion Pro step 3)
+    org_info_section:    'Organisation details',
+    org_email:           'Organisation email',
+    org_phone:           'Organisation phone',
+    org_logo:            'Logo',
+    org_logo_pick:       'Choose a file',
+    org_logo_hint:       'Recommended format: square, PNG or JPG, max 500KB',
+    org_logo_too_large:  'Logo too large (max 500KB)',
+    org_logo_invalid_type:'File must be an image',
+    org_logo_read_error: 'Could not read file',
+    org_info_save:       'Save organisation info',
+    org_info_saved:      'Information saved',
+    receipt_download:    'Download receipt',
+    receipt_error:       'Error downloading receipt',
 
     loading:               'Loading…'
   }

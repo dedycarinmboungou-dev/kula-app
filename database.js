@@ -153,6 +153,13 @@ db.exec(`
 const projectCols = db.prepare('PRAGMA table_info(projects)').all();
 if (!projectCols.some(c => c.name === 'total_budget'))
   db.exec("ALTER TABLE projects ADD COLUMN total_budget INTEGER NOT NULL DEFAULT 0");
+// Migration: organisation info for payment receipts (Gestion Pro étape 3)
+if (!projectCols.some(c => c.name === 'org_email'))
+  db.exec("ALTER TABLE projects ADD COLUMN org_email TEXT");
+if (!projectCols.some(c => c.name === 'org_phone'))
+  db.exec("ALTER TABLE projects ADD COLUMN org_phone TEXT");
+if (!projectCols.some(c => c.name === 'org_logo_base64'))
+  db.exec("ALTER TABLE projects ADD COLUMN org_logo_base64 TEXT");
 
 // ── Project members table ─────────────────────────────────────────────────────
 db.exec(`
@@ -717,12 +724,12 @@ const stmts = {
   `),
   getProjectById: db.prepare(`SELECT * FROM projects WHERE id = $id`),
   getOwnedProjects: db.prepare(`
-    SELECT id, name, type, owner_id, total_budget, created_at, 'owner' AS role
+    SELECT id, name, type, owner_id, total_budget, org_email, org_phone, created_at, 'owner' AS role
     FROM projects WHERE owner_id = $userId
     ORDER BY created_at ASC
   `),
   getMemberProjects: db.prepare(`
-    SELECT p.id, p.name, p.type, p.owner_id, p.total_budget, p.created_at, m.role
+    SELECT p.id, p.name, p.type, p.owner_id, p.total_budget, p.org_email, p.org_phone, p.created_at, m.role
     FROM projects p
     JOIN project_members m ON m.project_id = p.id
     WHERE m.email = $email AND m.status = 'accepted' AND p.owner_id != $userId
@@ -733,7 +740,13 @@ const stmts = {
     ORDER BY created_at ASC LIMIT 1
   `),
   updateProject: db.prepare(`
-    UPDATE projects SET name = $name, type = $type WHERE id = $id AND owner_id = $ownerId
+    UPDATE projects SET
+      name             = $name,
+      type             = $type,
+      org_email        = $orgEmail,
+      org_phone        = $orgPhone,
+      org_logo_base64  = $orgLogoBase64
+    WHERE id = $id AND owner_id = $ownerId
   `),
   deleteProject: db.prepare(`
     DELETE FROM projects WHERE id = $id AND owner_id = $ownerId AND type != 'perso'

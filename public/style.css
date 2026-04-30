@@ -5028,3 +5028,81 @@ button, a, img, .nav-item, .nav-fab,
 }
 .payment-form-modal .poche-field textarea:focus { border-color: var(--color-primary); }
 .muted { color: var(--color-text-secondary); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ORG INFO + RECEIPT (Gestion Pro étape 3)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.org-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.org-logo-preview {
+  width: 60px;
+  height: 60px;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.org-logo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.org-logo-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.org-logo-actions .btn-back-project {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.org-logo-actions .org-logo-remove {
+  width: 36px;
+  padding: 10px;
+  color: var(--color-danger);
+  border-color: var(--color-border);
+}
+.org-logo-actions .org-logo-remove:hover {
+  background: #FEF2F2;
+  border-color: var(--color-danger);
+}
+.poche-field-hint {
+  display: block;
+  margin-top: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Receipt button inside payment row */
+.contact-payment-receipt {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  width: 28px; height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.contact-payment-receipt:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
