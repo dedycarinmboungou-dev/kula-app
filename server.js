@@ -1861,6 +1861,8 @@ Ton rôle : conseiller financier personnel. Réponds aux questions, donne des co
 // CHAT (AI)
 // ═══════════════════════════════════════════════════════════════════════════════
 app.post('/api/chat', requireAuth, checkAccess, requireProjectAccess, async (req, res) => {
+  const reqId = Math.random().toString(36).slice(2, 8);
+  console.log(`[chat ${reqId}] === Request received userId=${req.userId} projectId=${req.projectId} ===`);
   try {
     const { message } = req.body;
     if (!message?.trim()) return res.status(400).json({ error: 'Message requis' });
@@ -1871,9 +1873,16 @@ app.post('/api/chat', requireAuth, checkAccess, requireProjectAccess, async (req
 
     const today = new Date().toISOString().slice(0, 10);
 
-    // ── Load conversation history from DB (last 20 messages, chronological) ──
-    const dbHistory = stmts.getChatHistory.all({ userId: req.userId, projectId: req.projectId, limit: 20 });
-    dbHistory.reverse(); // DESC → ASC
+    // ── Load conversation history from DB (last 20 messages) ─ NON-FATAL ─────
+    let dbHistory = [];
+    try {
+      dbHistory = stmts.getChatHistory.all({ userId: req.userId, projectId: req.projectId, limit: 20 });
+      dbHistory.reverse(); // DESC → ASC
+      console.log(`[chat ${reqId}] DB history loaded: ${dbHistory.length} messages`);
+    } catch (dbErr) {
+      console.error(`[chat ${reqId}] ⚠ getChatHistory failed (continuing without memory):`, dbErr.message);
+      dbHistory = [];
+    }
 
     // ── Fetch live financial context ──────────────────────────────────────────
     const currentMonth = today.slice(0, 7);
@@ -2053,8 +2062,12 @@ ${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.languag
       }
     ];
 
-    // ── Save user message to DB ───────────────────────────────────────────────
-    stmts.insertChatMessage.run({ userId: req.userId, projectId: req.projectId, role: 'user', content: message.trim() });
+    // ── Save user message to DB ─ NON-FATAL ────────────────────────────────
+    try {
+      stmts.insertChatMessage.run({ userId: req.userId, projectId: req.projectId, role: 'user', content: message.trim() });
+    } catch (dbErr) {
+      console.error(`[chat ${reqId}] ⚠ insertChatMessage(user) failed:`, dbErr.message);
+    }
 
     let goalReachedPoche = null; // set when add_to_poche reaches the goal
 
@@ -2069,7 +2082,7 @@ ${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.languag
 
     while (true) {
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1024,
         system: systemPrompt,
         tools,
@@ -2233,19 +2246,32 @@ ${userCurrency !== 'XOF' || user.language === 'en' ? `\nLANGUAGE: ${user.languag
       }
     }
 
-    // ── Save assistant response to DB ─────────────────────────────────────────
+    // ── Save assistant response to DB ─ NON-FATAL ──────────────────────────
     const assistantContent = parsed.message || raw;
     if (assistantContent) {
-      stmts.insertChatMessage.run({ userId: req.userId, projectId: req.projectId, role: 'assistant', content: String(assistantContent) });
+      try {
+        stmts.insertChatMessage.run({ userId: req.userId, projectId: req.projectId, role: 'assistant', content: String(assistantContent) });
+      } catch (dbErr) {
+        console.error(`[chat ${reqId}] ⚠ insertChatMessage(assistant) failed:`, dbErr.message);
+      }
     }
 
-    // Trim to keep only the latest 100 messages per (user, project)
-    try { stmts.trimChatMessages.run({ userId: req.userId, projectId: req.projectId }); } catch { /* silent */ }
+    // Trim to keep only the latest 100 messages per (user, project) — non-fatal
+    try {
+      stmts.trimChatMessages.run({ userId: req.userId, projectId: req.projectId });
+    } catch (dbErr) {
+      console.error(`[chat ${reqId}] ⚠ trimChatMessages failed:`, dbErr.message);
+    }
 
+    console.log(`[chat ${reqId}] ✅ Done`);
     res.json(parsed);
   } catch (err) {
-    console.error('Chat error:', err);
-    const msg = err.status === 401 ? 'Clé API invalide.' : "Erreur, réessayez.";
+    console.error(`[chat ${reqId}] ❌ Unhandled error:`, err.status, err.message, err.stack);
+    // Distinguish error types for cleaner client UX
+    let msg = "Erreur, réessayez.";
+    if (err.status === 401)                  msg = 'Clé API invalide.';
+    else if (err.status === 429)             msg = 'Trop de requêtes — réessaye dans un instant.';
+    else if (err.status === 404 || /model/i.test(err.message)) msg = 'Modèle IA indisponible.';
     res.status(500).json({ type: 'message', message: msg });
   }
 });
