@@ -5,6 +5,13 @@ const I18N = {
     // Navigation
     nav_dashboard:    'Tableau de bord',
     nav_epargne:      'Épargne',
+    nav_savings_perso:      'Épargne',
+    nav_savings_asso:       'Réserves',
+    nav_savings_event:      'Fonds',
+    nav_savings_enterprise: 'Épargne',
+    savings_title_perso:    'Mes Poches',
+    savings_title_asso:     'Réserves',
+    savings_title_event:    'Fonds',
     nav_transactions: 'Historique',
     nav_chat:         'Coach IA',
 
@@ -497,6 +504,13 @@ const I18N = {
     // Navigation
     nav_dashboard:    'Dashboard',
     nav_epargne:      'Savings',
+    nav_savings_perso:      'Savings',
+    nav_savings_asso:       'Reserves',
+    nav_savings_event:      'Funds',
+    nav_savings_enterprise: 'Savings',
+    savings_title_perso:    'My Pockets',
+    savings_title_asso:     'Reserves',
+    savings_title_event:    'Funds',
     nav_transactions: 'History',
     nav_chat:         'AI Coach',
 

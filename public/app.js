@@ -570,7 +570,8 @@ function selectProject(id) {
   state.currentProjectId = id;
   localStorage.setItem('kula_project_id', String(id));
   renderProjectBar();
-  updateContactsTabVisibility();
+  const cur = currentProject();
+  updateTabsVisibility(cur?.type || null);
   closeProjectSheet();
   // Reset project-scoped in-memory state BEFORE refreshing the active tab
   state.contacts = [];
@@ -687,10 +688,14 @@ async function openProjectSettings(projectId) {
   const danger = document.getElementById('project-settings-danger');
   if (danger) danger.style.display = (project.type === 'perso') ? 'none' : 'block';
 
-  // Show contributions tab only for asso / entreprise
+  // Show contributions tab only for asso / entreprise.
+  // Force inline-flex (the matching value of `.settings-tab` in CSS) to bypass
+  // any conflict with the inline `style="display:none"` set in HTML.
   const contribTab = document.getElementById('settings-tab-contributions');
+  const supportsContrib = project.type === 'asso' || project.type === 'entreprise';
+  console.log(`[settings] contributions tab supported=${supportsContrib} (project.type="${project.type}")`);
   if (contribTab) {
-    contribTab.style.display = (project.type === 'asso' || project.type === 'entreprise') ? '' : 'none';
+    contribTab.style.display = supportsContrib ? 'inline-flex' : 'none';
   }
   // Org info section: only asso / entreprise
   const orgSection = document.getElementById('org-info-section');
@@ -883,7 +888,7 @@ async function confirmDeleteProject() {
       state.currentProjectId = perso.id;
       localStorage.setItem('kula_project_id', String(perso.id));
       renderProjectBar();
-      updateContactsTabVisibility();
+      updateTabsVisibility(perso.type || null);
       // Refresh current tab
       if (state.currentTab === 'dashboard') loadDashboard();
       if (state.currentTab === 'transactions') loadTransactions();
@@ -960,54 +965,88 @@ function escapeHtml(s) {
 // CONTACTS — Gestion Pro (members for asso, clients for entreprise)
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Show / hide the contacts nav tab depending on current project type.
-// STRICT rule: visible ONLY for asso (label "Membres") or entreprise (label "Clients").
-// For perso and event: always hidden. If user was on contacts tab, fallback to dashboard.
+// ── Vocabulary helpers (savings label adapts per project type) ───────────────
+// perso → Épargne · asso → Réserves · event → Fonds · entreprise → Épargne
+function getSavingsNavKey(projectType) {
+  if (projectType === 'asso')        return 'nav_savings_asso';
+  if (projectType === 'event')       return 'nav_savings_event';
+  if (projectType === 'entreprise')  return 'nav_savings_enterprise';
+  return 'nav_savings_perso';
+}
+function getSavingsTitleKey(projectType) {
+  if (projectType === 'asso')  return 'savings_title_asso';
+  if (projectType === 'event') return 'savings_title_event';
+  return 'savings_title_perso';
+}
+
+// Centralised tab visibility — single source of truth for all 4 project types.
+//   perso       : dashboard, chat, savings (Épargne), transactions
+//   association : dashboard, chat, savings (Réserves), contacts (Membres), transactions
+//   event       : dashboard, chat, savings (Fonds), transactions
+//   entreprise  : dashboard, chat, savings (Épargne), contacts (Clients), transactions
+function updateTabsVisibility(projectType) {
+  console.log(`[tabs] updating visibility for projectType="${projectType}"`);
+
+  // ── 1) Contacts tab (Membres / Clients) ─────────────────────────────────
+  const navContacts    = document.getElementById('nav-contacts');
+  const navContactsLbl = document.getElementById('nav-contacts-label');
+  const isMembers = projectType === 'asso';
+  const isClients = projectType === 'entreprise';
+  const showContacts = isMembers || isClients;
+
+  if (navContacts) {
+    if (showContacts) {
+      navContacts.style.display = 'flex';
+      navContacts.removeAttribute('aria-hidden');
+      const key = isMembers ? 'nav_members' : 'nav_clients';
+      if (navContactsLbl) {
+        navContactsLbl.setAttribute('data-i18n', key);
+        navContactsLbl.textContent = t(key);
+      }
+      // Update titles + empty state in tab-contacts
+      const titleEl = document.getElementById('contacts-title');
+      const emptyEl = document.getElementById('contacts-empty-text');
+      if (titleEl) {
+        const k = isMembers ? 'contacts_title_members' : 'contacts_title_clients';
+        titleEl.setAttribute('data-i18n', k);
+        titleEl.textContent = t(k);
+      }
+      if (emptyEl) {
+        const k = isMembers ? 'no_contacts_members' : 'no_contacts_clients';
+        emptyEl.setAttribute('data-i18n', k);
+        emptyEl.textContent = t(k);
+      }
+    } else {
+      navContacts.style.display = 'none';
+      navContacts.setAttribute('aria-hidden', 'true');
+      // Auto-fallback if user was on contacts and project no longer supports it
+      if (state.currentTab === 'contacts') {
+        console.log('[tabs] auto-switching to dashboard (project no longer supports contacts)');
+        switchTab('dashboard');
+      }
+    }
+  }
+
+  // ── 2) Savings (Épargne / Réserves / Fonds) — label-only swap ──────────
+  const navSavingsLbl = document.querySelector('[data-tab="epargne"] .nav-label');
+  if (navSavingsLbl) {
+    const key = getSavingsNavKey(projectType);
+    navSavingsLbl.setAttribute('data-i18n', key);
+    navSavingsLbl.textContent = t(key);
+  }
+  // Page title in tab-epargne
+  const epargneTitleEl = document.querySelector('.epargne-title');
+  if (epargneTitleEl) {
+    const key = getSavingsTitleKey(projectType);
+    epargneTitleEl.setAttribute('data-i18n', key);
+    epargneTitleEl.textContent = t(key);
+  }
+}
+
+// Backward-compat alias — many existing callers still use the old name
 function updateContactsTabVisibility() {
   const cur = currentProject();
-  const navBtn = document.getElementById('nav-contacts');
-  const navLbl = document.getElementById('nav-contacts-label');
-  if (!navBtn) return;
-
-  const type = cur?.type || null;
-  const isProMember = type === 'asso';
-  const isProClient = type === 'entreprise';
-  const visible     = isProMember || isProClient;
-
-  console.log(`[contacts-tab] project type="${type}" visible=${visible}`);
-
-  if (!visible) {
-    navBtn.style.display = 'none';
-    // Failsafe: also hide via attribute in case display:none gets overridden
-    navBtn.setAttribute('aria-hidden', 'true');
-    // If user was on contacts tab, switch back to dashboard
-    if (state.currentTab === 'contacts') {
-      console.log('[contacts-tab] auto-switching to dashboard (project type does not allow contacts)');
-      switchTab('dashboard');
-    }
-    return;
-  }
-
-  // Force display:flex explicitly to bypass any potential inline-style overrides
-  navBtn.style.display = 'flex';
-  navBtn.removeAttribute('aria-hidden');
-
-  const labelKey = isProMember ? 'nav_members' : 'nav_clients';
-  navLbl.setAttribute('data-i18n', labelKey);
-  navLbl.textContent = t(labelKey);
-
-  const titleEl = document.getElementById('contacts-title');
-  const emptyEl = document.getElementById('contacts-empty-text');
-  if (titleEl) {
-    const k = isProMember ? 'contacts_title_members' : 'contacts_title_clients';
-    titleEl.setAttribute('data-i18n', k);
-    titleEl.textContent = t(k);
-  }
-  if (emptyEl) {
-    const k = isProMember ? 'no_contacts_members' : 'no_contacts_clients';
-    emptyEl.setAttribute('data-i18n', k);
-    emptyEl.textContent = t(k);
-  }
+  updateTabsVisibility(cur?.type || null);
 }
 
 function getContactInitials(fullName) {
@@ -3032,7 +3071,8 @@ async function init() {
 
   // Load projects FIRST so currentProjectId is set before any data fetch
   await loadProjects();
-  updateContactsTabVisibility();
+  const initialProj = currentProject();
+  updateTabsVisibility(initialProj?.type || null);
 
   // ── Contacts wiring ──
   document.getElementById('fab-add-contact')?.addEventListener('click', () => openContactForm());

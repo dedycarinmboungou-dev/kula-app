@@ -4054,12 +4054,27 @@ button, a, img, .nav-item, .nav-fab,
   border-radius: 20px 20px 0 0;
   max-width: 520px;
   padding: 20px 20px 32px;
+  /* Allow the body to scroll while the header stays stuck to the top */
+  max-height: 90vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .project-sheet .poche-modal-header,
 .project-settings-modal .poche-modal-header {
   margin-bottom: 18px;
-  padding-bottom: 0;
-  border-bottom: 0;
+  padding-bottom: 12px;
+  padding-top: 4px;
+  border-bottom: 1px solid var(--color-border);
+  /* Sticky header so close button is always reachable when scrolled */
+  position: sticky;
+  top: -20px;          /* compensate for modal's top padding */
+  background: var(--color-surface);
+  z-index: 5;
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  padding-top: 20px;
 }
 .project-sheet .poche-modal-title,
 .project-settings-modal .poche-modal-title {
