@@ -1830,7 +1830,7 @@ button, a, img, .nav-item, .nav-fab,
   transition: opacity 0.3s, transform 0.3s;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 1000;
+  z-index: 20000;       /* must be above all modals (poche-modal-overlay: 1000, cat-modal: 10001) */
   max-width: calc(100% - 32px);
   text-align: center;
 }

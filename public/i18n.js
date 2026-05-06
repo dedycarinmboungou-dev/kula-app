@@ -447,8 +447,10 @@ const I18N = {
     confirm_delete_contact:      'Supprimer le contact « {name} » ?',
 
     // Contributions (Gestion Pro étape 2)
-    settings_tab_general:           'Général',
-    settings_tab_contributions:     'Cotisations',
+    settings_tab_general:                   'Général',
+    settings_tab_contributions:             'Cotisations',
+    settings_tab_contributions_asso:        'Cotisations',
+    settings_tab_contributions_enterprise:  'Paiements',
     contribution_rule_section_title:'Règles de cotisation',
     contribution_rule_hint:         'Définis le montant et la fréquence pour chaque catégorie. Les membres seront automatiquement classés "à jour" ou "en retard" selon leurs paiements.',
     contribution_rule_save:         'Enregistrer',
@@ -946,8 +948,10 @@ const I18N = {
     confirm_delete_contact:      'Delete contact "{name}"?',
 
     // Contributions (Gestion Pro step 2)
-    settings_tab_general:           'General',
-    settings_tab_contributions:     'Contributions',
+    settings_tab_general:                   'General',
+    settings_tab_contributions:             'Contributions',
+    settings_tab_contributions_asso:        'Contributions',
+    settings_tab_contributions_enterprise:  'Payments',
     contribution_rule_section_title:'Contribution rules',
     contribution_rule_hint:         'Set the amount and frequency for each category. Members will automatically be classified as "up to date" or "late" based on their payments.',
     contribution_rule_save:         'Save',

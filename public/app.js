@@ -696,6 +696,15 @@ async function openProjectSettings(projectId) {
   console.log(`[settings] contributions tab supported=${supportsContrib} (project.type="${project.type}")`);
   if (contribTab) {
     contribTab.style.display = supportsContrib ? 'inline-flex' : 'none';
+    // Vocabulary: "Cotisations" for asso, "Paiements" for entreprise
+    const labelEl = contribTab.querySelector('span[data-i18n]');
+    if (labelEl) {
+      const key = project.type === 'entreprise'
+        ? 'settings_tab_contributions_enterprise'
+        : 'settings_tab_contributions_asso';
+      labelEl.setAttribute('data-i18n', key);
+      labelEl.textContent = t(key);
+    }
   }
   // Org info section: only asso / entreprise
   const orgSection = document.getElementById('org-info-section');
@@ -1379,20 +1388,46 @@ function renderContributionRulesPanel(projectType) {
 
 async function saveContributionRule(category) {
   const safeId = category.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-  const amount = parseInt(document.getElementById(`rule-amount-${safeId}`).value) || 0;
-  const frequency = document.getElementById(`rule-freq-${safeId}`).value;
+  const amountEl = document.getElementById(`rule-amount-${safeId}`);
+  const freqEl   = document.getElementById(`rule-freq-${safeId}`);
+  if (!amountEl || !freqEl) {
+    console.error(`[rule-save] inputs not found for category="${category}" safeId="${safeId}"`);
+    showToast('Erreur interne — règle introuvable', 'error');
+    return;
+  }
+  const amount = parseInt(amountEl.value) || 0;
+  const frequency = freqEl.value;
+  console.log(`[rule-save] category="${category}" amount=${amount} frequency=${frequency} project=${state.currentProjectId}`);
+
+  // Find the save button for this row to give visual feedback
+  const btn = document.querySelector(`.btn-rule-save[data-cat="${CSS.escape(category)}"]`);
+  const originalText = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
   try {
     const rule = await api(withProject('/api/contribution-rules'), {
       method: 'POST',
       body: JSON.stringify({ category, amount, frequency })
     });
+    console.log('[rule-save] success:', rule);
     // Update local state
     const idx = state.contributionRules.findIndex(r => r.category === category);
     if (idx >= 0) state.contributionRules[idx] = rule;
     else state.contributionRules.push(rule);
+    // Button success feedback for 2s
+    if (btn) { btn.textContent = '✓ Enregistré'; btn.style.background = 'var(--color-success)'; }
     showToast(t('contribution_rule_saved'), 'success');
+    setTimeout(() => {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = originalText || t('contribution_rule_save');
+        btn.style.background = '';
+      }
+    }, 2000);
   } catch (e) {
+    console.error('[rule-save] error:', e.message);
     showToast(e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = originalText || t('contribution_rule_save'); btn.style.background = ''; }
   }
 }
 
@@ -1486,9 +1521,14 @@ async function loadContactContributions(contactId) {
       ruleEl.innerHTML = `<span class="muted">${t('member_no_rule')}</span>`;
     }
 
+    console.log(`[contributions] contact=${contactId} payments=${payments.length} rules=${rules.length}`);
     if (!payments.length) {
       listEl.innerHTML = `<div class="contact-payments-empty">${t('member_no_payments')}</div>`;
     } else {
+      // Use inline SVGs for these buttons — Lucide CDN may not be available
+      // inside modals on slow connections or cached PWAs.
+      const ICON_RECEIPT = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`;
+      const ICON_TRASH  = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
       listEl.innerHTML = payments.map(p => `
         <div class="contact-payment-item">
           <div class="contact-payment-info">
@@ -1498,22 +1538,21 @@ async function loadContactContributions(contactId) {
             </div>
           </div>
           <div class="contact-payment-amount">${formatMoney(p.amount)}</div>
-          <button class="contact-payment-receipt" data-id="${p.id}" title="${t('receipt_download')}" aria-label="${t('receipt_download')}">
-            <i data-lucide="file-text" style="width:14px;height:14px"></i>
-          </button>
-          <button class="contact-payment-delete" data-id="${p.id}" aria-label="Supprimer ce paiement">
-            <i data-lucide="trash-2" style="width:14px;height:14px"></i>
-          </button>
+          <button class="contact-payment-receipt" data-id="${p.id}" title="${t('receipt_download')}" aria-label="${t('receipt_download')}">${ICON_RECEIPT}</button>
+          <button class="contact-payment-delete" data-id="${p.id}" aria-label="Supprimer ce paiement">${ICON_TRASH}</button>
         </div>
       `).join('');
       listEl.querySelectorAll('.contact-payment-receipt').forEach(btn => {
-        btn.addEventListener('click', () => downloadReceipt(parseInt(btn.dataset.id)));
+        btn.addEventListener('click', () => {
+          const id = parseInt(btn.dataset.id);
+          console.log(`[receipt] download triggered for paymentId=${id}`);
+          downloadReceipt(id);
+        });
       });
       listEl.querySelectorAll('.contact-payment-delete').forEach(btn => {
         btn.addEventListener('click', () => deletePayment(parseInt(btn.dataset.id), contactId));
       });
     }
-    refreshIcons();
   } catch (e) {
     ruleEl.innerHTML = `<span class="muted">${escapeHtml(e.message)}</span>`;
   }

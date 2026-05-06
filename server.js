@@ -1808,14 +1808,17 @@ app.post('/api/payments', requireAuth, requireProjectAccess, (req, res) => {
     const periodVal = period ? String(period).trim().slice(0, 32) || null : null;
     const noteVal   = note   ? String(note).trim().slice(0, 500) || null : null;
 
-    // Auto-create "Cotisation" category for this user if missing
+    // Vocabulary adapts per project type: "Cotisation" (asso) vs "Paiement client" (entreprise)
+    const catNom  = project.type === 'entreprise' ? 'Paiement client' : 'Cotisation';
+    const catLabel = project.type === 'entreprise' ? 'Paiement client' : 'Cotisation';
+    // Auto-create the income category for this user if missing
     stmts.insertCategory.run({
-      userId: req.userId, nom: 'Cotisation',
+      userId: req.userId, nom: catNom,
       icone: '💰', couleur: '#0A5C3A', type: 'income'
     });
 
     const today = new Date().toISOString().slice(0, 10);
-    const description = sanitizeForTx(`Cotisation — ${contact.full_name}`);
+    const description = sanitizeForTx(`${catLabel} — ${contact.full_name}`);
 
     // Atomic: insert transaction + payment in one DB transaction
     const result = runInTransaction(() => {
@@ -1824,7 +1827,7 @@ app.post('/api/payments', requireAuth, requireProjectAccess, (req, res) => {
         projectId:    req.projectId,
         type:         'income',
         amount:       amt,
-        category:     'Cotisation',
+        category:     catNom,
         description,
         date:         today,
         justificatif: null
